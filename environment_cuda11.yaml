@@ -1,0 +1,15 @@
+name: raftstereo
+dependencies:
+  - python=3.8
+  # - pytorch=1.11.0
+  # - cudatoolkit=11.3
+  - torchvision
+  - matplotlib
+  # - tensorboard
+  - scipy
+  - opencv
+  - tqdm
+  - opt_einsum
+  - imageio
+  - scikit-image
+  - p7zip
