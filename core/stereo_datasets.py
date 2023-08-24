@@ -137,7 +137,7 @@ class SceneFlowDatasets(StereoDataset):
         """ Add FlyingThings3D data """
 
         original_length = len(self.disparity_list)
-        root = osp.join(self.root, 'FlyingThings3D')
+        root = osp.join(self.root, 'flyingthings3d')
         left_images = sorted( glob(osp.join(root, self.dstype, split, '*/*/left/*.png')) )
         right_images = [ im.replace('left', 'right') for im in left_images ]
         disparity_images = [ im.replace(self.dstype, 'disparity').replace('.png', '.pfm') for im in left_images ]
@@ -158,7 +158,7 @@ class SceneFlowDatasets(StereoDataset):
         """ Add FlyingThings3D data """
 
         original_length = len(self.disparity_list)
-        root = osp.join(self.root, 'Monkaa')
+        root = osp.join(self.root, 'monkaa')
         left_images = sorted( glob(osp.join(root, self.dstype, '*/left/*.png')) )
         right_images = [ image_file.replace('left', 'right') for image_file in left_images ]
         disparity_images = [ im.replace(self.dstype, 'disparity').replace('.png', '.pfm') for im in left_images ]
@@ -173,7 +173,7 @@ class SceneFlowDatasets(StereoDataset):
         """ Add FlyingThings3D data """
 
         original_length = len(self.disparity_list)
-        root = osp.join(self.root, 'Driving')
+        root = osp.join(self.root, 'driving')
         left_images = sorted( glob(osp.join(root, self.dstype, '*/*/*/left/*.png')) )
         right_images = [ image_file.replace('left', 'right') for image_file in left_images ]
         disparity_images = [ im.replace(self.dstype, 'disparity').replace('.png', '.pfm') for im in left_images ]
@@ -270,7 +270,7 @@ class Middlebury(StereoDataset):
                     self.disparity_list += [ str(scene / "disp0.pfm") ]
         else:
             lines = list(map(osp.basename, glob(os.path.join(root, "MiddEval3/trainingF/*"))))
-            lines = list(filter(lambda p: any(s in p.split('/') for s in Path(os.path.join(root, "MiddEval3/official_train.txt")).read_text().splitlines()), lines))
+            # lines = list(filter(lambda p: any(s in p.split('/') for s in Path(os.path.join(root, "MiddEval3/official_train.txt")).read_text().splitlines()), lines))
             image1_list = sorted([os.path.join(root, "MiddEval3", f'training{split}', f'{name}/im0.png') for name in lines])
             image2_list = sorted([os.path.join(root, "MiddEval3", f'training{split}', f'{name}/im1.png') for name in lines])
             disp_list = sorted([os.path.join(root, "MiddEval3", f'training{split}', f'{name}/disp0GT.pfm') for name in lines])

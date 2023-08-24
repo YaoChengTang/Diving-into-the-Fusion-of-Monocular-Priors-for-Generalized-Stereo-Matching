@@ -16,11 +16,11 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 @torch.no_grad()
-def validate_eth3d(model, iters=32, mixed_prec=False):
+def validate_eth3d(model, iters=32, root="", mixed_prec=False):
     """ Peform validation using the ETH3D (train) split """
     model.eval()
     aug_params = {}
-    val_dataset = datasets.ETH3D(aug_params)
+    val_dataset = datasets.ETH3D(aug_params, root=root)
 
     out_list, epe_list = [], []
     for val_id in range(len(val_dataset)):
@@ -57,11 +57,11 @@ def validate_eth3d(model, iters=32, mixed_prec=False):
 
 
 @torch.no_grad()
-def validate_kitti(model, iters=32, mixed_prec=False):
+def validate_kitti(model, iters=32, root="", mixed_prec=False):
     """ Peform validation using the KITTI-2015 (train) split """
     model.eval()
     aug_params = {}
-    val_dataset = datasets.KITTI(aug_params, image_set='training')
+    val_dataset = datasets.KITTI(aug_params, root=root, image_set='training')
     torch.backends.cudnn.benchmark = True
 
     out_list, epe_list, elapsed_list = [], [], []
@@ -109,10 +109,10 @@ def validate_kitti(model, iters=32, mixed_prec=False):
 
 
 @torch.no_grad()
-def validate_things(model, iters=32, mixed_prec=False):
+def validate_things(model, iters=32, root='', mixed_prec=False):
     """ Peform validation using the FlyingThings3D (TEST) split """
     model.eval()
-    val_dataset = datasets.SceneFlowDatasets(dstype='frames_finalpass', things_test=True)
+    val_dataset = datasets.SceneFlowDatasets(dstype='frames_finalpass', root=root, things_test=True)
 
     out_list, epe_list = [], []
     for val_id in tqdm(range(len(val_dataset))):
@@ -147,11 +147,11 @@ def validate_things(model, iters=32, mixed_prec=False):
 
 
 @torch.no_grad()
-def validate_middlebury(model, iters=32, split='F', mixed_prec=False):
+def validate_middlebury(model, iters=32, split='F', root="", mixed_prec=False):
     """ Peform validation using the Middlebury-V3 dataset """
     model.eval()
     aug_params = {}
-    val_dataset = datasets.Middlebury(aug_params, split=split)
+    val_dataset = datasets.Middlebury(aug_params, root=root, split=split)
 
     out_list, epe_list = [], []
     for val_id in range(len(val_dataset)):
@@ -191,6 +191,7 @@ def validate_middlebury(model, iters=32, split='F', mixed_prec=False):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--root', help="dataset root", default=None)
     parser.add_argument('--restore_ckpt', help="restore checkpoint", default=None)
     parser.add_argument('--dataset', help="dataset for evaluation", required=True, choices=["eth3d", "kitti", "things"] + [f"middlebury_{s}" for s in 'FHQ'])
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
@@ -231,13 +232,13 @@ if __name__ == '__main__':
     use_mixed_precision = args.corr_implementation.endswith("_cuda")
 
     if args.dataset == 'eth3d':
-        validate_eth3d(model, iters=args.valid_iters, mixed_prec=use_mixed_precision)
+        validate_eth3d(model, iters=args.valid_iters, root=args.root, mixed_prec=use_mixed_precision)
 
     elif args.dataset == 'kitti':
-        validate_kitti(model, iters=args.valid_iters, mixed_prec=use_mixed_precision)
+        validate_kitti(model, iters=args.valid_iters, root=args.root, mixed_prec=use_mixed_precision)
 
     elif args.dataset in [f"middlebury_{s}" for s in 'FHQ']:
-        validate_middlebury(model, iters=args.valid_iters, split=args.dataset[-1], mixed_prec=use_mixed_precision)
+        validate_middlebury(model, iters=args.valid_iters, root=args.root, split=args.dataset[-1], mixed_prec=use_mixed_precision)
 
     elif args.dataset == 'things':
-        validate_things(model, iters=args.valid_iters, mixed_prec=use_mixed_precision)
+        validate_things(model, iters=args.valid_iters, root=args.root, mixed_prec=use_mixed_precision)
