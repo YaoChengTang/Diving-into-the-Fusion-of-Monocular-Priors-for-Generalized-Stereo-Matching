@@ -50,6 +50,16 @@ def validate_eth3d(model, iters=32, root="", sv_root="", mixed_prec=False):
 
         # save prediction and the corresponding path for visualization
         viser.save_pred_vis(-flow_pr.data.numpy()[0], imageGT_file)
+        image1 = padder.unpad(image1).cpu().squeeze(0)
+        image2 = padder.unpad(image2).cpu().squeeze(0)
+        info   = "epe:{:.2f}, 1px:{:.1f}".format(image_epe, image_out*100)
+        viser.analyze(-flow_pr.data.numpy()[0], 
+                      image1.data.numpy(), 
+                      image2.data.numpy(), 
+                      -flow_gt.data.numpy()[0], 
+                      valid_gt.data.numpy(),
+                      imageGT_file,
+                      info)
 
     epe_list = np.array(epe_list)
     out_list = np.array(out_list)
@@ -104,6 +114,17 @@ def validate_kitti(model, iters=32, root="", sv_root="", mixed_prec=False):
 
         # save prediction and the corresponding path for visualization
         viser.save_pred_vis(-flow_pr.data.numpy()[0], imageGT_file)
+        image1 = padder.unpad(image1).cpu().squeeze(0)
+        image2 = padder.unpad(image2).cpu().squeeze(0)
+        info   = "epe:{:.2f}, 3px:{:.1f}".format(image_epe, image_out*100)
+        viser.analyze(-flow_pr.data.numpy()[0], 
+                      image1.data.numpy(), 
+                      image2.data.numpy(), 
+                      -flow_gt.data.numpy()[0], 
+                      valid_gt.data.numpy(),
+                      imageGT_file,
+                      info)
+        break
 
     epe_list = np.array(epe_list)
     out_list = np.concatenate(out_list)

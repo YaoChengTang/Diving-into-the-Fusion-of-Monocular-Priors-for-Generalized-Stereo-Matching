@@ -143,9 +143,10 @@ class Visualizer:
         self.sv_root = sv_root.rstrip("/")
         self.dataset = dataset
         self.scratch = scratch
-        self.sv_root = self.sv_root if self.sv_root[-len(self.dataset):]==self.dataset else os.path.join(self.sv_root, self.dataset)
-        self.vis_root = os.path.join(self.sv_root, "analysis")
-        print("saving to {}".format(self.sv_root))
+        self.sv_root = self.sv_root if self.sv_root[-(1+len(self.dataset)):]=="/"+self.dataset \
+                       else os.path.join(self.sv_root, self.dataset)
+        self.vis_root = self.sv_root.replace(self.dataset, os.path.join("analysis", self.dataset))
+        print("saving prediction to {}, visualization to {}".format(self.sv_root, self.vis_root))
 
     def save_pred_vis(self, flow_pr, imageGT_file):
         assert self.root in imageGT_file, "{} not in {}".format(self.root, imageGT_file)
@@ -192,6 +193,7 @@ class Visualizer:
         image1 = np.transpose(image1, (1,2,0)).astype(np.uint8)
         image2 = np.transpose(image2, (1,2,0)).astype(np.uint8)
         error_map = np.abs(flow_pr-flow_gt)
+        error_map[np.isinf(flow_gt)|np.isnan(flow_gt)|(flow_gt==0)] = 0
         colored_error_map = colorize_error_map(error_map)
         show_imgs([{"img":image1, "title":"Left Image", },
                    {"img":image2, "title":"Right Image", },
