@@ -190,7 +190,7 @@ class ETH3D(StereoDataset):
 
         image1_list = sorted( glob(osp.join(root, f'two_view_{split}/*/im0.png')) )
         image2_list = sorted( glob(osp.join(root, f'two_view_{split}/*/im1.png')) )
-        disp_list = sorted( glob(osp.join(root, 'two_view_training_gt/*/disp0GT.pfm')) ) if split == 'training' else [osp.join(root, 'two_view_training_gt/playground_1l/disp0GT.pfm')]*len(image1_list)
+        disp_list = sorted( glob(osp.join(root, 'two_view_training/*/disp0GT.pfm')) ) if split == 'training' else [osp.join(root, 'two_view_training_gt/playground_1l/disp0GT.pfm')]*len(image1_list)
 
         for img1, img2, disp in zip(image1_list, image2_list, disp_list):
             self.image_list += [ [img1, img2] ]

@@ -126,6 +126,11 @@ def readDispKITTI(filename):
     valid = disp > 0.0
     return disp, valid
 
+def writeDispKITTI(filename, disp):
+    disp = np.round(disp * 256).astype(np.uint16)
+    # skimage.io.imsave(filename, disp)
+    cv2.imwrite(filename, disp)
+
 # Method taken from /n/fs/raft-depth/RAFT-Stereo/datasets/SintelStereo/sdk/python/sintel_io.py
 def readDispSintelStereo(file_name):
     a = np.array(Image.open(file_name))
@@ -167,6 +172,9 @@ def readDispMiddlebury(file_name):
         valid = disp < 1e3
         return disp, valid
 
+def writeDispMiddlebury(file_name, disp):
+    writePFM(file_name, disp)
+
 def writeFlowKITTI(filename, uv):
     uv = 64.0 * uv + 2**15
     valid = np.ones([uv.shape[0], uv.shape[1], 1])
@@ -189,3 +197,16 @@ def read_gen(file_name, pil=False):
         else:
             return flow[:, :, :-1]
     return []
+
+def write_gen(file_name, disp, pil=False):
+    ext = splitext(file_name)[-1]
+    if ext == '.png' or ext == '.jpeg' or ext == '.ppm' or ext == '.jpg':
+        raise Exception("no support for {} file".format(ext))
+    elif ext == '.bin' or ext == '.raw':
+        np.save(disp, file_name)
+    elif ext == '.flo':
+        writeFlow(file_name, disp)
+    elif ext == '.pfm':
+        writePFM(file_name, disp)
+    else:
+        raise Exception("no support for {} file".format(ext))
