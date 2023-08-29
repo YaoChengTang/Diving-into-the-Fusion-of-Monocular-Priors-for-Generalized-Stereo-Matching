@@ -213,6 +213,7 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--ouput_root', default='~/output', help="directory used to save log and checkpoints")
     parser.add_argument('--name', default='raft-stereo', help="name your experiment")
     parser.add_argument('--restore_ckpt', help="restore checkpoint")
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
