@@ -298,6 +298,6 @@ if __name__ == '__main__':
 
     elif args.dataset == 'things':
         if args.root is None:
-            args.root = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/KITTI2015"
+            args.root = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/Sceneflow"
         validate_things(model, iters=args.valid_iters, root=args.root, 
                         sv_root=args.sv_root, mixed_prec=use_mixed_precision)
