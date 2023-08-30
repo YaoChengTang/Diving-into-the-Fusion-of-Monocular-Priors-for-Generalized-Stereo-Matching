@@ -122,10 +122,11 @@ class StereoDataset(data.Dataset):
 
 
 class SceneFlowDatasets(StereoDataset):
-    def __init__(self, aug_params=None, root='', dstype='frames_cleanpass', things_test=False):
+    def __init__(self, aug_params=None, root='', dstype='frames_cleanpass', things_test=False, caching=False):
         super(SceneFlowDatasets, self).__init__(aug_params)
         self.root = root if len(root)>0 else DATASET_ROOT
         self.dstype = dstype
+        self.caching = caching
 
         if things_test:
             self._add_things("TEST")
@@ -139,7 +140,7 @@ class SceneFlowDatasets(StereoDataset):
 
         original_length = len(self.disparity_list)
         cache_file = osp.join(self.root, 'flyingthings3d'+"-"+self.dstype+"-"+split+".npz")
-        if os.path.exists(cache_file):
+        if self.caching and os.path.exists(cache_file):
             cache = np.load(cache_file)
             root = cache["root"]
             left_images = cache["left_images"]
@@ -150,11 +151,12 @@ class SceneFlowDatasets(StereoDataset):
             left_images = sorted( glob(osp.join(root, self.dstype, split, '*/*/left/*.png')) )
             right_images = [ im.replace('left', 'right') for im in left_images ]
             disparity_images = [ im.replace(self.dstype, 'disparity').replace('.png', '.pfm') for im in left_images ]
-            np.savez(cache_file, 
-                     root=root,
-                     left_images=left_images, 
-                     right_images=right_images, 
-                     disparity_images=disparity_images)
+            if self.caching :
+                np.savez(cache_file, 
+                        root=root,
+                        left_images=left_images, 
+                        right_images=right_images, 
+                        disparity_images=disparity_images)
 
         # Choose a random subset of 400 images for validation
         state = np.random.get_state()

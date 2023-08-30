@@ -1,6 +1,7 @@
 pretrained
 commits.bundle
-runs
-checkpoints
+runs/
+checkpoints/
+logs/
 
 *.pyc

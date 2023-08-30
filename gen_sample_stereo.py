@@ -124,7 +124,6 @@ def validate_kitti(model, iters=32, root="", sv_root="", mixed_prec=False):
                       valid_gt.data.numpy(),
                       imageGT_file,
                       info)
-        break
 
     epe_list = np.array(epe_list)
     out_list = np.concatenate(out_list)

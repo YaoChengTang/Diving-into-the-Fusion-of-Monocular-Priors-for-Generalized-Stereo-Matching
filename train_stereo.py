@@ -1,10 +1,13 @@
 from __future__ import print_function, division
 
+import os
+import sys
 import argparse
 import logging
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
+from datetime import datetime
 
 from torch.utils.tensorboard import SummaryWriter
 import torch
@@ -30,6 +33,13 @@ except:
             optimizer.step()
         def update(self):
             pass
+
+LOG_ROOT     = os.getenv('LOG_ROOT', default="")
+TB_ROOT      = os.getenv('TB_ROOT', default="")
+CKPOINT_ROOT = os.getenv('CKPOINT_ROOT', default="")
+logging.basicConfig(filename=os.path.join("logs" if LOG_ROOT is None or len(LOG_ROOT)==0 else LOG_ROOT, 
+                                'log-{}.log'.format(datetime.now().strftime("%y%m%d_%H%M%S"))), 
+                    level=logging.INFO)
 
 
 def sequence_loss(flow_preds, flow_gt, valid, loss_gamma=0.9, max_flow=700):
@@ -88,7 +98,7 @@ class Logger:
         self.scheduler = scheduler
         self.total_steps = 0
         self.running_loss = {}
-        self.writer = SummaryWriter(log_dir='runs')
+        self.writer = SummaryWriter(log_dir='runs' if TB_ROOT is None or len(TB_ROOT)==0 else TB_ROOT)
 
     def _print_training_status(self):
         metrics_data = [self.running_loss[k]/Logger.SUM_FREQ for k in sorted(self.running_loss.keys())]
@@ -99,7 +109,7 @@ class Logger:
         logging.info(f"Training Metrics ({self.total_steps}): {training_str + metrics_str}")
 
         if self.writer is None:
-            self.writer = SummaryWriter(log_dir='runs')
+            self.writer = SummaryWriter(log_dir='runs' if TB_ROOT is None or len(TB_ROOT)==0 else TB_ROOT)
 
         for k in self.running_loss:
             self.writer.add_scalar(k, self.running_loss[k]/Logger.SUM_FREQ, self.total_steps)
@@ -120,7 +130,7 @@ class Logger:
 
     def write_dict(self, results):
         if self.writer is None:
-            self.writer = SummaryWriter(log_dir='runs')
+            self.writer = SummaryWriter(log_dir='runs' if TB_ROOT is None or len(TB_ROOT)==0 else TB_ROOT)
 
         for key in results:
             self.writer.add_scalar(key, results[key], self.total_steps)
@@ -181,7 +191,9 @@ def train(args):
             logger.push(metrics)
 
             if total_steps % validation_frequency == validation_frequency - 1:
-                save_path = Path('checkpoints/%d_%s.pth' % (total_steps + 1, args.name))
+                if not os.path.exists( os.path.join(CKPOINT_ROOT, 'checkpoints') ):
+                    os.makedirs( os.path.join(CKPOINT_ROOT, 'checkpoints') )
+                save_path = Path( os.path.join(CKPOINT_ROOT, 'checkpoints/%d_%s.pth' % (total_steps + 1, args.name)) )
                 logging.info(f"Saving file {save_path.absolute()}")
                 torch.save(model.state_dict(), save_path)
 
@@ -199,13 +211,18 @@ def train(args):
                 break
 
         if len(train_loader) >= 10000:
-            save_path = Path('checkpoints/%d_epoch_%s.pth.gz' % (total_steps + 1, args.name))
+            if not os.path.exists( os.path.join(CKPOINT_ROOT, 'checkpoints') ):
+                os.makedirs( os.path.join(CKPOINT_ROOT, 'checkpoints') )
+            save_path = Path( os.path.join(CKPOINT_ROOT, 'checkpoints/%d_epoch_%s.pth.gz' % (total_steps + 1, args.name)) )
             logging.info(f"Saving file {save_path}")
             torch.save(model.state_dict(), save_path)
 
     print("FINISHED TRAINING")
     logger.close()
-    PATH = 'checkpoints/%s.pth' % args.name
+
+    if not os.path.exists( os.path.join(CKPOINT_ROOT, 'checkpoints') ):
+        os.makedirs( os.path.join(CKPOINT_ROOT, 'checkpoints') )
+    PATH = os.path.join(CKPOINT_ROOT, 'checkpoints/%s.pth' % args.name)
     torch.save(model.state_dict(), PATH)
 
     return PATH
@@ -213,7 +230,6 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ouput_root', default='~/output', help="directory used to save log and checkpoints")
     parser.add_argument('--name', default='raft-stereo', help="name your experiment")
     parser.add_argument('--restore_ckpt', help="restore checkpoint")
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
