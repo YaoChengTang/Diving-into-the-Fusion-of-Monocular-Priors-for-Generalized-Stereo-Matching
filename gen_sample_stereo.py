@@ -34,16 +34,26 @@ def validate_eth3d(model, iters=32, root="", sv_root="", mixed_prec=False):
         image1, image2 = padder.pad(image1, image2)
 
         with autocast(enabled=mixed_prec):
-            _, flow_pr = model(image1, image2, iters=iters, test_mode=True)
-        flow_pr = padder.unpad(flow_pr.float()).cpu().squeeze(0)
-        assert flow_pr.shape == flow_gt.shape, (flow_pr.shape, flow_gt.shape)
-        epe = torch.sum((flow_pr - flow_gt)**2, dim=0).sqrt()
+            flow_pr_sequence = model(image1, image2, iters=iters, test_mode=False, vis_mode=True)
+        
+        vis_epe_sequence = []
+        vis_xpx_sequence = []
+        for idx, flow_pr in enumerate(flow_pr_sequence):
+            flow_pr = padder.unpad(flow_pr.float()).cpu().squeeze(0)
+            flow_pr_sequence[idx] = flow_pr
 
-        epe_flattened = epe.flatten()
-        val = valid_gt.flatten() >= 0.5
-        out = (epe_flattened > 1.0)
-        image_out = out[val].float().mean().item()
-        image_epe = epe_flattened[val].mean().item()
+            assert flow_pr.shape == flow_gt.shape, (flow_pr.shape, flow_gt.shape)
+            epe = torch.sum((flow_pr - flow_gt)**2, dim=0).sqrt()
+
+            epe_flattened = epe.flatten()
+            val = valid_gt.flatten() >= 0.5
+            out = (epe_flattened > 1.0)
+            image_out = out[val].float().mean().item()
+            image_epe = epe_flattened[val].mean().item()
+
+            vis_epe_sequence.append(image_epe)
+            vis_xpx_sequence.append(image_out)
+
         logging.info(f"ETH3D {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}")
         epe_list.append(image_epe)
         out_list.append(image_out)
@@ -52,15 +62,15 @@ def validate_eth3d(model, iters=32, root="", sv_root="", mixed_prec=False):
         viser.save_pred_vis(-flow_pr.data.numpy()[0], imageGT_file)
         image1 = padder.unpad(image1).cpu().squeeze(0)
         image2 = padder.unpad(image2).cpu().squeeze(0)
-        info   = "epe:{:.2f}, 1px:{:.1f}".format(image_epe, image_out*100)
-        viser.analyze(-flow_pr.data.numpy()[0], 
+        viser.analyze([-flow_pr.data.numpy()[0] for flow_pr in flow_pr_sequence], 
                       image1.data.numpy(), 
                       image2.data.numpy(), 
                       -flow_gt.data.numpy()[0], 
                       valid_gt.data.numpy(),
                       imageGT_file,
-                      info)
-
+                      vis_epe_sequence,
+                      vis_xpx_sequence)
+    
     epe_list = np.array(epe_list)
     out_list = np.array(out_list)
 
@@ -91,22 +101,31 @@ def validate_kitti(model, iters=32, root="", sv_root="", mixed_prec=False):
 
         with autocast(enabled=mixed_prec):
             start = time.time()
-            _, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+            flow_pr_sequence = model(image1, image2, iters=iters, test_mode=False, vis_mode=True)
             end = time.time()
+        
+        vis_epe_sequence = []
+        vis_xpx_sequence = []
+        for idx, flow_pr in enumerate(flow_pr_sequence):
 
-        if val_id > 50:
-            elapsed_list.append(end-start)
-        flow_pr = padder.unpad(flow_pr).cpu().squeeze(0)
+            if val_id > 50:
+                elapsed_list.append(end-start)
+            flow_pr = padder.unpad(flow_pr).cpu().squeeze(0)
+            flow_pr_sequence[idx] = flow_pr
 
-        assert flow_pr.shape == flow_gt.shape, (flow_pr.shape, flow_gt.shape)
-        epe = torch.sum((flow_pr - flow_gt)**2, dim=0).sqrt()
+            assert flow_pr.shape == flow_gt.shape, (flow_pr.shape, flow_gt.shape)
+            epe = torch.sum((flow_pr - flow_gt)**2, dim=0).sqrt()
 
-        epe_flattened = epe.flatten()
-        val = valid_gt.flatten() >= 0.5
+            epe_flattened = epe.flatten()
+            val = valid_gt.flatten() >= 0.5
 
-        out = (epe_flattened > 3.0)
-        image_out = out[val].float().mean().item()
-        image_epe = epe_flattened[val].mean().item()
+            out = (epe_flattened > 3.0)
+            image_out = out[val].float().mean().item()
+            image_epe = epe_flattened[val].mean().item()
+
+            vis_epe_sequence.append(image_epe)
+            vis_xpx_sequence.append(image_out)
+            
         if val_id < 9 or (val_id+1)%10 == 0:
             logging.info(f"KITTI Iter {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}. Runtime: {format(end-start, '.3f')}s ({format(1/(end-start), '.2f')}-FPS)")
         epe_list.append(epe_flattened[val].mean().item())
@@ -116,15 +135,15 @@ def validate_kitti(model, iters=32, root="", sv_root="", mixed_prec=False):
         viser.save_pred_vis(-flow_pr.data.numpy()[0], imageGT_file)
         image1 = padder.unpad(image1).cpu().squeeze(0)
         image2 = padder.unpad(image2).cpu().squeeze(0)
-        info   = "epe:{:.2f}, 3px:{:.1f}".format(image_epe, image_out*100)
-        viser.analyze(-flow_pr.data.numpy()[0], 
+        viser.analyze([-flow_pr.data.numpy()[0] for flow_pr in flow_pr_sequence], 
                       image1.data.numpy(), 
                       image2.data.numpy(), 
                       -flow_gt.data.numpy()[0], 
                       valid_gt.data.numpy(),
                       imageGT_file,
-                      info)
-
+                      vis_epe_sequence,
+                      vis_xpx_sequence)
+    
     epe_list = np.array(epe_list)
     out_list = np.concatenate(out_list)
 
@@ -193,18 +212,27 @@ def validate_middlebury(model, iters=32, split='F', root="", sv_root="", mixed_p
         image1, image2 = padder.pad(image1, image2)
 
         with autocast(enabled=mixed_prec):
-            _, flow_pr = model(image1, image2, iters=iters, test_mode=True)
-        flow_pr = padder.unpad(flow_pr).cpu().squeeze(0)
+            flow_pr_sequence = model(image1, image2, iters=iters, test_mode=False, vis_mode=True)
 
-        assert flow_pr.shape == flow_gt.shape, (flow_pr.shape, flow_gt.shape)
-        epe = torch.sum((flow_pr - flow_gt)**2, dim=0).sqrt()
+        vis_epe_sequence = []
+        vis_xpx_sequence = []
+        for idx, flow_pr in enumerate(flow_pr_sequence):
+            flow_pr = padder.unpad(flow_pr).cpu().squeeze(0)
+            flow_pr_sequence[idx] = flow_pr
 
-        epe_flattened = epe.flatten()
-        val = (valid_gt.reshape(-1) >= -0.5) & (flow_gt[0].reshape(-1) > -1000)
+            assert flow_pr.shape == flow_gt.shape, (flow_pr.shape, flow_gt.shape)
+            epe = torch.sum((flow_pr - flow_gt)**2, dim=0).sqrt()
 
-        out = (epe_flattened > 2.0)
-        image_out = out[val].float().mean().item()
-        image_epe = epe_flattened[val].mean().item()
+            epe_flattened = epe.flatten()
+            val = (valid_gt.reshape(-1) >= -0.5) & (flow_gt[0].reshape(-1) > -1000)
+
+            out = (epe_flattened > 2.0)
+            image_out = out[val].float().mean().item()
+            image_epe = epe_flattened[val].mean().item()
+
+            vis_epe_sequence.append(image_epe)
+            vis_xpx_sequence.append(image_out)
+            
         logging.info(f"Middlebury Iter {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}")
         epe_list.append(image_epe)
         out_list.append(image_out)
@@ -213,14 +241,14 @@ def validate_middlebury(model, iters=32, split='F', root="", sv_root="", mixed_p
         viser.save_pred_vis(-flow_pr.data.numpy()[0], imageGT_file)
         image1 = padder.unpad(image1).cpu().squeeze(0)
         image2 = padder.unpad(image2).cpu().squeeze(0)
-        info   = "epe:{:.2f}, 2px:{:.1f}".format(image_epe, image_out*100)
-        viser.analyze(-flow_pr.data.numpy()[0], 
+        viser.analyze([-flow_pr.data.numpy()[0] for flow_pr in flow_pr_sequence], 
                       image1.data.numpy(), 
                       image2.data.numpy(), 
                       -flow_gt.data.numpy()[0], 
                       valid_gt.data.numpy(),
                       imageGT_file,
-                      info)
+                      vis_epe_sequence,
+                      vis_xpx_sequence)
 
     epe_list = np.array(epe_list)
     out_list = np.array(out_list)
