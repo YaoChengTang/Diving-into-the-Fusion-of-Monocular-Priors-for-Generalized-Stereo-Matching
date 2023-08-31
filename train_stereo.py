@@ -2,21 +2,22 @@ from __future__ import print_function, division
 
 import os
 import sys
-import argparse
 import logging
+import argparse
 import numpy as np
-from pathlib import Path
 from tqdm import tqdm
+from pathlib import Path
 from datetime import datetime
 
-from torch.utils.tensorboard import SummaryWriter
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from core.raft_stereo import RAFTStereo
+from torch.utils.tensorboard import SummaryWriter
 
 from evaluate_stereo import *
-import core.stereo_datasets as datasets
+from core.raft_stereo import RAFTStereo
+from core.stereo_datasets import fetch_dataloader
+from core.utils.ddp import ddp_init, ddp_close, get_model_ddp
 
 try:
     from torch.cuda.amp import GradScaler
@@ -39,7 +40,8 @@ TB_ROOT      = os.getenv('TB_ROOT', default="")
 CKPOINT_ROOT = os.getenv('CKPOINT_ROOT', default="")
 logging.basicConfig(filename=os.path.join("logs" if LOG_ROOT is None or len(LOG_ROOT)==0 else LOG_ROOT, 
                                 'log-{}.log'.format(datetime.now().strftime("%y%m%d_%H%M%S"))), 
-                    level=logging.INFO)
+                    level=logging.INFO,
+                    format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
 
 
 def sequence_loss(flow_preds, flow_gt, valid, loss_gamma=0.9, max_flow=700):
@@ -141,20 +143,13 @@ class Logger:
 
 def train(args):
 
-    model = nn.DataParallel(RAFTStereo(args))
+    model = get_model_ddp(args)
     print("Parameter Count: %d" % count_parameters(model))
 
-    train_loader = datasets.fetch_dataloader(args)
+    train_loader = fetch_dataloader(args)
     optimizer, scheduler = fetch_optimizer(args, model)
-    total_steps = 0
-    logger = Logger(model, scheduler)
-
-    if args.restore_ckpt is not None:
-        assert args.restore_ckpt.endswith(".pth")
-        logging.info("Loading checkpoint...")
-        checkpoint = torch.load(args.restore_ckpt)
-        model.load_state_dict(checkpoint, strict=True)
-        logging.info(f"Done loading checkpoint")
+    if args.local_rank==0:
+        logger = Logger(model, scheduler)
 
     model.cuda()
     model.train()
@@ -164,11 +159,12 @@ def train(args):
 
     scaler = GradScaler(enabled=args.mixed_precision)
 
+    total_steps = 0
     should_keep_training = True
     global_batch_num = 0
     while should_keep_training:
-
-        for i_batch, (_, *data_blob) in enumerate(tqdm(train_loader)):
+        
+        for i_batch, (_, *data_blob) in enumerate(tqdm(train_loader, disable=args.local_rank>0)):
             optimizer.zero_grad()
             image1, image2, flow, valid = [x.cuda() for x in data_blob]
 
@@ -177,8 +173,11 @@ def train(args):
             assert model.training
 
             loss, metrics = sequence_loss(flow_predictions, flow, valid)
-            logger.writer.add_scalar("live_loss", loss.item(), global_batch_num)
-            logger.writer.add_scalar(f'learning_rate', optimizer.param_groups[0]['lr'], global_batch_num)
+            if args.local_rank==0:
+                logger.push(metrics)
+                logger.writer.add_scalar("live_loss", loss.item(), global_batch_num)
+                logger.writer.add_scalar(f'learning_rate', optimizer.param_groups[0]['lr'], global_batch_num)
+            
             global_batch_num += 1
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
@@ -188,44 +187,45 @@ def train(args):
             scheduler.step()
             scaler.update()
 
-            logger.push(metrics)
-
             if total_steps % validation_frequency == validation_frequency - 1:
-                if not os.path.exists( os.path.join(CKPOINT_ROOT, 'checkpoints') ):
-                    os.makedirs( os.path.join(CKPOINT_ROOT, 'checkpoints') )
-                save_path = Path( os.path.join(CKPOINT_ROOT, 'checkpoints/%d_%s.pth' % (total_steps + 1, args.name)) )
-                logging.info(f"Saving file {save_path.absolute()}")
-                torch.save(model.state_dict(), save_path)
+                if args.local_rank==0:
+                    save_path = os.path.join(CKPOINT_ROOT, 
+                                    'checkpoints/%d_%s.pth' % (total_steps + 1, args.name))
+                    logging.info(f"Saving file {save_path}")
+                    torch.save(model.state_dict(), save_path)
 
                 results = validate_things(model.module, iters=args.valid_iters)
 
-                logger.write_dict(results)
+                if args.local_rank==0:
+                    logger.write_dict(results)
 
                 model.train()
                 model.module.freeze_bn()
 
             total_steps += 1
-
             if total_steps > args.num_steps:
                 should_keep_training = False
                 break
 
-        if len(train_loader) >= 10000:
-            if not os.path.exists( os.path.join(CKPOINT_ROOT, 'checkpoints') ):
-                os.makedirs( os.path.join(CKPOINT_ROOT, 'checkpoints') )
-            save_path = Path( os.path.join(CKPOINT_ROOT, 'checkpoints/%d_epoch_%s.pth.gz' % (total_steps + 1, args.name)) )
+        if args.local_rank==0 and len(train_loader) >= 10000:
+            save_path = os.path.join(CKPOINT_ROOT, 
+                            'checkpoints/%d_epoch_%s.pth.gz' % (total_steps + 1, args.name))
             logging.info(f"Saving file {save_path}")
             torch.save(model.state_dict(), save_path)
 
-    print("FINISHED TRAINING")
-    logger.close()
-
-    if not os.path.exists( os.path.join(CKPOINT_ROOT, 'checkpoints') ):
-        os.makedirs( os.path.join(CKPOINT_ROOT, 'checkpoints') )
-    PATH = os.path.join(CKPOINT_ROOT, 'checkpoints/%s.pth' % args.name)
-    torch.save(model.state_dict(), PATH)
+    if args.local_rank==0:
+        logger.close()
+        PATH = os.path.join(CKPOINT_ROOT, 'checkpoints/%s.pth' % args.name)
+        torch.save(model.state_dict(), PATH)
+        print("FINISHED TRAINING")
 
     return PATH
+
+
+def init_directory(args):
+    if args.local_rank==0 :
+        if not os.path.exists( os.path.join(CKPOINT_ROOT, 'checkpoints') ):
+            os.makedirs( os.path.join(CKPOINT_ROOT, 'checkpoints') )
 
 
 if __name__ == '__main__':
@@ -236,6 +236,7 @@ if __name__ == '__main__':
 
     # Training parameters
     parser.add_argument('--batch_size', type=int, default=6, help="batch size used during training.")
+    parser.add_argument('--num_workers', type=int, default=8, help="number of worker used during training.")
     parser.add_argument('--train_datasets', nargs='+', default=['sceneflow'], help="training datasets.")
     parser.add_argument('--lr', type=float, default=0.0002, help="max learning rate.")
     parser.add_argument('--num_steps', type=int, default=100000, help="length of training schedule.")
@@ -263,14 +264,21 @@ if __name__ == '__main__':
     parser.add_argument('--do_flip', default=False, choices=['h', 'v'], help='flip the images horizontally or vertically')
     parser.add_argument('--spatial_scale', type=float, nargs='+', default=[0, 0], help='re-scale the images randomly')
     parser.add_argument('--noyjitter', action='store_true', help='don\'t simulate imperfect rectification')
+
+    # DDP setting
+    parser.add_argument('--distributed', action='store_true')
+    parser.add_argument("--local-rank", type=int, default=os.getenv("LOCAL_RANK"))
+    parser.add_argument('--gpu', type=int, default = 0)
+    parser.add_argument('--world-size', type=int, default=os.getenv("WORLD_SIZE"))
+
     args = parser.parse_args()
 
     torch.manual_seed(1234)
     np.random.seed(1234)
     
-    logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
-
-    Path("checkpoints").mkdir(exist_ok=True, parents=True)
+    ddp_init(args)
+    init_directory(args)
 
     train(args)
+
+    ddp_close()

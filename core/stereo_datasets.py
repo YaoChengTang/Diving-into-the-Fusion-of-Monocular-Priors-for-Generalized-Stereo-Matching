@@ -15,6 +15,7 @@ from glob import glob
 import os.path as osp
 
 from core.utils import frame_utils
+from core.utils.ddp import get_loader
 from core.utils.augmentor import FlowAugmentor, SparseFlowAugmentor
 DATASET_ROOT = os.getenv('DATASET_ROOT')
 
@@ -127,6 +128,7 @@ class SceneFlowDatasets(StereoDataset):
         self.root = root if len(root)>0 else DATASET_ROOT
         self.dstype = dstype
         self.caching = caching
+        assert os.path.exists(self.root), "check the existence: {}".format(self.root)
 
         if things_test:
             self._add_things("TEST")
@@ -204,6 +206,7 @@ class ETH3D(StereoDataset):
     def __init__(self, aug_params=None, root='datasets/ETH3D', split='training'):
         super(ETH3D, self).__init__(aug_params, sparse=True)
         root = root if len(root)>0 else DATASET_ROOT
+        assert os.path.exists(root), "check the existence: {}".format(root)
 
         image1_list = sorted( glob(osp.join(root, f'two_view_{split}/*/im0.png')) )
         image2_list = sorted( glob(osp.join(root, f'two_view_{split}/*/im1.png')) )
@@ -267,7 +270,7 @@ class KITTI(StereoDataset):
     def __init__(self, aug_params=None, root='datasets/KITTI', image_set='training'):
         super(KITTI, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispKITTI)
         root = root if len(root)>0 else DATASET_ROOT
-        assert os.path.exists(root)
+        assert os.path.exists(root), "check the existence: {}".format(self.root)
 
         image1_list = sorted(glob(os.path.join(root, image_set, 'image_2/*_10.png')))
         image2_list = sorted(glob(os.path.join(root, image_set, 'image_3/*_10.png')))
@@ -282,7 +285,7 @@ class Middlebury(StereoDataset):
     def __init__(self, aug_params=None, root='datasets/Middlebury', split='F'):
         super(Middlebury, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispMiddlebury)
         root = root if len(root)>0 else DATASET_ROOT
-        assert os.path.exists(root)
+        assert os.path.exists(root), "check the existence: {}".format(self.root)
         assert split in ["F", "H", "Q", "2014"]
         if split == "2014": # datasets/Middlebury/2014/Pipes-perfect/im0.png
             scenes = list((Path(root) / "2014").glob("*"))
@@ -336,8 +339,10 @@ def fetch_dataloader(args):
             logging.info(f"Adding {len(new_dataset)} samples from Tartain Air")
         train_dataset = new_dataset if train_dataset is None else train_dataset + new_dataset
 
-    train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size, 
-        pin_memory=True, shuffle=True, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', 6))-2, drop_last=True)
+    # train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size, 
+    #     pin_memory=True, shuffle=True, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', 6))-2, drop_last=True)
+    train_loader = get_loader(train_dataset, args)
+    train_loader.sampler.set_epoch(0)
 
     logging.info('Training with %d image pairs' % len(train_dataset))
     return train_loader
