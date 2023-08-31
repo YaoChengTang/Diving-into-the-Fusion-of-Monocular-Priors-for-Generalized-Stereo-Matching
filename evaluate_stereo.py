@@ -109,13 +109,14 @@ def validate_kitti(model, iters=32, root="", mixed_prec=False):
 
 
 @torch.no_grad()
-def validate_things(model, iters=32, root='', mixed_prec=False):
+def validate_things(model, iters=32, root='', mixed_prec=False, args=None):
     """ Peform validation using the FlyingThings3D (TEST) split """
     model.eval()
     val_dataset = datasets.SceneFlowDatasets(dstype='frames_finalpass', root=root, things_test=True)
 
     out_list, epe_list = [], []
-    for val_id in tqdm(range(len(val_dataset))):
+    tqdm_disable = args is not None and args.local_rank>0
+    for val_id in tqdm(range(len(val_dataset)), disable=tqdm_disable):
         _, image1, image2, flow_gt, valid_gt = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
@@ -135,6 +136,9 @@ def validate_things(model, iters=32, root='', mixed_prec=False):
         out = (epe > 1.0)
         epe_list.append(epe[val].mean().item())
         out_list.append(out[val].cpu().numpy())
+        
+        if val_id>10:
+            break
 
     epe_list = np.array(epe_list)
     out_list = np.concatenate(out_list)

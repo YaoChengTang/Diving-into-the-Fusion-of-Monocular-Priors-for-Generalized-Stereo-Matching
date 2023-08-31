@@ -194,7 +194,7 @@ def train(args):
                     logging.info(f"Saving file {save_path}")
                     torch.save(model.state_dict(), save_path)
 
-                results = validate_things(model.module, iters=args.valid_iters)
+                results = validate_things(model.module, iters=args.valid_iters, args=args)
 
                 if args.local_rank==0:
                     logger.write_dict(results)
