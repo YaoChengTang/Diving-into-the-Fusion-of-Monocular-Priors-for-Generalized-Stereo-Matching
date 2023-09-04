@@ -2,16 +2,30 @@ from __future__ import print_function, division
 import sys
 sys.path.append('core')
 
+import os
 import argparse
 import time
 import logging
 import numpy as np
 import torch
 from tqdm import tqdm
+from datetime import datetime
+
 from raft_stereo import RAFTStereo, autocast
 import stereo_datasets as datasets
 from utils.utils import InputPadder
 from utils.vis import Visualizer
+
+
+LOG_ROOT = os.getenv('LOG_ROOT', default="")
+LOG_PATH = os.path.join("logs" if LOG_ROOT is None or len(LOG_ROOT)==0 else LOG_ROOT, 
+                        '{}-{}.log'.format(__file__, datetime.now().strftime("%y%m%d_%H%M%S")))
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
+                    handlers = [logging.FileHandler(LOG_PATH), 
+                                logging.StreamHandler()]
+                   )
+
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -77,7 +91,7 @@ def validate_eth3d(model, iters=32, root="", sv_root="", mixed_prec=False):
     epe = np.mean(epe_list)
     d1 = 100 * np.mean(out_list)
 
-    print("Validation ETH3D: EPE %f, D1 %f" % (epe, d1))
+    logging.info("Validation ETH3D: EPE %f, D1 %f" % (epe, d1))
     return {'eth3d-epe': epe, 'eth3d-d1': d1}
 
 
@@ -152,7 +166,7 @@ def validate_kitti(model, iters=32, root="", sv_root="", mixed_prec=False):
 
     avg_runtime = np.mean(elapsed_list)
 
-    print(f"Validation KITTI: EPE {epe}, D1 {d1}, {format(1/avg_runtime, '.2f')}-FPS ({format(avg_runtime, '.3f')}s)")
+    logging.info(f"Validation KITTI: EPE {epe}, D1 {d1}, {format(1/avg_runtime, '.2f')}-FPS ({format(avg_runtime, '.3f')}s)")
     return {'kitti-epe': epe, 'kitti-d1': d1}
 
 
@@ -190,7 +204,7 @@ def validate_things(model, iters=32, root='', sv_root="", mixed_prec=False):
     epe = np.mean(epe_list)
     d1 = 100 * np.mean(out_list)
 
-    print("Validation FlyingThings: %f, %f" % (epe, d1))
+    logging.info("Validation FlyingThings: %f, %f" % (epe, d1))
     return {'things-epe': epe, 'things-d1': d1}
 
 
@@ -256,7 +270,7 @@ def validate_middlebury(model, iters=32, split='F', root="", sv_root="", mixed_p
     epe = np.mean(epe_list)
     d1 = 100 * np.mean(out_list)
 
-    print(f"Validation Middlebury{split}: EPE {epe}, D1 {d1}")
+    logging.info(f"Validation Middlebury{split}: EPE {epe}, D1 {d1}")
     return {f'middlebury{split}-epe': epe, f'middlebury{split}-d1': d1}
 
 
@@ -293,12 +307,12 @@ if __name__ == '__main__':
         logging.info("Loading checkpoint...")
         checkpoint = torch.load(args.restore_ckpt)
         model.load_state_dict(checkpoint, strict=True)
-        logging.info(f"Done loading checkpoint")
+        logging.info(f"Done loading checkpoint from {args.restore_ckpt}")
 
     model.cuda()
     model.eval()
 
-    print(f"The model has {format(count_parameters(model)/1e6, '.2f')}M learnable parameters.")
+    logging.info(f"The model has {format(count_parameters(model)/1e6, '.2f')}M learnable parameters.")
 
     # The CUDA implementations of the correlation volume prevent half-precision
     # rounding errors in the correlation lookup. This allows us to use mixed precision

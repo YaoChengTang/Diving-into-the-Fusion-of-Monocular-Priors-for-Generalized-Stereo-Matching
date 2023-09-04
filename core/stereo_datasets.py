@@ -320,6 +320,7 @@ def fetch_dataloader(args):
     for dataset_name in args.train_datasets:
         if dataset_name.startswith("middlebury_"):
             new_dataset = Middlebury(aug_params, split=dataset_name.replace('middlebury_',''))
+            logging.info(f"Adding {len(new_dataset)} samples from Middlebury")
         elif dataset_name == 'sceneflow':
             clean_dataset = SceneFlowDatasets(aug_params, dstype='frames_cleanpass')
             final_dataset = SceneFlowDatasets(aug_params, dstype='frames_finalpass')
