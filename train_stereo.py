@@ -268,8 +268,10 @@ if __name__ == '__main__':
     # DDP setting
     parser.add_argument('--distributed', action='store_true')
     parser.add_argument("--local-rank", type=int, default=os.getenv("LOCAL_RANK"))
-    parser.add_argument('--gpu', type=int, default = 0)
     parser.add_argument('--world-size', type=int, default=os.getenv("WORLD_SIZE"))
+    parser.add_argument("--local_rank", type=int, default=os.getenv("LOCAL_RANK"))
+    parser.add_argument('--world_size', type=int, default=os.getenv("WORLD_SIZE"))
+
 
     args = parser.parse_args()
 
