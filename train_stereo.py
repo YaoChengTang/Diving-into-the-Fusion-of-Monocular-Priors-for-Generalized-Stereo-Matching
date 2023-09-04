@@ -219,7 +219,7 @@ def train(args):
         torch.save(model.state_dict(), PATH)
         print("FINISHED TRAINING")
 
-    return PATH
+    return None
 
 
 def init_directory(args):
