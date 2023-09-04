@@ -172,6 +172,8 @@ def validate_middlebury(model, iters=32, split='F', root="", mixed_prec=False):
     val_dataset = datasets.Middlebury(aug_params, root=root, split=split)
 
     out_list, epe_list = [], []
+    out_nocc_list, epe_nocc_list = [], []
+    out_mask_list, epe_mask_list = [], []
     for val_id in range(len(val_dataset)):
         (imageL_file, _, _), image1, image2, flow_gt, valid_gt = val_dataset[val_id]
         image1 = image1[None].cuda()
@@ -189,21 +191,47 @@ def validate_middlebury(model, iters=32, split='F', root="", mixed_prec=False):
 
         epe_flattened = epe.flatten()
         val = (valid_gt.reshape(-1) >= -0.5) & (flow_gt[0].reshape(-1) > -1000)
+        val_nocc = (valid_gt.reshape(-1) >= 0.5) & (flow_gt[0].reshape(-1) > -1000)
+
+        mask_analysis = ( (valid_gt.reshape(-1) >= 0.5) | (epe_flattened <= 2.0) ) & \
+                        (flow_gt[0].reshape(-1) > -1000)
+
 
         out = (epe_flattened > 2.0)
         image_out = out[val].float().mean().item()
         image_epe = epe_flattened[val].mean().item()
-        logging.info(f"Middlebury Iter {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}")
+        image_out_nocc = out[val_nocc].float().mean().item()
+        image_epe_nocc = epe_flattened[val_nocc].mean().item()
+        image_out_mask = (out[mask_analysis].float().sum() / val.sum()).item()
+        image_epe_mask = (epe_flattened[mask_analysis].sum() / val.sum()).item()
+        logging.info(f"Middlebury Iter {val_id+1} out of {len(val_dataset)}. " + \
+                     f"EPE {round(image_epe,4)} D1 {round(image_out,4)} " + \
+                     f"EPE_nocc {round(image_epe_nocc,4)} D1_nocc {round(image_out_nocc,4)} " + \
+                     f"EPE_mask {round(image_epe_mask,4)} D1_mask {round(image_out_mask,4)}")
         epe_list.append(image_epe)
         out_list.append(image_out)
+        epe_nocc_list.append(image_epe_nocc)
+        out_nocc_list.append(image_out_nocc)
+        epe_mask_list.append(image_epe_mask)
+        out_mask_list.append(image_out_mask)
 
     epe_list = np.array(epe_list)
     out_list = np.array(out_list)
+    epe_nocc_list = np.array(epe_nocc_list)
+    out_nocc_list = np.array(out_nocc_list)
+    epe_mask_list = np.array(epe_mask_list)
+    out_mask_list = np.array(out_mask_list)
 
     epe = np.mean(epe_list)
-    d1 = 100 * np.mean(out_list)
+    d1  = 100 * np.mean(out_list)
+    epe_nocc = np.mean(epe_nocc_list)
+    d1_nocc  = 100 * np.mean(out_nocc_list)
+    epe_mask = np.mean(epe_mask_list)
+    d1_mask  = 100 * np.mean(out_mask_list)
 
-    logging.info(f"Validation Middlebury{split}: EPE {epe}, D1 {d1}")
+    logging.info(f"Validation Middlebury{split}: EPE {epe}, D1 {d1}, " + \
+                 f"EPE_nocc {epe_nocc}, D1_nocc {d1_nocc}, " + \
+                 f"EPE_mask {epe_mask} D1_mask {d1_mask}")
     return {f'middlebury{split}-epe': epe, f'middlebury{split}-d1': d1}
 
 
