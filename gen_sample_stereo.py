@@ -19,7 +19,7 @@ from utils.vis import Visualizer
 
 LOG_ROOT = os.getenv('LOG_ROOT', default="")
 LOG_PATH = os.path.join("logs" if LOG_ROOT is None or len(LOG_ROOT)==0 else LOG_ROOT, 
-                        '{}-{}.log'.format(__file__, datetime.now().strftime("%y%m%d_%H%M%S")))
+                        '{}-{}.log'.format(os.path.basename(__file__), datetime.now().strftime("%y%m%d_%H%M%S")))
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
                     handlers = [logging.FileHandler(LOG_PATH), 
