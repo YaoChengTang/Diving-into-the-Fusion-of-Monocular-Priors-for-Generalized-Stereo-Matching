@@ -17,9 +17,6 @@ from torch.utils.tensorboard import SummaryWriter
 LOG_ROOT     = os.getenv('LOG_ROOT', default="")
 TB_ROOT      = os.getenv('TB_ROOT', default="")
 CKPOINT_ROOT = os.getenv('CKPOINT_ROOT', default="")
-print("-"*10, LOG_ROOT is None or len(LOG_ROOT)==0,
-      os.path.join("logs" if LOG_ROOT is None or len(LOG_ROOT)==0 else LOG_ROOT, 
-                   'log-{}.log'.format(datetime.now().strftime("%y%m%d_%H%M%S"))))
 logging.basicConfig(filename=os.path.join("logs" if LOG_ROOT is None or len(LOG_ROOT)==0 else LOG_ROOT, 
                                           'log-{}.log'.format(datetime.now().strftime("%y%m%d_%H%M%S"))), 
                     level=logging.INFO,
