@@ -261,7 +261,7 @@ if __name__ == '__main__':
                         format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
 
     if args.restore_ckpt is not None:
-        assert args.restore_ckpt.endswith(".pth")
+        assert args.restore_ckpt.endswith(".pth") or args.restore_ckpt.endswith(".tar")
         logging.info("Loading checkpoint...")
         checkpoint = torch.load(args.restore_ckpt)
         model.load_state_dict(checkpoint, strict=True)
