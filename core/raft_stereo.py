@@ -120,8 +120,13 @@ class RAFTStereo(nn.Module):
             # in stereo mode, project flow onto epipolar
             delta_flow[:,1] = 0.0
 
-            # F(t+1) = F(t) + \Delta(t)
-            coords1 = coords1 + delta_flow
+            if self.args.slant :
+                # d = a*u + b*v + c
+                offset = delta_flow[:,0:1]/100*coords0 + delta_flow[:,2:3]/100*coords0[:,[1,0]] + delta_flow[:,4:5]
+                coords1 = coords1 + offset
+            else :
+                # F(t+1) = F(t) + \Delta(t)
+                coords1 = coords1 + delta_flow
 
             # We do not need to upsample or output intermediate results in test_mode
             if test_mode and itr < iters-1:

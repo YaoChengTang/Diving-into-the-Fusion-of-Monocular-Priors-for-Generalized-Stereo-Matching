@@ -14,6 +14,17 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
+LOG_ROOT     = os.getenv('LOG_ROOT', default="")
+TB_ROOT      = os.getenv('TB_ROOT', default="")
+CKPOINT_ROOT = os.getenv('CKPOINT_ROOT', default="")
+print("-"*10, LOG_ROOT is None or len(LOG_ROOT)==0,
+      os.path.join("logs" if LOG_ROOT is None or len(LOG_ROOT)==0 else LOG_ROOT, 
+                   'log-{}.log'.format(datetime.now().strftime("%y%m%d_%H%M%S"))))
+logging.basicConfig(filename=os.path.join("logs" if LOG_ROOT is None or len(LOG_ROOT)==0 else LOG_ROOT, 
+                                          'log-{}.log'.format(datetime.now().strftime("%y%m%d_%H%M%S"))), 
+                    level=logging.INFO,
+                    format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
+
 from evaluate_stereo import *
 from core.raft_stereo import RAFTStereo
 from core.stereo_datasets import fetch_dataloader
@@ -34,14 +45,6 @@ except:
             optimizer.step()
         def update(self):
             pass
-
-LOG_ROOT     = os.getenv('LOG_ROOT', default="")
-TB_ROOT      = os.getenv('TB_ROOT', default="")
-CKPOINT_ROOT = os.getenv('CKPOINT_ROOT', default="")
-logging.basicConfig(filename=os.path.join("logs" if LOG_ROOT is None or len(LOG_ROOT)==0 else LOG_ROOT, 
-                                'log-{}.log'.format(datetime.now().strftime("%y%m%d_%H%M%S"))), 
-                    level=logging.INFO,
-                    format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
 
 
 def sequence_loss(flow_preds, flow_gt, valid, loss_gamma=0.9, max_flow=700):
@@ -257,6 +260,7 @@ if __name__ == '__main__':
     parser.add_argument('--slow_fast_gru', action='store_true', help="iterate the low-res GRUs more frequently")
     parser.add_argument('--n_gru_layers', type=int, default=3, help="number of hidden GRU levels")
     parser.add_argument('--hidden_dims', nargs='+', type=int, default=[128]*3, help="hidden state and context dimensions")
+    parser.add_argument('--slant', action='store_true', help="use slanted stereo matching")
 
     # Data augmentation
     parser.add_argument('--img_gamma', type=float, nargs='+', default=None, help="gamma range")

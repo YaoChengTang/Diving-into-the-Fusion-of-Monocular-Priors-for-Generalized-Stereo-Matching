@@ -104,7 +104,7 @@ class BasicMultiUpdateBlock(nn.Module):
         self.gru08 = ConvGRU(hidden_dims[2], encoder_output_dim + hidden_dims[1] * (args.n_gru_layers > 1))
         self.gru16 = ConvGRU(hidden_dims[1], hidden_dims[0] * (args.n_gru_layers == 3) + hidden_dims[2])
         self.gru32 = ConvGRU(hidden_dims[0], hidden_dims[1])
-        self.flow_head = FlowHead(hidden_dims[2], hidden_dim=256, output_dim=2)
+        self.flow_head = FlowHead(hidden_dims[2], hidden_dim=256, output_dim=2 + 4*args.slant)
         factor = 2**self.args.n_downsample
 
         self.mask = nn.Sequential(
