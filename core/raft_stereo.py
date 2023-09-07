@@ -122,7 +122,11 @@ class RAFTStereo(nn.Module):
 
             if self.args.slant :
                 # d = a*u + b*v + c
-                offset = delta_flow[:,0:1]/100*coords0 + delta_flow[:,2:3]/100*coords0[:,[1,0]] + delta_flow[:,4:5]
+                B,_,H,W = coords0.shape
+                norm_range = torch.Tensor([H,W])[None,:,None,None].float().to(coords0.device)
+                offset = delta_flow[:,0:1] * coords0 / norm_range + \
+                         delta_flow[:,2:3] * coords0[:,[1,0]] / norm_range[:,[1,0]] + \
+                         delta_flow[:,4:5]
                 coords1 = coords1 + offset
             else :
                 # F(t+1) = F(t) + \Delta(t)
