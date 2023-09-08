@@ -23,6 +23,7 @@ logging.basicConfig(filename=os.path.join("logs" if LOG_ROOT is None or len(LOG_
                     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
 
 from evaluate_stereo import *
+from core.loss import Loss
 from core.raft_stereo import RAFTStereo
 from core.stereo_datasets import fetch_dataloader
 from core.utils.ddp import ddp_init, ddp_close, get_model_ddp
@@ -44,52 +45,10 @@ except:
             pass
 
 
-def sequence_loss(flow_preds, flow_gt, valid, 
-                  loss_gamma=0.9, max_flow=700,
-                  smoothness=False, imgL=None, imgR=None):
-    """ Loss function defined over sequence of flow predictions """
-
-    n_predictions = len(flow_preds)
-    assert n_predictions >= 1
-    flow_loss = 0.0
-
-    # exlude invalid pixels and extremely large diplacements
-    mag = torch.sum(flow_gt**2, dim=1).sqrt()
-
-    # exclude extremly large displacements
-    valid = ((valid >= 0.5) & (mag < max_flow)).unsqueeze(1)
-    assert valid.shape == flow_gt.shape, [valid.shape, flow_gt.shape]
-    assert not torch.isinf(flow_gt[valid.bool()]).any()
-
-    for i in range(n_predictions):
-        assert not torch.isnan(flow_preds[i]).any() and not torch.isinf(flow_preds[i]).any()
-        # We adjust the loss_gamma so it is consistent for any number of RAFT-Stereo iterations
-        adjusted_loss_gamma = loss_gamma**(15/(n_predictions - 1))
-        i_weight = adjusted_loss_gamma**(n_predictions - i - 1)
-        i_loss = (flow_preds[i] - flow_gt).abs()
-        assert i_loss.shape == valid.shape, [i_loss.shape, valid.shape, flow_gt.shape, flow_preds[i].shape]
-        flow_loss += i_weight * i_loss[valid.bool()].mean()
-
-        if smoothness:
-            """TODO"""
-            pass
-
-    epe = torch.sum((flow_preds[-1] - flow_gt)**2, dim=1).sqrt()
-    epe = epe.view(-1)[valid.view(-1)]
-
-    metrics = {
-        'epe': epe.mean().item(),
-        '1px': (epe < 1).float().mean().item(),
-        '3px': (epe < 3).float().mean().item(),
-        '5px': (epe < 5).float().mean().item(),
-    }
-
-    return flow_loss, metrics
-
-
 def fetch_optimizer(args, model):
     """ Create the optimizer and learning rate scheduler """
-    optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wdecay, eps=1e-8)
+    optimizer = optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), 
+                            lr=args.lr, weight_decay=args.wdecay, eps=1e-8)
 
     scheduler = optim.lr_scheduler.OneCycleLR(optimizer, args.lr, args.num_steps+100,
             pct_start=0.01, cycle_momentum=False, anneal_strategy='linear')
@@ -161,6 +120,12 @@ def train(args):
     model.train()
     model.module.freeze_bn() # We keep BatchNorm frozen
 
+    myLoss = Loss(loss_gamma=0.9, max_flow=700, loss_zeta=0.5,
+                  smoothness=args.loss_smooth, 
+                  slant=args.slant, slant_norm=args.slant_norm,
+                  ner_kernel_size=args.ner_kernel_size,
+                  local_rank=args.local_rank)
+
     validation_frequency = 10000
 
     scaler = GradScaler(enabled=args.mixed_precision)
@@ -175,14 +140,21 @@ def train(args):
             image1, image2, flow, valid = [x.cuda() for x in data_blob]
 
             assert model.training
-            flow_predictions = model(image1, image2, iters=args.train_iters)
+            if args.slant:
+                flow_predictions, params_list = model(image1, image2, iters=args.train_iters)
+            else:
+                flow_predictions = model(image1, image2, iters=args.train_iters)
             assert model.training
 
-            loss, metrics = sequence_loss(flow_predictions, flow, valid, 
-                                          smoothness=args.slant_smooth, imgL=image1, imgR=image2)
+            loss, metrics, \
+            flow_loss, smooth_loss = myLoss(flow_predictions, flow, valid, 
+                                            params_list=params_list, 
+                                            imgL=image1, imgR=image2)
             if args.local_rank==0:
                 logger.push(metrics)
                 logger.writer.add_scalar("live_loss", loss.item(), global_batch_num)
+                logger.writer.add_scalar("live_flow_loss", flow_loss.item(), global_batch_num)
+                logger.writer.add_scalar("live_smooth_loss", smooth_loss.item(), global_batch_num)
                 logger.writer.add_scalar(f'learning_rate', optimizer.param_groups[0]['lr'], global_batch_num)
             
             global_batch_num += 1
@@ -266,7 +238,10 @@ if __name__ == '__main__':
     parser.add_argument('--hidden_dims', nargs='+', type=int, default=[128]*3, help="hidden state and context dimensions")
     parser.add_argument('--slant', action='store_true', help="use slanted stereo matching")
     parser.add_argument('--slant_norm', action='store_true', help="use normalization in slanted stereo matching")
-    parser.add_argument('--slant_smooth', action='store_true', help="use smoothness in slanted stereo matching")
+    
+    # Loss parameters
+    parser.add_argument('--loss_smooth', type=str, default=None, choices=["", "gradient", "curvature"], help="use smoothness loss")
+    parser.add_argument('--ner_kernel_size', type=int, default=3, help="nerghborhood size used in smooth loss")
 
     # Data augmentation
     parser.add_argument('--img_gamma', type=float, nargs='+', default=None, help="gamma range")

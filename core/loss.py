@@ -1,0 +1,185 @@
+import os
+import sys
+import logging
+import numpy as np
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+from core.utils.utils import coords_grid, disparity_computation
+
+
+class Loss(nn.Module):
+    def __init__(self, loss_gamma=0.9, max_flow=700, loss_zeta=0.3,
+                 smoothness=None, slant=False, slant_norm=False, ner_kernel_size=3,
+                 local_rank=None):
+        super(Loss, self).__init__()
+        self.loss_gamma = loss_gamma
+        self.loss_zeta = loss_zeta 
+        self.max_flow = max_flow
+        self.smoothness = smoothness
+
+        if self.smoothness is not None and len(self.smoothness)>0:
+            self.smooth_loss_computer = SmoothLoss(self.smoothness, 
+                                                   slant=slant, 
+                                                   slant_norm=slant_norm, 
+                                                   kernel_size=ner_kernel_size)
+        
+        if local_rank==0 :
+            logging.info(f"smoothness: {smoothness}, " +\
+                         f"slant: {slant}, slant_norm: {slant_norm}, " +\
+                         f"ner_kernel_size: {ner_kernel_size}")
+    
+    def forward(self, flow_preds, flow_gt, valid, 
+                params_list=None, imgL=None, imgR=None):
+        """ Loss function defined over sequence of flow predictions """
+        n_predictions = len(flow_preds)
+        assert n_predictions >= 1
+        flow_loss = 0.0
+        smooth_loss = 0.0
+
+        # exlude invalid pixels and extremely large diplacements
+        mag = torch.sum(flow_gt**2, dim=1).sqrt()
+
+        # exclude extremly large displacements
+        valid = ((valid >= 0.5) & (mag < self.max_flow)).unsqueeze(1)
+        assert valid.shape == flow_gt.shape, [valid.shape, flow_gt.shape]
+        assert not torch.isinf(flow_gt[valid.bool()]).any()
+
+        for i in range(n_predictions):
+            assert not torch.isnan(flow_preds[i]).any() and not torch.isinf(flow_preds[i]).any()
+            # We adjust the loss_gamma so it is consistent for any number of RAFT-Stereo iterations
+            adjusted_loss_gamma = self.loss_gamma**(15/(n_predictions - 1))
+            i_weight = adjusted_loss_gamma**(n_predictions - i - 1)
+            i_loss = (flow_preds[i] - flow_gt).abs()
+            assert i_loss.shape == valid.shape, [i_loss.shape, valid.shape, flow_gt.shape, flow_preds[i].shape]
+            flow_loss += i_weight * i_loss[valid.bool()].mean()
+
+            if self.smoothness=="gradient":
+                smooth_loss += i_weight * self.smooth_loss_computer(flow_preds[i], imgL).mean()
+            elif self.smoothness=="curvature":
+                smooth_loss += i_weight * self.smooth_loss_computer(params_list[i], imgL).mean()
+
+        epe = torch.sum((flow_preds[-1] - flow_gt)**2, dim=1).sqrt()
+        epe = epe.view(-1)[valid.view(-1)]
+
+        metrics = {
+            'epe': epe.mean().item(),
+            '1px': (epe < 1).float().mean().item(),
+            '3px': (epe < 3).float().mean().item(),
+            '5px': (epe < 5).float().mean().item(),
+        }
+
+        if self.smoothness is not None and len(self.smoothness)>0:
+            loss = flow_loss + self.loss_zeta * smooth_loss
+        else:
+            loss = flow_loss
+            smooth_loss = torch.Tensor([0.0]).to(flow_loss.device)
+        return loss, metrics, flow_loss, smooth_loss
+
+
+class SmoothLoss(nn.Module):
+    """Smooth constaint for prediction.
+    - gradient-based smooth regularization:
+        \psi_{pq}  = max(w_{pq},\epsilon) min(\hat{\psi}_{pq}(f_p,f_q), \tau_{dis}) \\
+        w_{pq}     = e^{-||I_L(p)-I_L(q)||_1 / \eta} \\
+        \hat{\psi}_{pq} = |d_p(f_p) - d_q(f_q)| \\
+        d_p(f_p)   = a_p p_u + b_p p_v + c_p \\
+        d_q(f_q)   = a_q q_u + b_q q_v + c_q
+    - curvature-based smooth regularization:
+        \psi_{pq}  = max(w_{pq},\epsilon) min(\hat{\psi}_{pq}(f_p,f_q), \tau_{dis}) \\
+        w_{pq}     = e^{-||I_L(p)-I_L(q)||_1 / \eta} \\
+        \hat{\psi}_{pq} = |d_p(f_p) - d_p(f_q)| + |d_q(f_q) - d_q(f_p)| \\
+        d_p(f_p)   = a_p p_u + b_p p_v + c_p \\
+        d_p(f_q)   = a_p q_u + b_p q_v + c_p
+    """
+    def __init__(self, smoothness, slant=False, slant_norm=False, kernel_size=3, 
+                 epsilon=0.01, tau=3, eta=10):
+        super(SmoothLoss, self).__init__()
+        self.smoothness = smoothness
+        self.slant = slant
+        self.slant_norm = slant_norm
+
+        self.eta = eta
+        self.tau = tau
+        self.epsilon = epsilon
+
+        self.img_ner_extractor = NerghborExtractor(3, kernel_size)
+        self.coord_ner_extractor = NerghborExtractor(2, kernel_size)
+        self.params_ner_extractor = NerghborExtractor(3, kernel_size)
+    
+    def forward(self, params, imgL, coordL, corrdR):
+        """Function: compute smoothe loss 
+        args:
+            params: (B,3,H,W)
+            imgL: (B,3,H,W)
+            coordL: (B,2,H,W)
+            corrdR: (B,2,H,W)
+        """
+        img_ner    = self.img_ner_extractor(imgL)         # B,3,N,H,W
+        B, _, H, W = imgL.shape
+        coord      = coords_grid(B, H, W).to(imgL.device) # B,2,H,W
+        coord_ner  = self.coord_ner_extractor(coord)      # B,2,N,H,W
+        coord      = coord.unsqueeze(2)                   # B,2,1,H,W
+        params_ner = self.params_ner_extractor(params)    # B,3,N,H,W
+
+        # w_{pq} = e^{-||I_L(p)-I_L(q)||_1 / \eta}
+        weight = torch.exp(-torch.abs(img_ner-imgL.unsqueeze(2)).mean(dim=1) / self.eta)   # B,N,H,W
+
+        if self.smoothness=="gradient":
+            # \hat{\psi}_{pq} = |d_p(f_p) - d_q(f_q)|
+            psi_p = disparity_computation(params, coords0=coord, 
+                                        slant=self.slant, slant_norm=self.slant_norm) - \
+                    disparity_computation(params_ner, coords0=coord_ner, 
+                                        slant=self.slant, slant_norm=self.slant_norm)
+            psi   = torch.abs(psi_p)                            # B,N,H,W
+        elif self.smoothness=="curvature":
+            # |d_p(f_p) - d_p(f_q)|
+            psi_p = disparity_computation(params, coords0=coord, 
+                                        slant=self.slant, slant_norm=self.slant_norm) - \
+                    disparity_computation(params, coords0=coord_ner, 
+                                        slant=self.slant, slant_norm=self.slant_norm)
+            # d_q(f_q) - d_q(f_p)
+            psi_q = disparity_computation(params_ner, coords0=coord_ner, 
+                                        slant=self.slant, slant_norm=self.slant_norm) - \
+                    disparity_computation(params_ner, coords0=coord, 
+                                        slant=self.slant, slant_norm=self.slant_norm)
+            # \hat{\psi} = |d_p(f_p) - d_p(f_q)| + |d_q(f_q) - d_q(f_p)|
+            psi   = torch.abs(psi_p) + torch.abs(psi_q)         # B,N,H,W
+        
+        # \psi_{pq}  = max(w_{pq},\epsilon) min(\hat{\psi_{pq}(f_p,f_q)}, \tau_{dis})
+        smooth_loss = torch.clip(weight, min=self.epsilon,) * \
+                      F.sigmoid(psi/self.tau*8-4) * self.tau
+        smooth_loss = smooth_loss.mean()
+        return smooth_loss
+
+
+class NerghborExtractor(nn.Module):
+    """Extarct the nerghbors of each pixel using depthwise convolution. 
+       Input: (B,C,H,W), Output: (B,C,N,H,W).
+    """
+    def __init__(self, input_channel, kernel_size=3):
+        super(NerghborExtractor, self).__init__()
+        # build kernel matrix
+        if isinstance(kernel_size, int):
+            neighbor_kernel = np.zeros((kernel_size*kernel_size, kernel_size, kernel_size))
+        else:
+            raise Exception("kernel_size currently only supports integer")
+        N,H,W = neighbor_kernel.shape
+        for idx in range(N):
+            neighbor_kernel[idx, idx//H, idx%W] = 1
+        neighbor_kernel = np.tile(neighbor_kernel, (input_channel,1,1))
+        neighbor_kernel = torch.Tensor(neighbor_kernel)
+
+        # extract nerghbors through depthwise conv
+        output_channel = input_channel*kernel_size*kernel_size
+        self.conv = nn.Conv2d(input_channel, output_channel, 
+                              kernel_size=3, padding=1, bias=False, 
+                              groups=input_channel, padding_mode="reflect")
+        self.conv.weight = nn.Parameter(neighbor_kernel.unsqueeze(1), requires_grad=False)
+        
+    def forward(self, x):
+        B,C,H,W = x.shape
+        nerghbors = self.conv(x)
+        return nerghbors.reshape((B,C,-1,H,W))

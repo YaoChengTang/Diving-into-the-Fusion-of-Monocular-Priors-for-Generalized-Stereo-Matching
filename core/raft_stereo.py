@@ -118,6 +118,8 @@ class RAFTStereo(nn.Module):
             coords1 = coords1 + flow_init
 
         flow_predictions = []
+        raw_params_list = []
+        params_list = []
         for itr in range(iters):
             coords1 = coords1.detach()
             corr = corr_fn(coords1) # index correlation volume
@@ -136,15 +138,21 @@ class RAFTStereo(nn.Module):
                 # d = a*u + b*v + c
                 B,_,H,W = coords0.shape
                 if self.args.slant_norm:
-                    norm_range = torch.Tensor([H,W])[None,:,None,None].float().to(coords0.device)
+                    norm_range = torch.Tensor([W,H])[None,:,None,None].float().to(coords0.device)
                     offset = delta_flow[:,0:1] * coords0 / norm_range + \
-                            delta_flow[:,2:3] * coords0[:,[1,0]] / norm_range[:,[1,0]] + \
-                            delta_flow[:,4:5]
+                             delta_flow[:,2:3] * coords0[:,[1,0]] / norm_range[:,[1,0]] + \
+                             delta_flow[:,4:5]
                 else:
                     offset = delta_flow[:,0:1] * coords0 + \
-                            delta_flow[:,2:3] * coords0[:,[1,0]] + \
-                            delta_flow[:,4:5]
+                             delta_flow[:,2:3] * coords0[:,[1,0]] + \
+                             delta_flow[:,4:5]
                 coords1 = coords1 + offset
+
+                if not test_mode:
+                    if len(params_list)==0:
+                        raw_params_list.append(delta_flow)
+                    else:
+                        raw_params_list.append(raw_params_list[-1].detach() + delta_flow)
             else :
                 # F(t+1) = F(t) + \Delta(t)
                 coords1 = coords1 + delta_flow
@@ -159,8 +167,15 @@ class RAFTStereo(nn.Module):
             else:
                 flow_up = self.upsample_flow(coords1 - coords0, up_mask)
             flow_up = flow_up[:,:1]
-
             flow_predictions.append(flow_up)
+
+            if self.args.slant and not test_mode:
+                if up_mask is None:
+                    params = upflow8(raw_params_list[-1])
+                else:
+                    params = self.upsample_flow(raw_params_list[-1], up_mask)
+                params = torch.concat([params[:,0:1], params[:,2:3], params[:,4:5]], dim=1)
+                params_list.append(params)
 
         if test_mode:
             return coords1 - coords0, flow_up
@@ -168,4 +183,6 @@ class RAFTStereo(nn.Module):
         if vis_mode:
             return flow_predictions
 
+        if self.args.slant:
+            return flow_predictions, params_list
         return flow_predictions
