@@ -1,6 +1,14 @@
+import os
+import sys
+import logging
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',)
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from core.update import BasicMultiUpdateBlock
 from core.extractor import BasicEncoder, MultiBasicEncoder, ResidualBlock
 from core.corr import CorrBlock1D, PytorchAlternateCorrBlock1D, CorrBlockFast1D, AlternateCorrBlock
@@ -37,6 +45,10 @@ class RAFTStereo(nn.Module):
                 nn.Conv2d(128, 256, 3, padding=1))
         else:
             self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', downsample=args.n_downsample)
+        
+        if "local_rank" not in args or args.local_rank==0 :
+            logging.info(f"RAFTStereo: " + \
+                         f"slant: {args.slant}, slant range norm: {args.slant_norm}")
 
     def freeze_bn(self):
         for m in self.modules():
@@ -123,10 +135,15 @@ class RAFTStereo(nn.Module):
             if self.args.slant :
                 # d = a*u + b*v + c
                 B,_,H,W = coords0.shape
-                norm_range = torch.Tensor([H,W])[None,:,None,None].float().to(coords0.device)
-                offset = delta_flow[:,0:1] * coords0 / norm_range + \
-                         delta_flow[:,2:3] * coords0[:,[1,0]] / norm_range[:,[1,0]] + \
-                         delta_flow[:,4:5]
+                if self.args.slant_norm:
+                    norm_range = torch.Tensor([H,W])[None,:,None,None].float().to(coords0.device)
+                    offset = delta_flow[:,0:1] * coords0 / norm_range + \
+                            delta_flow[:,2:3] * coords0[:,[1,0]] / norm_range[:,[1,0]] + \
+                            delta_flow[:,4:5]
+                else:
+                    offset = delta_flow[:,0:1] * coords0 + \
+                            delta_flow[:,2:3] * coords0[:,[1,0]] + \
+                            delta_flow[:,4:5]
                 coords1 = coords1 + offset
             else :
                 # F(t+1) = F(t) + \Delta(t)

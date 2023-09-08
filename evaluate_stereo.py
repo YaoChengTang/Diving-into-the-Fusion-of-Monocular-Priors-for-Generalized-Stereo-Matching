@@ -254,6 +254,7 @@ if __name__ == '__main__':
     parser.add_argument('--slow_fast_gru', action='store_true', help="iterate the low-res GRUs more frequently")
     parser.add_argument('--n_gru_layers', type=int, default=3, help="number of hidden GRU levels")
     parser.add_argument('--slant', action='store_true', help="use slanted stereo matching")
+    parser.add_argument('--slant_norm', action='store_true', help="use normalization in slanted stereo matching")
     args = parser.parse_args()
 
     model = torch.nn.DataParallel(RAFTStereo(args), device_ids=[0])

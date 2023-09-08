@@ -44,7 +44,9 @@ except:
             pass
 
 
-def sequence_loss(flow_preds, flow_gt, valid, loss_gamma=0.9, max_flow=700):
+def sequence_loss(flow_preds, flow_gt, valid, 
+                  loss_gamma=0.9, max_flow=700,
+                  smoothness=False, imgL=None, imgR=None):
     """ Loss function defined over sequence of flow predictions """
 
     n_predictions = len(flow_preds)
@@ -67,6 +69,10 @@ def sequence_loss(flow_preds, flow_gt, valid, loss_gamma=0.9, max_flow=700):
         i_loss = (flow_preds[i] - flow_gt).abs()
         assert i_loss.shape == valid.shape, [i_loss.shape, valid.shape, flow_gt.shape, flow_preds[i].shape]
         flow_loss += i_weight * i_loss[valid.bool()].mean()
+
+        if smoothness:
+            """TODO"""
+            pass
 
     epe = torch.sum((flow_preds[-1] - flow_gt)**2, dim=1).sqrt()
     epe = epe.view(-1)[valid.view(-1)]
@@ -172,7 +178,8 @@ def train(args):
             flow_predictions = model(image1, image2, iters=args.train_iters)
             assert model.training
 
-            loss, metrics = sequence_loss(flow_predictions, flow, valid)
+            loss, metrics = sequence_loss(flow_predictions, flow, valid, 
+                                          smoothness=args.slant_smooth, imgL=image1, imgR=image2)
             if args.local_rank==0:
                 logger.push(metrics)
                 logger.writer.add_scalar("live_loss", loss.item(), global_batch_num)
@@ -258,6 +265,8 @@ if __name__ == '__main__':
     parser.add_argument('--n_gru_layers', type=int, default=3, help="number of hidden GRU levels")
     parser.add_argument('--hidden_dims', nargs='+', type=int, default=[128]*3, help="hidden state and context dimensions")
     parser.add_argument('--slant', action='store_true', help="use slanted stereo matching")
+    parser.add_argument('--slant_norm', action='store_true', help="use normalization in slanted stereo matching")
+    parser.add_argument('--slant_smooth', action='store_true', help="use smoothness in slanted stereo matching")
 
     # Data augmentation
     parser.add_argument('--img_gamma', type=float, nargs='+', default=None, help="gamma range")
