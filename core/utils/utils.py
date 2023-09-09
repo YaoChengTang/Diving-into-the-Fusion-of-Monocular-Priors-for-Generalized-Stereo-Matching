@@ -101,7 +101,7 @@ def disparity_computation(params, slant=True, slant_norm=False, coords0=None):
     """
     if slant :
         # d = a*u + b*v + c
-        B,_,H,W = coords0.shape
+        B,H,W = coords0.shape[0], coords0.shape[-2], coords0.shape[-1]
         if slant_norm:
             norm_range = torch.Tensor([W,H])[None,:,None,None].float().to(coords0.device)
             offset = params[:,0] * coords0[:,0] / norm_range[:,0] + \

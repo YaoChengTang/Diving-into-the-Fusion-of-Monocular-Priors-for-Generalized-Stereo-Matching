@@ -121,11 +121,14 @@ def train(args):
     model.module.freeze_bn() # We keep BatchNorm frozen
 
     myLoss = Loss(loss_gamma=0.9, max_flow=700, loss_zeta=0.5,
-                  smoothness=args.loss_smooth, 
-                  slant=args.slant, slant_norm=args.slant_norm,
-                  ner_kernel_size=args.ner_kernel_size,
-                  local_rank=args.local_rank)
-
+                    smoothness=args.loss_smooth, 
+                    slant=args.slant, slant_norm=args.slant_norm,
+                    ner_kernel_size=args.ner_kernel_size,
+                    local_rank=args.local_rank,
+                    mixed_precision=args.mixed_precision)
+    device  = torch.device("cuda", args.local_rank)
+    myLoss  = myLoss.to(device)
+                    
     validation_frequency = 10000
 
     scaler = GradScaler(enabled=args.mixed_precision)
@@ -150,6 +153,7 @@ def train(args):
             flow_loss, smooth_loss = myLoss(flow_predictions, flow, valid, 
                                             params_list=params_list, 
                                             imgL=image1, imgR=image2)
+
             if args.local_rank==0:
                 logger.push(metrics)
                 logger.writer.add_scalar("live_loss", loss.item(), global_batch_num)

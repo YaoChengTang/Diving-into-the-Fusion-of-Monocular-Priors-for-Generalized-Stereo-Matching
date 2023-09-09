@@ -10,15 +10,29 @@ import torch.nn.functional as F
 from core.utils.utils import coords_grid, disparity_computation
 
 
+try:
+    autocast = torch.cuda.amp.autocast
+except:
+    # dummy autocast for PyTorch < 1.6
+    class autocast:
+        def __init__(self, enabled):
+            pass
+        def __enter__(self):
+            pass
+        def __exit__(self, *args):
+            pass
+
+
 class Loss(nn.Module):
     def __init__(self, loss_gamma=0.9, max_flow=700, loss_zeta=0.3,
                  smoothness=None, slant=False, slant_norm=False, ner_kernel_size=3,
-                 local_rank=None):
+                 local_rank=None, mixed_precision=True):
         super(Loss, self).__init__()
         self.loss_gamma = loss_gamma
         self.loss_zeta = loss_zeta 
         self.max_flow = max_flow
         self.smoothness = smoothness
+        self.mixed_precision = mixed_precision
 
         if self.smoothness is not None and len(self.smoothness)>0:
             self.smooth_loss_computer = SmoothLoss(self.smoothness, 
@@ -56,10 +70,11 @@ class Loss(nn.Module):
             assert i_loss.shape == valid.shape, [i_loss.shape, valid.shape, flow_gt.shape, flow_preds[i].shape]
             flow_loss += i_weight * i_loss[valid.bool()].mean()
 
-            if self.smoothness=="gradient":
-                smooth_loss += i_weight * self.smooth_loss_computer(flow_preds[i], imgL).mean()
-            elif self.smoothness=="curvature":
-                smooth_loss += i_weight * self.smooth_loss_computer(params_list[i], imgL).mean()
+            with autocast(enabled=self.mixed_precision):
+                if self.smoothness=="gradient":
+                    smooth_loss += i_weight * self.smooth_loss_computer(flow_preds[i], imgL).mean()
+                elif self.smoothness=="curvature":
+                    smooth_loss += i_weight * self.smooth_loss_computer(params_list[i], imgL).mean()
 
         epe = torch.sum((flow_preds[-1] - flow_gt)**2, dim=1).sqrt()
         epe = epe.view(-1)[valid.view(-1)]
@@ -109,7 +124,7 @@ class SmoothLoss(nn.Module):
         self.coord_ner_extractor = NerghborExtractor(2, kernel_size)
         self.params_ner_extractor = NerghborExtractor(3, kernel_size)
     
-    def forward(self, params, imgL, coordL, corrdR):
+    def forward(self, params, imgL):
         """Function: compute smoothe loss 
         args:
             params: (B,3,H,W)
@@ -163,7 +178,7 @@ class NerghborExtractor(nn.Module):
         super(NerghborExtractor, self).__init__()
         # build kernel matrix
         if isinstance(kernel_size, int):
-            neighbor_kernel = np.zeros((kernel_size*kernel_size, kernel_size, kernel_size))
+            neighbor_kernel = np.zeros((kernel_size*kernel_size, kernel_size, kernel_size), dtype=np.float16)
         else:
             raise Exception("kernel_size currently only supports integer")
         N,H,W = neighbor_kernel.shape
