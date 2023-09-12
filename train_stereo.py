@@ -109,7 +109,8 @@ class Logger:
 def train(args):
 
     model = get_model_ddp(args)
-    print("Parameter Count: %d" % count_parameters(model))
+    if args.local_rank==0 :
+        logging.info("Parameter Count: %d" % count_parameters(model))
 
     train_loader = fetch_dataloader(args)
     optimizer, scheduler = fetch_optimizer(args, model)
@@ -149,10 +150,27 @@ def train(args):
                 flow_predictions = model(image1, image2, iters=args.train_iters)
             assert model.training
 
-            loss, metrics, \
-            flow_loss, smooth_loss = myLoss(flow_predictions, flow, valid, 
-                                            params_list=params_list, 
-                                            imgL=image1, imgR=image2)
+            try:
+                loss, metrics, \
+                flow_loss, smooth_loss = myLoss(flow_predictions, flow, valid, 
+                                                params_list=params_list, 
+                                                imgL=image1, imgR=image2)
+            except Exception as err:
+                if args.local_rank==0:
+                    debug_info = ""
+                    n_predictions = len(flow_predictions)
+                    for i in range(n_predictions):
+                        if torch.isnan(flow_preds[i]).any():
+                            debug_info += f" {i}-iter contains NAN."
+                        if torch.isinf(flow_preds[i]).any():
+                            debug_info += f" {i}-iter contains INF."
+                    for name, param in model.named_parameters():
+                        if param.requires_grad and torch.isnan(param).any():
+                            debug_info += f" NAN found in parameter: {name}"
+                        if param.requires_grad and torch.isinf(param).any():
+                            debug_info += f" INF found in parameter: {name}"
+                    logging.info(debug_info)
+                raise Exception(err)
 
             if args.local_rank==0:
                 logger.push(metrics)

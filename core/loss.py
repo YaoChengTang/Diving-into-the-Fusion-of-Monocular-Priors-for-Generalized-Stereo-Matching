@@ -191,7 +191,7 @@ class NerghborExtractor(nn.Module):
         # extract nerghbors through depthwise conv
         output_channel = input_channel*kernel_size*kernel_size
         self.conv = nn.Conv2d(input_channel, output_channel, 
-                              kernel_size=3, padding=1, bias=False, 
+                              kernel_size=kernel_size, padding=kernel_size//2, bias=False, 
                               groups=input_channel, padding_mode="reflect")
         self.conv.weight = nn.Parameter(neighbor_kernel.unsqueeze(1), requires_grad=False)
         
