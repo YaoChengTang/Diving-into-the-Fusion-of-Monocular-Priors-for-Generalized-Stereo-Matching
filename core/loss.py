@@ -25,7 +25,8 @@ except:
 
 class Loss(nn.Module):
     def __init__(self, loss_gamma=0.9, max_flow=700, loss_zeta=0.3,
-                 smoothness=None, slant=False, slant_norm=False, ner_kernel_size=3,
+                 smoothness=None, slant=False, slant_norm=False, 
+                 ner_kernel_size=3, ner_weight_reduce=False,
                  local_rank=None, mixed_precision=True):
         super(Loss, self).__init__()
         self.loss_gamma = loss_gamma
@@ -38,12 +39,14 @@ class Loss(nn.Module):
             self.smooth_loss_computer = SmoothLoss(self.smoothness, 
                                                    slant=slant, 
                                                    slant_norm=slant_norm, 
-                                                   kernel_size=ner_kernel_size)
+                                                   kernel_size=ner_kernel_size,
+                                                   ner_weight_reduce=ner_weight_reduce)
         
         if local_rank==0 :
             logging.info(f"smoothness: {smoothness}, " +\
                          f"slant: {slant}, slant_norm: {slant_norm}, " +\
-                         f"ner_kernel_size: {ner_kernel_size}")
+                         f"ner_kernel_size: {ner_kernel_size}, " +\
+                         f"ner_weight_reduce: {ner_weight_reduce}. " )
     
     def forward(self, flow_preds, flow_gt, valid, 
                 params_list=None, imgL=None, imgR=None):
@@ -110,7 +113,7 @@ class SmoothLoss(nn.Module):
         d_p(f_q)   = a_p q_u + b_p q_v + c_p
     """
     def __init__(self, smoothness, slant=False, slant_norm=False, kernel_size=3, 
-                 epsilon=0.01, tau=3, eta=10):
+                 ner_weight_reduce=False, epsilon=0.01, tau=3, eta=10):
         super(SmoothLoss, self).__init__()
         self.smoothness = smoothness
         self.slant = slant
@@ -120,7 +123,8 @@ class SmoothLoss(nn.Module):
         self.tau = tau
         self.epsilon = epsilon
 
-        self.img_ner_extractor = NerghborExtractor(3, kernel_size)
+        self.reduce = ner_weight_reduce
+        self.img_ner_extractor = NerghborExtractor(3, kernel_size, reduce=self.reduce)
         self.coord_ner_extractor = NerghborExtractor(2, kernel_size)
         self.params_ner_extractor = NerghborExtractor(3, kernel_size)
     
@@ -141,7 +145,10 @@ class SmoothLoss(nn.Module):
         params     = params.unsqueeze(2)                  # B,3,1,H,W
 
         # w_{pq} = e^{-||I_L(p)-I_L(q)||_1 / \eta}
-        weight = torch.exp(-torch.abs(img_ner-imgL.unsqueeze(2)).mean(dim=1) / self.eta)   # B,N,H,W
+        if not self.reduce:
+            weight = torch.exp(-torch.abs(img_ner-imgL.unsqueeze(2)).mean(dim=1) / self.eta)   # B,N,H,W
+        else:
+            weight = torch.exp(-torch.abs(img_ner).mean(dim=1) / self.eta)   # B,N,H,W
 
         if self.smoothness=="gradient":
             # \hat{\psi}_{pq} = |d_p(f_p) - d_q(f_q)|
@@ -171,31 +178,74 @@ class SmoothLoss(nn.Module):
         return smooth_loss
 
 
+def diamond(n):
+    a = np.arange(n)
+    b = np.minimum(a,a[::-1])
+    return (b[:,None]+b)>=(n-1)//2
+def diamond_edge(n):
+    arr = np.diagflat(np.ones(n//2+1), n//2)
+    arr = np.maximum(arr,np.flip(arr,1))
+    return np.maximum(arr,np.flip(arr,0))
+kernel_dict = {}
+kernel_dict["diamond"] = diamond
+kernel_dict["diamond_edge"] = diamond_edge
+
 class NerghborExtractor(nn.Module):
-    """Extarct the nerghbors of each pixel using depthwise convolution. 
+    """Extarct the neighbors of each pixel using depthwise convolution. 
        Input: (B,C,H,W), Output: (B,C,N,H,W).
     """
-    def __init__(self, input_channel, kernel_size=3):
+    def __init__(self, input_channel, kernel_size=3, reduce=False):
         super(NerghborExtractor, self).__init__()
+        self.reduce = reduce
+        self.input_channel = input_channel
+
         # build kernel matrix
         if isinstance(kernel_size, int):
-            neighbor_kernel = np.zeros((kernel_size*kernel_size, kernel_size, kernel_size), dtype=np.float16)
+            H, W = kernel_size, kernel_size
+            self.neighbors_num = kernel_size*kernel_size
+            neighbor_kernel = np.zeros((self.neighbors_num, H, W), dtype=np.float16)
+            for idx in range(self.neighbors_num):
+                neighbor_kernel[idx, idx//H, idx%W] = 1
+
+        elif isinstance(kernel_size, str):
+            ## obatin the compressed kernel
+            kernel_type, size = kernel_size.split("-")
+            kernel_size = int(size)
+            compressed_kernel = kernel_dict[kernel_type](kernel_size)
+            ## decode the compressed kernel into a series of kernels
+            H, W = compressed_kernel.shape
+            self.neighbors_num = np.count_nonzero(compressed_kernel)
+            neighbors_pos = np.nonzero(compressed_kernel)
+            neighbor_kernel = np.zeros((self.neighbors_num, H, W), dtype=np.float16)
+            for idx_k, (idx_h, idx_w) in enumerate(zip(neighbors_pos[0],neighbors_pos[1])):
+                neighbor_kernel[idx_k, idx_h, idx_w] = compressed_kernel[idx_h, idx_w]
         else:
             raise Exception("kernel_size currently only supports integer")
-        N,H,W = neighbor_kernel.shape
-        for idx in range(N):
-            neighbor_kernel[idx, idx//H, idx%W] = 1
-        neighbor_kernel = np.tile(neighbor_kernel, (input_channel,1,1))
-        neighbor_kernel = torch.Tensor(neighbor_kernel)
+        if self.reduce:
+            neighbor_kernel[:, H//2, W//2] = -1
 
-        # extract nerghbors through depthwise conv
-        output_channel = input_channel*kernel_size*kernel_size
+        if not self.reduce:
+            neighbor_kernel = np.tile(neighbor_kernel, (input_channel,1,1))
+            neighbor_kernel = neighbor_kernel[:,np.newaxis]                     # in*neighbors_num, 1, k, k
+            output_channel  = input_channel*self.neighbors_num
+            groups = input_channel
+        else:
+            neighbor_kernel = np.tile(neighbor_kernel[:, np.newaxis], 
+                                      (1,input_channel,1,1))                    # neighbors_num, in, k, k
+            output_channel  = self.neighbors_num
+            groups = 1
+        
+        # extract neighbors through depthwise conv
         self.conv = nn.Conv2d(input_channel, output_channel, 
                               kernel_size=kernel_size, padding=kernel_size//2, bias=False, 
-                              groups=input_channel, padding_mode="reflect")
-        self.conv.weight = nn.Parameter(neighbor_kernel.unsqueeze(1), requires_grad=False)
+                              groups=groups, padding_mode="reflect")
+        neighbor_kernel  = torch.Tensor(neighbor_kernel)
+        self.conv.weight = nn.Parameter(neighbor_kernel, requires_grad=False)
         
     def forward(self, x):
         B,C,H,W = x.shape
-        nerghbors = self.conv(x)
-        return nerghbors.reshape((B,C,-1,H,W))
+        neighbors = self.conv(x)
+        neighbors = neighbors.reshape((B,-1,self.neighbors_num,H,W))
+        if self.reduce:
+            neighbors = neighbors / self.input_channel
+        return neighbors
