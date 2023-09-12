@@ -138,6 +138,7 @@ class SmoothLoss(nn.Module):
         coord_ner  = self.coord_ner_extractor(coord)      # B,2,N,H,W
         coord      = coord.unsqueeze(2)                   # B,2,1,H,W
         params_ner = self.params_ner_extractor(params)    # B,3,N,H,W
+        params     = params.unsqueeze(2)                  # B,3,1,H,W
 
         # w_{pq} = e^{-||I_L(p)-I_L(q)||_1 / \eta}
         weight = torch.exp(-torch.abs(img_ner-imgL.unsqueeze(2)).mean(dim=1) / self.eta)   # B,N,H,W
