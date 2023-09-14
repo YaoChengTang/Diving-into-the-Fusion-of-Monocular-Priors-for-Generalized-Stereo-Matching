@@ -145,10 +145,10 @@ def train(args):
             image1, image2, flow, valid = [x.cuda() for x in data_blob]
 
             assert model.training
-            if args.slant:
-                flow_predictions, params_list = model(image1, image2, iters=args.train_iters)
-            else:
+            if args.slant is None or len(args.slant)==0:
                 flow_predictions = model(image1, image2, iters=args.train_iters)
+            else:
+                flow_predictions, params_list = model(image1, image2, iters=args.train_iters)
             assert model.training
 
             try:
@@ -258,7 +258,7 @@ if __name__ == '__main__':
     parser.add_argument('--slow_fast_gru', action='store_true', help="iterate the low-res GRUs more frequently")
     parser.add_argument('--n_gru_layers', type=int, default=3, help="number of hidden GRU levels")
     parser.add_argument('--hidden_dims', nargs='+', type=int, default=[128]*3, help="hidden state and context dimensions")
-    parser.add_argument('--slant', action='store_true', help="use slanted stereo matching")
+    parser.add_argument('--slant', type=str, default=None, help="use slanted stereo matching")
     parser.add_argument('--slant_norm', action='store_true', help="use normalization in slanted stereo matching")
     
     # Loss parameters

@@ -93,13 +93,15 @@ def gauss_blur(input, N=5, std=1):
     output = F.conv2d(input.reshape(B*D,1,H,W), weights, padding=N//2)
     return output.view(B, D, H, W)
 
-def disparity_computation(params, slant=True, slant_norm=False, coords0=None):
+def disparity_computation(params, slant=None, slant_norm=False, coords0=None):
     """
     args:
         params: (B,C,...), C is the type of parameters.
         coords0: (B,C,...), C is the number of coordinates' axis.
     """
-    if slant :
+    if args.slant is None or len(args.slant)==0 :
+        offset = params
+    elif args.slant=="slant" :
         # d = a*u + b*v + c
         B,H,W = coords0.shape[0], coords0.shape[-2], coords0.shape[-1]
         if slant_norm:
@@ -111,6 +113,4 @@ def disparity_computation(params, slant=True, slant_norm=False, coords0=None):
             offset = params[:,0] * coords0[:,0] + \
                      params[:,1] * coords0[:,1] + \
                      params[:,2]
-    else :
-        offset = params
     return offset

@@ -25,7 +25,7 @@ except:
 
 class Loss(nn.Module):
     def __init__(self, loss_gamma=0.9, max_flow=700, loss_zeta=0.3,
-                 smoothness=None, slant=False, slant_norm=False, 
+                 smoothness=None, slant=None, slant_norm=False, 
                  ner_kernel_size=3, ner_weight_reduce=False,
                  local_rank=None, mixed_precision=True):
         super(Loss, self).__init__()
@@ -113,7 +113,7 @@ class SmoothLoss(nn.Module):
         d_p(f_p)   = a_p p_u + b_p p_v + c_p \\
         d_p(f_q)   = a_p q_u + b_p q_v + c_p
     """
-    def __init__(self, smoothness, slant=False, slant_norm=False, kernel_size=3, 
+    def __init__(self, smoothness, slant=None, slant_norm=False, kernel_size=3, 
                  ner_weight_reduce=False, epsilon=0.01, tau=3, eta=10):
         super(SmoothLoss, self).__init__()
         self.smoothness = smoothness

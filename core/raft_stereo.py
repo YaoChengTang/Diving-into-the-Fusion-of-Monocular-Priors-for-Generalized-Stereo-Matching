@@ -64,7 +64,7 @@ class RAFTStereo(nn.Module):
 
         return coords0, coords1
 
-    def upsample_flow(self, flow, mask):
+    def upsample_flow(self, flow, mask, slan_local=False):
         """ Upsample flow field [H/8, W/8, 2] -> [H, W, 2] using convex combination """
         N, D, H, W = flow.shape
         factor = 2 ** self.args.n_downsample
@@ -134,7 +134,10 @@ class RAFTStereo(nn.Module):
             # in stereo mode, project flow onto epipolar
             delta_flow[:,1] = 0.0
 
-            if self.args.slant :
+            if args.slant is None or len(args.slant)==0 :
+                # F(t+1) = F(t) + \Delta(t)
+                coords1 = coords1 + delta_flow
+            elif args.slant=="slant" :
                 # d = a*u + b*v + c
                 B,_,H,W = coords0.shape
                 if self.args.slant_norm:
@@ -152,10 +155,9 @@ class RAFTStereo(nn.Module):
                     if len(params_list)==0:
                         raw_params_list.append(delta_flow)
                     else:
-                        raw_params_list.append(raw_params_list[-1].detach() + delta_flow)
-            else :
-                # F(t+1) = F(t) + \Delta(t)
-                coords1 = coords1 + delta_flow
+                        raw_params_list.append(raw_params_list[-1].detach() + delta_flow)y
+            else:
+                raise Exception(f"No such slant type {args.slant}")
 
             # We do not need to upsample or output intermediate results in test_mode
             if test_mode and itr < iters-1:
@@ -169,7 +171,7 @@ class RAFTStereo(nn.Module):
             flow_up = flow_up[:,:1]
             flow_predictions.append(flow_up)
 
-            if self.args.slant and not test_mode:
+            if args.slant is not None and len(args.slant)>0 and not test_mode:
                 if up_mask is None:
                     params = upflow8(raw_params_list[-1])
                 else:
@@ -183,6 +185,6 @@ class RAFTStereo(nn.Module):
         if vis_mode:
             return flow_predictions
 
-        if self.args.slant:
+        if args.slant is not None and len(args.slant)>0:
             return flow_predictions, params_list
         return flow_predictions
