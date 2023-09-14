@@ -161,9 +161,9 @@ def train(args):
                     debug_info = ""
                     n_predictions = len(flow_predictions)
                     for i in range(n_predictions):
-                        if torch.isnan(flow_preds[i]).any():
+                        if torch.isnan(flow_predictions[i]).any():
                             debug_info += f" {i}-iter contains NAN."
-                        if torch.isinf(flow_preds[i]).any():
+                        if torch.isinf(flow_predictions[i]).any():
                             debug_info += f" {i}-iter contains INF."
                     for name, param in model.named_parameters():
                         if param.requires_grad and torch.isnan(param).any():

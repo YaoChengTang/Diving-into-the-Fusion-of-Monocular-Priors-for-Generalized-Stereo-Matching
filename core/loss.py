@@ -73,11 +73,12 @@ class Loss(nn.Module):
             assert i_loss.shape == valid.shape, [i_loss.shape, valid.shape, flow_gt.shape, flow_preds[i].shape]
             flow_loss += i_weight * i_loss[valid.bool()].mean()
 
-            with autocast(enabled=self.mixed_precision):
-                if self.smoothness=="gradient":
-                    smooth_loss += i_weight * self.smooth_loss_computer(flow_preds[i], imgL).mean()
-                elif self.smoothness=="curvature":
-                    smooth_loss += i_weight * self.smooth_loss_computer(params_list[i], imgL).mean()
+            if i>n_predictions//2:
+                with autocast(enabled=self.mixed_precision):
+                    if self.smoothness=="gradient":
+                        smooth_loss += i_weight * self.smooth_loss_computer(flow_preds[i], imgL).mean()
+                    elif self.smoothness=="curvature":
+                        smooth_loss += i_weight * self.smooth_loss_computer(params_list[i], imgL).mean()
 
         epe = torch.sum((flow_preds[-1] - flow_gt)**2, dim=1).sqrt()
         epe = epe.view(-1)[valid.view(-1)]
