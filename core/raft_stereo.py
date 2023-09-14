@@ -134,10 +134,10 @@ class RAFTStereo(nn.Module):
             # in stereo mode, project flow onto epipolar
             delta_flow[:,1] = 0.0
 
-            if args.slant is None or len(args.slant)==0 :
+            if self.args.slant is None or len(self.args.slant)==0 :
                 # F(t+1) = F(t) + \Delta(t)
                 coords1 = coords1 + delta_flow
-            elif args.slant=="slant" :
+            elif self.args.slant=="slant" :
                 # d = a*u + b*v + c
                 B,_,H,W = coords0.shape
                 if self.args.slant_norm:
@@ -155,9 +155,9 @@ class RAFTStereo(nn.Module):
                     if len(params_list)==0:
                         raw_params_list.append(delta_flow)
                     else:
-                        raw_params_list.append(raw_params_list[-1].detach() + delta_flow)y
+                        raw_params_list.append(raw_params_list[-1].detach() + delta_flow)
             else:
-                raise Exception(f"No such slant type {args.slant}")
+                raise Exception(f"No such slant type {self.args.slant}")
 
             # We do not need to upsample or output intermediate results in test_mode
             if test_mode and itr < iters-1:
@@ -171,7 +171,7 @@ class RAFTStereo(nn.Module):
             flow_up = flow_up[:,:1]
             flow_predictions.append(flow_up)
 
-            if args.slant is not None and len(args.slant)>0 and not test_mode:
+            if self.args.slant is not None and len(self.args.slant)>0 and not test_mode:
                 if up_mask is None:
                     params = upflow8(raw_params_list[-1])
                 else:
@@ -185,6 +185,6 @@ class RAFTStereo(nn.Module):
         if vis_mode:
             return flow_predictions
 
-        if args.slant is not None and len(args.slant)>0:
+        if self.args.slant is not None and len(self.args.slant)>0:
             return flow_predictions, params_list
         return flow_predictions

@@ -99,9 +99,9 @@ def disparity_computation(params, slant=None, slant_norm=False, coords0=None):
         params: (B,C,...), C is the type of parameters.
         coords0: (B,C,...), C is the number of coordinates' axis.
     """
-    if args.slant is None or len(args.slant)==0 :
+    if slant is None or len(slant)==0 :
         offset = params
-    elif args.slant=="slant" :
+    elif slant=="slant" :
         # d = a*u + b*v + c
         B,H,W = coords0.shape[0], coords0.shape[-2], coords0.shape[-1]
         if slant_norm:
