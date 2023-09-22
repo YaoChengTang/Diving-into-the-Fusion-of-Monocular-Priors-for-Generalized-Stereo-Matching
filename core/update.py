@@ -103,8 +103,10 @@ class BasicMultiUpdateBlock(nn.Module):
         encoder_output_dim = 128
         if args.slant is None or len(args.slant)==0:
             output_dim = 2
-        elif args.slant=="slant":
+        elif args.slant in ["slant", "slant_local"]:
             output_dim = 6
+        else:
+            raise Exception(f"No such slant type {self.args.slant}")
 
         self.gru08 = ConvGRU(hidden_dims[2], encoder_output_dim + hidden_dims[1] * (args.n_gru_layers > 1))
         self.gru16 = ConvGRU(hidden_dims[1], hidden_dims[0] * (args.n_gru_layers == 3) + hidden_dims[2])

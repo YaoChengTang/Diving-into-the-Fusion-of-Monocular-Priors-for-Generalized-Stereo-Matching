@@ -1,6 +1,7 @@
 import os
 import sys
 import logging
+import numpy as np
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',)
@@ -46,6 +47,25 @@ class RAFTStereo(nn.Module):
         else:
             self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', downsample=args.n_downsample)
         
+        # build offset for interpolation in slant plane
+        # d_p = d_q + a_q\cdot\Delta u_{q\to p} + b_q\cdot\Delta v_{q\to p}
+        if self.args.slant in ["slant_local"]:
+            factor = 2 ** self.args.n_downsample
+            delta_center = []
+            for sub_row_idx in range(0, factor):
+                for sub_col_idx in range(0, factor):
+                    delta = [-factor/2 + 0.5 + sub_row_idx, -factor/2 + 0.5 + sub_col_idx]
+                    delta_center.append(delta)
+            delta_center = np.array(delta_center)
+            delta_pq = []
+            for row_idx in [-1,0,1]:
+                for col_idx in [-1,0,1]:
+                    delta = delta_center - np.array([row_idx,col_idx])*factor
+                    delta_pq.append(delta)
+            delta_pq = np.array(delta_pq).reshape(9,factor,factor,2)
+            delta_pq = torch.Tensor(delta_pq)
+            self.delta_pq = nn.Parameter(delta_pq, requires_grad=False)   # (9,factor,factor,2)
+
         if "local_rank" not in args or args.local_rank==0 :
             logging.info(f"RAFTStereo: " + \
                          f"slant: {args.slant}, slant range norm: {args.slant_norm}")
@@ -64,15 +84,26 @@ class RAFTStereo(nn.Module):
 
         return coords0, coords1
 
-    def upsample_flow(self, flow, mask, slan_local=False):
+    def upsample_flow(self, flow, mask, params=None):
         """ Upsample flow field [H/8, W/8, 2] -> [H, W, 2] using convex combination """
         N, D, H, W = flow.shape
         factor = 2 ** self.args.n_downsample
         mask = mask.view(N, 1, 9, factor, factor, H, W)
         mask = torch.softmax(mask, dim=2)
 
-        up_flow = F.unfold(factor * flow, [3,3], padding=1)
-        up_flow = up_flow.view(N, D, 9, 1, 1, H, W)
+        if self.args.slant in ["slant_local"] and params is not None:
+            up_flow = F.unfold(factor * flow, [3,3], padding=1)
+            up_flow = up_flow.view(N, D, 9, 1, 1, H, W)
+            a = F.unfold(params[:,2:4], [3,3], padding=1)
+            a = a.view(N, D, 9, 1, 1, H, W)
+            b = F.unfold(params[:,4:6], [3,3], padding=1)
+            b = b.view(N, D, 9, 1, 1, H, W)
+            # d_p = d_q + a_q\cdot\Delta u_{q\to p} + b_q\cdot\Delta v_{q\to p}
+            delta_pq = self.delta_pq.view(1,1,9,factor,factor,1,1,2)
+            up_flow = up_flow + a*delta_pq[...,1] + b*delta_pq[...,0]
+        else:
+            up_flow = F.unfold(factor * flow, [3,3], padding=1)
+            up_flow = up_flow.view(N, D, 9, 1, 1, H, W)
 
         up_flow = torch.sum(mask * up_flow, dim=2)
         up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
@@ -137,18 +168,21 @@ class RAFTStereo(nn.Module):
             if self.args.slant is None or len(self.args.slant)==0 :
                 # F(t+1) = F(t) + \Delta(t)
                 coords1 = coords1 + delta_flow
-            elif self.args.slant=="slant" :
+            elif self.args.slant in ["slant", "slant_local"] :
                 # d = a*u + b*v + c
                 B,_,H,W = coords0.shape
-                if self.args.slant_norm:
-                    norm_range = torch.Tensor([W,H])[None,:,None,None].float().to(coords0.device)
-                    offset = delta_flow[:,0:1] * coords0 / norm_range + \
-                             delta_flow[:,2:3] * coords0[:,[1,0]] / norm_range[:,[1,0]] + \
-                             delta_flow[:,4:5]
-                else:
-                    offset = delta_flow[:,0:1] * coords0 + \
-                             delta_flow[:,2:3] * coords0[:,[1,0]] + \
-                             delta_flow[:,4:5]
+                if self.args.slant=="slant" :
+                    if self.args.slant_norm:
+                        norm_range = torch.Tensor([W,H])[None,:,None,None].float().to(coords0.device)
+                        offset = delta_flow[:,0:1] * coords0 / norm_range + \
+                                 delta_flow[:,2:3] * coords0[:,[1,0]] / norm_range[:,[1,0]] + \
+                                 delta_flow[:,4:5]
+                    else:
+                        offset = delta_flow[:,0:1] * coords0 + \
+                                 delta_flow[:,2:3] * coords0[:,[1,0]] + \
+                                 delta_flow[:,4:5]
+                elif self.args.slant=="slant_local" :
+                    offset = delta_flow[:,:2]
                 coords1 = coords1 + offset
 
                 if not test_mode:
@@ -167,7 +201,8 @@ class RAFTStereo(nn.Module):
             if up_mask is None:
                 flow_up = upflow8(coords1 - coords0)
             else:
-                flow_up = self.upsample_flow(coords1 - coords0, up_mask)
+                flow_up = self.upsample_flow(coords1 - coords0, up_mask,
+                                             params=raw_params_list[-1] if self.args.slant in ["slant", "slant_local"] else None)
             flow_up = flow_up[:,:1]
             flow_predictions.append(flow_up)
 
