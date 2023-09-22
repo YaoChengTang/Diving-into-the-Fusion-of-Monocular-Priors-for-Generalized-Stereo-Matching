@@ -205,6 +205,7 @@ class Visualizer:
             error_map_sequence.append(error_map)
             colored_error_map = colorize_error_map(error_map)
             colored_error_map_sequence.append(colored_error_map)
+        
         # get the colored improvement map between adjacent iterations,
         # the improvement map of the first iteration is empty.
         colored_improvement_map_sequence = []
@@ -216,6 +217,17 @@ class Visualizer:
             colored_improvement_map = colorize_improvement_map(improvement_map)
             colored_improvement_map_sequence.append(colored_improvement_map)
         
+        # get the movement vector at each step
+        colored_movement_map_sequence = []
+        start_idx = 2
+        for idx in range(0, len(flow_pr_sequence)):
+            if idx<start_idx :
+                movement_map = np.zeros_like(flow_pr_sequence[idx])
+            else :
+                movement_map = flow_pr_sequence[idx] - flow_pr_sequence[idx-1]
+            colored_movement_map = colorize_improvement_map(movement_map)
+            colored_movement_map_sequence.append(colored_movement_map)
+
         # vis
         ## visualize GT and the final prediction
         info = "epe:{:.2f}".format(vis_epe_sequence[-1]) + \
@@ -245,12 +257,15 @@ class Visualizer:
                                 "cmap":None, },
                                {"img":colored_improvement_map_sequence[idx], 
                                 "title":"Improvement Map (err[i]-err[i-1])-{}".format(idx), 
+                                "cmap":'tab20c', },
+                               {"img":colored_movement_map_sequence[idx], 
+                                "title":"Movement Map (disp[i]-disp[i-1])-{}".format(idx), 
                                 "cmap":'tab20c', },]
         pre,lat = os.path.splitext(sv_path)
         sv_path = pre +"-sequence"+ lat
         show_imgs(atom_dict_list, 
                   sv_img=True, save2where=sv_path, if_inter=False, 
-                  fontsize=20, szWidth=10, szHeight=5, group=3, dpi=300)
+                  fontsize=20, szWidth=10, szHeight=5, group=4, dpi=300)
         # print("saving {}".format(sv_path))
         pass
 
