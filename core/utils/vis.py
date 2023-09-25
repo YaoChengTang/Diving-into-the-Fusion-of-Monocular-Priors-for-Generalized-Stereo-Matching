@@ -46,7 +46,7 @@ def show_imgs(param, sv_img=False, save2where=None, fontsize=20, szWidth=10, szH
         plt.subplot(rows,cols,i+1)
 #         plt.subplots_adjust(wspace =0, hspace =0)#调整子图间距
         plt.title(plt_par.get("title").replace("\t","   "), fontsize=fontsize)
-        im = plt.imshow(plt_par.get("img"), cmap=plt_par.get("cmap"))
+        im = plt.imshow(plt_par.get("img"), cmap=plt_par.get("cmap"), alpha=plt_par.get("alpha"))
         
         if plt_par.get("colorbar") == True :
             plt.colorbar(im, orientation='horizontal', fraction=0.02, pad=0.0004)
@@ -138,6 +138,13 @@ def show_dis(param, sv_img=False, fontsize=20, szWidth=10, szHeight=5, group=3):
     # plt.show(block=False)
 
 
+def compute_confidence(movement_cur, movement_pre):
+    # mask_forward = ((movement_cur<-1) & (movement_cur>=movement_pre-3)) | (movement_cur>=-1)
+    mask_forward = np.ones_like(movement_cur)
+    mask_direction = ((np.abs(movement_cur)>1) & (np.abs(movement_pre)>1) & (movement_cur*movement_pre>0)) | (np.abs(movement_cur)<=1) | (np.abs(movement_pre)<=1)
+    return mask_forward * mask_direction
+
+
 class Visualizer:
     def __init__(self, root, sv_root, dataset=None, scratch=True):
         self.root = root.rstrip("/")
@@ -208,25 +215,64 @@ class Visualizer:
         
         # get the colored improvement map between adjacent iterations,
         # the improvement map of the first iteration is empty.
+        improvement_map_sequence = []
         colored_improvement_map_sequence = []
         for idx in range(0, len(error_map_sequence)):
             if idx==0 :
                 improvement_map = np.zeros_like(error_map)
             else :
                 improvement_map = error_map_sequence[idx] - error_map_sequence[idx-1]
+            improvement_map_sequence.append(improvement_map)
             colored_improvement_map = colorize_improvement_map(improvement_map)
             colored_improvement_map_sequence.append(colored_improvement_map)
         
         # get the movement vector at each step
+        start_idx = 1
+        movement_map_sequence = []
         colored_movement_map_sequence = []
-        start_idx = 2
         for idx in range(0, len(flow_pr_sequence)):
             if idx<start_idx :
                 movement_map = np.zeros_like(flow_pr_sequence[idx])
             else :
                 movement_map = flow_pr_sequence[idx] - flow_pr_sequence[idx-1]
+            movement_map_sequence.append(movement_map)
             colored_movement_map = colorize_improvement_map(movement_map)
             colored_movement_map_sequence.append(colored_movement_map)
+        
+        # get the difference between movement vector
+        colored_acceleration_map_sequence =[]
+        for idx in range(0, len(movement_map_sequence)):
+            if idx<start_idx+1 :
+                acceleration_map = np.zeros_like(movement_map_sequence[idx])
+            else :
+                acceleration_map = movement_map_sequence[idx] - movement_map_sequence[idx-1]
+            colored_acceleration_map = colorize_improvement_map(acceleration_map)
+            colored_acceleration_map_sequence.append(colored_acceleration_map)
+
+        # get confidence
+        static_improvement_list = []
+        mask_sequence_list = []
+        for idx in range(0, len(flow_pr_sequence)):
+            if idx<=start_idx :
+                static_improvement_list.append([0,0,0,0])
+                confidence = np.ones_like(error_map_sequence[-1])
+                confidence[:1,:1] = 0
+                mask_sequence_list.append(confidence)
+            else:
+                improvement_map = improvement_map_sequence[idx]
+                TP = (improvement_map<-1).sum() / ((improvement_map<-1)|(improvement_map>1)).sum()
+                FN = (improvement_map>1).sum() / ((improvement_map<-1)|(improvement_map>1)).sum()
+                confidence = compute_confidence(movement_map_sequence[idx], movement_map_sequence[idx-1])
+                TP_conf = (improvement_map*confidence<-1).sum() / ((improvement_map<-1)|(improvement_map>1)).sum()
+                FN_conf = (improvement_map*confidence>1).sum() / ((improvement_map<-1)|(improvement_map>1)).sum()
+                static_improvement_list.append([TP,FN,TP_conf,FN_conf])
+                mask_sequence_list.append(confidence)
+            H,W = confidence.shape
+            confidence = confidence[..., np.newaxis]
+            ratio = 0.2
+            colored_movement_map_sequence[idx][:H] = ((1-ratio*(1-confidence))*colored_movement_map_sequence[idx][:H]).astype(np.uint8)
+            colored_improvement_map_sequence[idx][:H] = ((1-ratio*(1-confidence))*colored_improvement_map_sequence[idx][:H]).astype(np.uint8) 
+            colored_acceleration_map_sequence[idx][:H] = ((1-ratio*(1-confidence))*colored_acceleration_map_sequence[idx][:H]).astype(np.uint8)
 
         # vis
         ## visualize GT and the final prediction
@@ -245,29 +291,49 @@ class Visualizer:
         ## visuzalize the prediction sequence
         atom_dict_list = [{"img":flow_gt, "title":"GT Disparity", "cmap":'jet'},
                           {"img":image1, "title":"Left Image", },
-                          {"img":image2, "title":"Right Image", },]
+                          {"img":image2, "title":"Right Image", },
+                          {"img":np.zeros_like(image2), "title":"", },
+                          {"img":np.zeros_like(image2), "title":"", },
+                          {"img":np.zeros_like(image2), "title":"", },]
         for idx in range(0, len(error_map_sequence)):
+            if idx>20:
+                break
             info = "epe:{:.2f}".format(vis_epe_sequence[idx]) + ", " + \
                    "3px:{:.1f}".format(vis_xpx_sequence[idx]*100)
             atom_dict_list += [{"img":flow_pr_sequence[idx], 
                                 "title":"Predicted Disparity-{}".format(idx), 
-                                "cmap":'jet', },
+                                "cmap":'jet', 
+                                "alpha": mask_sequence_list[idx]+(mask_sequence_list[idx]<0.5)*0.5, },
                                {"img":colored_error_map_sequence[idx], 
                                 "title":"Error Map-{}".format(idx)+": "+info, 
                                 "cmap":None, },
                                {"img":colored_improvement_map_sequence[idx], 
-                                "title":"Improvement Map (err[i]-err[i-1])-{}".format(idx), 
-                                "cmap":'tab20c', },
+                                "title":"Improvement (err[i]-err[i-1])-{}".format(idx), 
+                                "cmap":None, },
                                {"img":colored_movement_map_sequence[idx], 
-                                "title":"Movement Map (disp[i]-disp[i-1])-{}".format(idx), 
-                                "cmap":'tab20c', },]
+                                "title":"Movement (disp[i]-disp[i-1])-{}".format(idx), 
+                                "cmap":None, },
+                               {"img":colored_acceleration_map_sequence[idx], 
+                                "title":"Acceleration (Move[i]-Move[i-1])-{}".format(idx), 
+                                "cmap":None, },
+                               {"img":mask_sequence_list[idx], 
+                                "title":"Mask-{}".format(idx), 
+                                "cmap":'gray', },]
         pre,lat = os.path.splitext(sv_path)
         sv_path = pre +"-sequence"+ lat
         show_imgs(atom_dict_list, 
                   sv_img=True, save2where=sv_path, if_inter=False, 
-                  fontsize=20, szWidth=10, szHeight=5, group=4, dpi=300)
+                  fontsize=20, szWidth=int(5*image1.shape[1]/image1.shape[0]), szHeight=5, 
+                  group=6, dpi=300)
         # print("saving {}".format(sv_path))
         pass
+# {"img":colored_improvement_map_sequence[idx], 
+#                                 "title":"Improvement (err[i]-err[i-1])-{}".format(idx)+\
+#                                         "\nTP:{:.3f}, FN:{:.3f} ".format(static_improvement_list[idx][0],
+#                                                                          static_improvement_list[idx][1])+\
+#                                         "TP':{:.3f}, FN':{:.3f} ".format(static_improvement_list[idx][2],
+#                                                                          static_improvement_list[idx][3]), 
+#                                 "cmap":None, },
 
 
 def colorize_error_map(error_map):
