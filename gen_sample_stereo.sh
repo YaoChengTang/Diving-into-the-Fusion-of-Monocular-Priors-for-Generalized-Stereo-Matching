@@ -12,6 +12,6 @@
 # CUDA_VISIBLE_DEVICE=2 python3 gen_sample_stereo.py --restore_ckpt pretrained/raftstereo-NS.tar --dataset kitti --sv_root /home/users/chengtang.yao/Output/raftstereo-nerf
 # CUDA_VISIBLE_DEVICE=2 python3 gen_sample_stereo.py --restore_ckpt pretrained/raftstereo-NS.tar --dataset eth3d --sv_root /home/users/chengtang.yao/Output/raftstereo-nerf
 
-CUDA_VISIBLE_DEVICE=2 python3 gen_sample_stereo.py --restore_ckpt pretrained/raftstereo-sceneflow.tar --dataset middlebury_H --sv_root /home/users/chengtang.yao/Output/raftstereo-confidence
-CUDA_VISIBLE_DEVICE=2 python3 gen_sample_stereo.py --restore_ckpt pretrained/raftstereo-sceneflow.tar --dataset kitti --sv_root /home/users/chengtang.yao/Output/raftstereo-confidence
-CUDA_VISIBLE_DEVICE=2 python3 gen_sample_stereo.py --restore_ckpt pretrained/raftstereo-sceneflow.tar --dataset eth3d --sv_root /home/users/chengtang.yao/Output/raftstereo-confidence
+CUDA_VISIBLE_DEVICE=2 python3 gen_sample_stereo.py --restore_ckpt pretrained/raftstereo-sceneflow.pth --dataset middlebury_H --sv_root /home/users/chengtang.yao/Output/raftstereo-confidence
+CUDA_VISIBLE_DEVICE=2 python3 gen_sample_stereo.py --restore_ckpt pretrained/raftstereo-sceneflow.pth --dataset kitti --sv_root /home/users/chengtang.yao/Output/raftstereo-confidence
+CUDA_VISIBLE_DEVICE=2 python3 gen_sample_stereo.py --restore_ckpt pretrained/raftstereo-sceneflow.pth --dataset eth3d --sv_root /home/users/chengtang.yao/Output/raftstereo-confidence

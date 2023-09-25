@@ -185,11 +185,10 @@ class RAFTStereo(nn.Module):
                     offset = delta_flow[:,:2]
                 coords1 = coords1 + offset
 
-                if not test_mode:
-                    if len(params_list)==0:
-                        raw_params_list.append(delta_flow)
-                    else:
-                        raw_params_list.append(raw_params_list[-1].detach() + delta_flow)
+                if len(params_list)==0:
+                    raw_params_list.append(delta_flow)
+                else:
+                    raw_params_list.append(raw_params_list[-1].detach() + delta_flow)
             else:
                 raise Exception(f"No such slant type {self.args.slant}")
 
