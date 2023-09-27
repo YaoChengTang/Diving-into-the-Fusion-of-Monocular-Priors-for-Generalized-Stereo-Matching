@@ -27,13 +27,15 @@ class Loss(nn.Module):
     def __init__(self, loss_gamma=0.9, max_flow=700, loss_zeta=0.3,
                  smoothness=None, slant=None, slant_norm=False, 
                  ner_kernel_size=3, ner_weight_reduce=False,
-                 local_rank=None, mixed_precision=True):
+                 local_rank=None, mixed_precision=True,
+                 args=None):
         super(Loss, self).__init__()
         self.loss_gamma = loss_gamma
         self.loss_zeta = loss_zeta 
         self.max_flow = max_flow
         self.smoothness = smoothness
         self.mixed_precision = mixed_precision
+        self.conf_disp = args.conf_disp
 
         if self.smoothness is not None and len(self.smoothness)>0:
             self.smooth_loss_computer = SmoothLoss(self.smoothness, 
@@ -46,15 +48,17 @@ class Loss(nn.Module):
             logging.info(f"smoothness: {smoothness}, " +\
                          f"slant: {slant}, slant_norm: {slant_norm}, " +\
                          f"ner_kernel_size: {ner_kernel_size}, " +\
-                         f"ner_weight_reduce: {ner_weight_reduce}. " )
+                         f"ner_weight_reduce: {ner_weight_reduce}, " +\
+                         f"conf_disp: {self.conf_disp}. " )
     
-    def forward(self, flow_preds, flow_gt, valid, 
+    def forward(self, flow_preds, flow_gt, valid, global_batch_num,
                 confidence_list=None, params_list=None, imgL=None, imgR=None):
         """ Loss function defined over sequence of flow predictions """
         n_predictions = len(flow_preds)
         assert n_predictions >= 1
         flow_loss = 0.0
         smooth_loss = 0.0
+        confidence_loss = 0.0
 
         # exlude invalid pixels and extremely large diplacements
         mag = torch.sum(flow_gt**2, dim=1).sqrt()
@@ -69,17 +73,20 @@ class Loss(nn.Module):
             # We adjust the loss_gamma so it is consistent for any number of RAFT-Stereo iterations
             adjusted_loss_gamma = self.loss_gamma**(15/(n_predictions - 1))
             i_weight = adjusted_loss_gamma**(n_predictions - i - 1)
-            i_loss = (flow_preds[i] - flow_gt).abs()
-            assert i_loss.shape == valid.shape, [i_loss.shape, valid.shape, flow_gt.shape, flow_preds[i].shape]
-            flow_loss += i_weight * i_loss[valid.bool()].mean()
 
             # confidence loss
-            confidence_loss = 0
-            for confidence in confidence_list:
-                if confidence is not None:
-                    gt_error = (flow_preds[i].detach() - flow_gt).abs()
-                    gt_error = F.interpolate(gt_error,scale_factor=1/4,mode='bilinear')
-                    confidence_loss += i_weight * F.smooth_l1_loss(confidence, gt_error)
+            if confidence_list[i] is not None:
+                gt_error = (flow_preds[i].detach() - flow_gt).abs()
+                gt_error = F.interpolate(gt_error,scale_factor=1/4,mode='bilinear')
+                confidence_loss += i_weight * F.smooth_l1_loss(confidence_list[i], gt_error)
+
+            # disprity loss
+            i_loss = (flow_preds[i] - flow_gt).abs()
+            if self.conf_disp and global_batch_num>3 and confidence_list[i] is not None:
+                weight = F.interpolate(confidence_list[i],scale_factor=4,mode='bilinear')
+                i_loss = i_loss * (F.sigmoid(weight.detach()/3)*1.5 + 1)
+            assert i_loss.shape == valid.shape, [i_loss.shape, valid.shape, flow_gt.shape, flow_preds[i].shape]
+            flow_loss += i_weight * i_loss[valid.bool()].mean()
 
             if i>n_predictions//2:
                 with autocast(enabled=self.mixed_precision):

@@ -127,7 +127,8 @@ def train(args):
                     ner_kernel_size=args.ner_kernel_size,
                     ner_weight_reduce=args.ner_weight_reduce,
                     local_rank=args.local_rank,
-                    mixed_precision=args.mixed_precision)
+                    mixed_precision=args.mixed_precision,
+                    args=args)
     device  = torch.device("cuda", args.local_rank)
     myLoss  = myLoss.to(device)
                     
@@ -151,10 +152,10 @@ def train(args):
             try:
                 loss, metrics, \
                 flow_loss, confidence_loss, \
-                smooth_loss = myLoss(flow_predictions, flow, valid, 
-                                                confidence_list=confidence_list,
-                                                params_list=params_list, 
-                                                imgL=image1, imgR=None)
+                smooth_loss = myLoss(flow_predictions, flow, valid, global_batch_num,
+                                    confidence_list=confidence_list,
+                                    params_list=params_list, 
+                                    imgL=image1, imgR=None)
             except Exception as err:
                 if args.local_rank==0:
                     debug_info = ""
@@ -268,6 +269,7 @@ if __name__ == '__main__':
     parser.add_argument('--loss_smooth', type=str, default=None, choices=["", "gradient", "curvature"], help="use smoothness loss")
     parser.add_argument('--ner_kernel_size', default=3, help="nerghborhood size used in smooth loss")
     parser.add_argument('--ner_weight_reduce', action='store_true', help="pre-reduce in the nerghborhood computation of smooth loss")
+    parser.add_argument('--conf_disp', action='store_true', help="use confidence in disparity loss")
 
     # Data augmentation
     parser.add_argument('--img_gamma', type=float, nargs='+', default=None, help="gamma range")

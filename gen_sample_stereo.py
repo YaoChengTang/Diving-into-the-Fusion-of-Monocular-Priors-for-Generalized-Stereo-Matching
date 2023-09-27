@@ -295,6 +295,9 @@ if __name__ == '__main__':
     parser.add_argument('--n_gru_layers', type=int, default=3, help="number of hidden GRU levels")
     parser.add_argument('--slant', type=str, default=None, help="use slanted stereo matching")
     parser.add_argument('--slant_norm', action='store_true', help="use normalization in slanted stereo matching")
+    parser.add_argument('--confidence', action='store_true', help="use confidence learning")
+    parser.add_argument('--offset_memory_size', type=int, default=2, help="size of offset memory in confidence learning")
+    parser.add_argument('--detach_in_confidence', action='store_true', help="detach for feature and offset in confidence learning")
     args = parser.parse_args()
 
     assert args.sv_root is not None, "Please specify the visualization root"
