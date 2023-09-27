@@ -14,6 +14,7 @@ from core.update import BasicMultiUpdateBlock
 from core.extractor import BasicEncoder, MultiBasicEncoder, ResidualBlock
 from core.corr import CorrBlock1D, PytorchAlternateCorrBlock1D, CorrBlockFast1D, AlternateCorrBlock
 from core.utils.utils import coords_grid, upflow8
+from core.confidence import OffsetConfidence
 
 
 try:
@@ -47,6 +48,9 @@ class RAFTStereo(nn.Module):
         else:
             self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', downsample=args.n_downsample)
         
+        if args.confidence:
+            self.confidence_computer = OffsetConfidence(args)
+
         # build offset for interpolation in slant plane
         # d_p = d_q + a_q\cdot\Delta u_{q\to p} + b_q\cdot\Delta v_{q\to p}
         if self.args.slant in ["slant_local"]:
@@ -68,6 +72,7 @@ class RAFTStereo(nn.Module):
 
         if "local_rank" not in args or args.local_rank==0 :
             logging.info(f"RAFTStereo: " + \
+                         f"Confidence: {args.confidence}, offset_memory_size: {args.offset_memory_size}" +\
                          f"slant: {args.slant}, slant range norm: {args.slant_norm}")
 
     def freeze_bn(self):
@@ -151,6 +156,8 @@ class RAFTStereo(nn.Module):
         flow_predictions = []
         raw_params_list = []
         params_list = []
+        confidence_list = []
+        offset_memory = []
         for itr in range(iters):
             coords1 = coords1.detach()
             corr = corr_fn(coords1) # index correlation volume
@@ -161,6 +168,17 @@ class RAFTStereo(nn.Module):
                 if self.args.n_gru_layers >= 2 and self.args.slow_fast_gru:# Update low-res GRU and mid-res GRU
                     net_list = self.update_block(net_list, inp_list, iter32=self.args.n_gru_layers==3, iter16=True, iter08=False, update=False)
                 net_list, up_mask, delta_flow = self.update_block(net_list, inp_list, corr, flow, iter32=self.args.n_gru_layers==3, iter16=self.args.n_gru_layers>=2)
+
+                # acquire confidence
+                if self.args.confidence:
+                    offset_memory.append(delta_flow[:,0:2])
+                    if itr<self.args.offset_memory_size:
+                        confidence = None
+                    else:
+                        confidence = self.confidence_computer(fmap1, offset_memory[-self.args.offset_memory_size:])
+                else:
+                    confidence = None
+                confidence_list.append(confidence)
 
             # in stereo mode, project flow onto epipolar
             delta_flow[:,1] = 0.0
@@ -219,6 +237,4 @@ class RAFTStereo(nn.Module):
         if vis_mode:
             return flow_predictions
 
-        if self.args.slant is not None and len(self.args.slant)>0:
-            return flow_predictions, params_list
-        return flow_predictions
+        return flow_predictions, confidence_list, params_list

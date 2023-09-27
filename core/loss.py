@@ -49,7 +49,7 @@ class Loss(nn.Module):
                          f"ner_weight_reduce: {ner_weight_reduce}. " )
     
     def forward(self, flow_preds, flow_gt, valid, 
-                params_list=None, imgL=None, imgR=None):
+                confidence_list=None, params_list=None, imgL=None, imgR=None):
         """ Loss function defined over sequence of flow predictions """
         n_predictions = len(flow_preds)
         assert n_predictions >= 1
@@ -73,6 +73,14 @@ class Loss(nn.Module):
             assert i_loss.shape == valid.shape, [i_loss.shape, valid.shape, flow_gt.shape, flow_preds[i].shape]
             flow_loss += i_weight * i_loss[valid.bool()].mean()
 
+            # confidence loss
+            confidence_loss = 0
+            for confidence in confidence_list:
+                if confidence is not None:
+                    gt_error = (flow_preds[i].detach() - flow_gt).abs()
+                    gt_error = F.interpolate(gt_error,scale_factor=1/4,mode='bilinear')
+                    confidence_loss += i_weight * F.smooth_l1_loss(confidence, gt_error)
+
             if i>n_predictions//2:
                 with autocast(enabled=self.mixed_precision):
                     if self.smoothness=="gradient":
@@ -91,11 +99,11 @@ class Loss(nn.Module):
         }
 
         if self.smoothness is not None and len(self.smoothness)>0:
-            loss = flow_loss + self.loss_zeta * smooth_loss
+            loss = flow_loss + confidence_loss +  self.loss_zeta * smooth_loss
         else:
-            loss = flow_loss
+            loss = flow_loss + confidence_loss
             smooth_loss = torch.Tensor([0.0]).to(flow_loss.device)
-        return loss, metrics, flow_loss, smooth_loss
+        return loss, metrics, flow_loss, confidence_loss, smooth_loss
 
 
 class SmoothLoss(nn.Module):

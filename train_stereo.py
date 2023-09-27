@@ -145,15 +145,14 @@ def train(args):
             image1, image2, flow, valid = [x.cuda() for x in data_blob]
 
             assert model.training
-            if args.slant is None or len(args.slant)==0:
-                flow_predictions = model(image1, image2, iters=args.train_iters)
-            else:
-                flow_predictions, params_list = model(image1, image2, iters=args.train_iters)
+            flow_predictions, confidence_list, params_list = model(image1, image2, iters=args.train_iters)
             assert model.training
 
             try:
                 loss, metrics, \
-                flow_loss, smooth_loss = myLoss(flow_predictions, flow, valid, 
+                flow_loss, confidence_loss, \
+                smooth_loss = myLoss(flow_predictions, flow, valid, 
+                                                confidence_list=confidence_list,
                                                 params_list=params_list, 
                                                 imgL=image1, imgR=None)
             except Exception as err:
@@ -177,6 +176,7 @@ def train(args):
                 logger.push(metrics)
                 logger.writer.add_scalar("live_loss", loss.item(), global_batch_num)
                 logger.writer.add_scalar("live_flow_loss", flow_loss.item(), global_batch_num)
+                logger.writer.add_scalar("live_confidence_loss", confidence_loss.item(), global_batch_num)
                 logger.writer.add_scalar("live_smooth_loss", smooth_loss.item(), global_batch_num)
                 logger.writer.add_scalar(f'learning_rate', optimizer.param_groups[0]['lr'], global_batch_num)
             
@@ -260,6 +260,9 @@ if __name__ == '__main__':
     parser.add_argument('--hidden_dims', nargs='+', type=int, default=[128]*3, help="hidden state and context dimensions")
     parser.add_argument('--slant', type=str, default=None, help="use slanted stereo matching")
     parser.add_argument('--slant_norm', action='store_true', help="use normalization in slanted stereo matching")
+    parser.add_argument('--confidence', action='store_true', help="use confidence learning")
+    parser.add_argument('--offset_memory_size', type=int, default=2, help="size of offset memory in confidence learning")
+    parser.add_argument('--detach_in_confidence', action='store_true', help="detach for feature and offset in confidence learning")
     
     # Loss parameters
     parser.add_argument('--loss_smooth', type=str, default=None, choices=["", "gradient", "curvature"], help="use smoothness loss")
