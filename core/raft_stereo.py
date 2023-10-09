@@ -72,7 +72,7 @@ class RAFTStereo(nn.Module):
 
         if "local_rank" not in args or args.local_rank==0 :
             logging.info(f"RAFTStereo: " + \
-                         f"Confidence: {args.confidence}, offset_memory_size: {args.offset_memory_size}" +\
+                         f"Confidence: {args.confidence}, offset_memory_size: {args.offset_memory_size} " +\
                          f"slant: {args.slant}, slant range norm: {args.slant_norm}")
 
     def freeze_bn(self):
