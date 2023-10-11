@@ -51,12 +51,13 @@ class Loss(nn.Module):
                          f"ner_weight_reduce: {ner_weight_reduce}, " +\
                          f"conf_disp: {self.conf_disp}. " )
     
-    def forward(self, flow_preds, flow_gt, valid, global_batch_num,
+    def forward(self, flow_preds, flow_preds_refine, flow_gt, valid, global_batch_num,
                 confidence_list=None, params_list=None, imgL=None, imgR=None):
         """ Loss function defined over sequence of flow predictions """
         n_predictions = len(flow_preds)
         assert n_predictions >= 1
         flow_loss = 0.0
+        refine_loss = 0.0
         smooth_loss = 0.0
         confidence_loss = 0.0
 
@@ -87,6 +88,11 @@ class Loss(nn.Module):
                 i_loss = i_loss * (F.sigmoid(weight.detach()/3)*1.5 + 1)
             assert i_loss.shape == valid.shape, [i_loss.shape, valid.shape, flow_gt.shape, flow_preds[i].shape]
             flow_loss += i_weight * i_loss[valid.bool()].mean()
+            
+            # refinement loss
+            if len(flow_preds_refine)>0 and flow_preds_refine[i] is not None:
+                disp_refine_loss = (flow_preds_refine[i] - flow_gt).abs()
+                refine_loss += i_weight * disp_refine_loss[valid.bool()].mean()
 
             if i>n_predictions//2:
                 with autocast(enabled=self.mixed_precision):
@@ -105,10 +111,16 @@ class Loss(nn.Module):
             '5px': (epe < 5).float().mean().item(),
         }
 
+        if len(flow_preds_refine)>0 and flow_preds_refine[-1] is not None:
+            epe_refine = torch.sum((flow_preds_refine[-1] - flow_gt)**2, dim=1).sqrt()
+            epe_refine = epe_refine.view(-1)[valid.view(-1)]
+            metrics.update({'epe_refine': epe_refine.mean().item(),
+                            '3px_refine': (epe_refine < 3).float().mean().item(),})
+
         if self.smoothness is not None and len(self.smoothness)>0:
-            loss = flow_loss + confidence_loss +  self.loss_zeta * smooth_loss
+            loss = flow_loss + refine_loss + confidence_loss +  self.loss_zeta * smooth_loss
         else:
-            loss = flow_loss + confidence_loss
+            loss = flow_loss + refine_loss + confidence_loss
             smooth_loss = torch.Tensor([0.0]).to(flow_loss.device)
         return loss, metrics, flow_loss, confidence_loss, smooth_loss
 

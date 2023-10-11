@@ -146,13 +146,14 @@ def train(args):
             image1, image2, flow, valid = [x.cuda() for x in data_blob]
 
             assert model.training
-            flow_predictions, confidence_list, params_list = model(image1, image2, iters=args.train_iters)
+            flow_predictions, flow_predictions_refine, \
+            confidence_list, params_list = model(image1, image2, iters=args.train_iters)
             assert model.training
 
             try:
                 loss, metrics, \
                 flow_loss, confidence_loss, \
-                smooth_loss = myLoss(flow_predictions, flow, valid, global_batch_num,
+                smooth_loss = myLoss(flow_predictions, flow_predictions_refine, flow, valid, global_batch_num,
                                     confidence_list=confidence_list,
                                     params_list=params_list, 
                                     imgL=image1, imgR=None)
@@ -264,6 +265,9 @@ if __name__ == '__main__':
     parser.add_argument('--confidence', action='store_true', help="use confidence learning")
     parser.add_argument('--offset_memory_size', type=int, default=2, help="size of offset memory in confidence learning")
     parser.add_argument('--detach_in_confidence', action='store_true', help="detach for feature and offset in confidence learning")
+    parser.add_argument('--refinement', type=str, default="", help="refinement for disparity map")
+    parser.add_argument('--refine_win_size', type=int, default=7, help="window size for refinement")
+    parser.add_argument('--refine_start_itr', type=int, default=3, help="start to do refinement at which iteration")
     
     # Loss parameters
     parser.add_argument('--loss_smooth', type=str, default=None, choices=["", "gradient", "curvature"], help="use smoothness loss")

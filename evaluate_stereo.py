@@ -258,6 +258,9 @@ if __name__ == '__main__':
     parser.add_argument('--confidence', action='store_true', help="use confidence learning")
     parser.add_argument('--offset_memory_size', type=int, default=2, help="size of offset memory in confidence learning")
     parser.add_argument('--detach_in_confidence', action='store_true', help="detach for feature and offset in confidence learning")
+    parser.add_argument('--refinement', type=str, default="", help="refinement for disparity map")
+    parser.add_argument('--refine_win_size', type=int, default=7, help="window size for refinement")
+    parser.add_argument('--refine_start_itr', type=int, default=3, help="start to do refinement at which iteration")
     args = parser.parse_args()
 
     model = torch.nn.DataParallel(RAFTStereo(args), device_ids=[0])
