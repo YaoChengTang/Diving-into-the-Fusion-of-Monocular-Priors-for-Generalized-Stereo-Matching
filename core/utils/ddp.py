@@ -15,9 +15,13 @@
 # ==============================================================================
 
 import os
+import random
+import logging
 import subprocess
 import numpy as np
-import random
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',)
 
 import torch
 import torch.nn as nn
@@ -113,11 +117,13 @@ def get_model_ddp(args):
     model  = model.to(device)
 
     if args.restore_ckpt is not None:
-        assert args.restore_ckpt.endswith(".pth")
-        logging.info("Loading checkpoint...")
+        assert args.restore_ckpt.endswith(".pth") or args.restore_ckpt.endswith(".tar")
+        if args.local_rank==0 :
+            logging.info("Loading checkpoint from {} ...".format(args.restore_ckpt))
         checkpoint = torch.load(args.restore_ckpt)
         model.load_state_dict(checkpoint, strict=True)
-        logging.info(f"Done loading checkpoint")
+        if args.local_rank==0 :
+            logging.info(f"Done loading checkpoint")
 
     dist.barrier()
     # DDP setting

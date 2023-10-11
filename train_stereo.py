@@ -147,7 +147,8 @@ def train(args):
 
             assert model.training
             flow_predictions, flow_predictions_refine, \
-            confidence_list, params_list = model(image1, image2, iters=args.train_iters)
+            confidence_list, params_list = model(image1, image2, iters=args.train_iters,
+                                                 enable_refinement=total_steps>30000)
             assert model.training
 
             try:

@@ -129,7 +129,7 @@ class RAFTStereo(nn.Module):
 
 
     def forward(self, image1, image2, iters=12, flow_init=None, 
-                test_mode=False, vis_mode=False):
+                test_mode=False, vis_mode=False, enable_refinement=True):
         """ Estimate optical flow between pair of frames """
 
         image1 = (2 * (image1 / 255.0) - 1.0).contiguous()
@@ -229,13 +229,12 @@ class RAFTStereo(nn.Module):
             disparity = coords1 - coords0
 
             ## manifold geometry refinement
-            if self.args.refinement is not None:
+            disparity_refine = None
+            if self.args.refinement is not None and enable_refinement:
                 if itr>=self.args.refine_start_itr:
                     disparity_refine = self.refine(disparity, fmap1, confidence, 
                                             if_shift=(itr-self.args.refine_start_itr)%2>0)
                     coords1 = coords0 + disparity_refine
-                else:
-                    disparity_refine = None
 
             # We do not need to upsample or output intermediate results in test_mode
             if test_mode and itr < iters-1:
