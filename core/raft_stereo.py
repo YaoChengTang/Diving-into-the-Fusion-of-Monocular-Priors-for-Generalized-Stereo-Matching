@@ -274,6 +274,6 @@ class RAFTStereo(nn.Module):
             return coords1 - coords0, flow_up
 
         if vis_mode:
-            return flow_predictions
+            return flow_predictions, flow_predictions_refine
 
         return flow_predictions, flow_predictions_refine, confidence_list, params_list

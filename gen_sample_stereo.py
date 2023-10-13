@@ -226,7 +226,18 @@ def validate_middlebury(model, iters=32, split='F', root="", sv_root="", mixed_p
         image1, image2 = padder.pad(image1, image2)
 
         with autocast(enabled=mixed_prec):
-            flow_pr_sequence = model(image1, image2, iters=iters, test_mode=False, vis_mode=True)
+            flow_pr_sequence, flow_predictions_refine = model(image1, image2, iters=iters, test_mode=False, vis_mode=True)
+
+        all_sequence = []
+        if flow_predictions_refine is not None and len(flow_predictions_refine)>0:
+            for idx in range(len(flow_pr_sequence)):
+                all_sequence.append(flow_pr_sequence[idx])
+                if flow_predictions_refine[idx] is None:
+                    tmp = torch.zeros_like(flow_pr_sequence[idx])
+                else:
+                    tmp = flow_predictions_refine[idx]
+                all_sequence.append(tmp)
+            flow_pr_sequence = all_sequence[:30]
 
         vis_epe_sequence = []
         vis_xpx_sequence = []
