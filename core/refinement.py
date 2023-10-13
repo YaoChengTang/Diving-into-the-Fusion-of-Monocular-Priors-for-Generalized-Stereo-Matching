@@ -283,7 +283,7 @@ class SwinTransformerBlock(nn.Module):
 
         # cyclic shift
         if self.shift_size > 0:
-            shifted_x = torch.roll(x, shifts=(-self.shift_size, -self.shift_size), dims=(1, 2))
+            shifted_x = torch.roll(x, shifts=(-self.shift_size, -self.shift_size), dims=(1, 2))   # (80, 180)
             shifted_guidance = torch.roll(guidance, shifts=(-self.shift_size, -self.shift_size), dims=(1, 2))
             shifted_reliability = torch.roll(reliability, shifts=(-self.shift_size, -self.shift_size), dims=(1, 2))
         else:
@@ -314,10 +314,10 @@ class SwinTransformerBlock(nn.Module):
         else:
             x = shifted_x
         x = x.view(B, H, W, C_x)
-        x = shortcut + self.drop_path(self.norm1(x))
+        # x = shortcut + self.drop_path(self.norm1(x))
 
         # FFN
-        x = x + self.drop_path(self.norm2(self.mlp(x)))
+        x = shortcut + self.drop_path(self.norm2(self.mlp(x)))
         x = x.view(B,H,W,C_x).permute((0,3,1,2))
 
         return x

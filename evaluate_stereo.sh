@@ -56,6 +56,11 @@
 # CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-OffsetConfidence_loss.pth --confidence --offset_memory_size 3 --detach_in_confidence --dataset kitti
 # CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-OffsetConfidence_loss.pth --confidence --offset_memory_size 3 --detach_in_confidence --dataset eth3d
 
-CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-SlantNorm-Conf_loss.pth --confidence --offset_memory_size 3 --detach_in_confidence --slant "slant" --slant_norm --dataset middlebury_H
-CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-SlantNorm-Conf_loss.pth --confidence --offset_memory_size 3 --detach_in_confidence --slant "slant" --slant_norm --dataset kitti
-CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-SlantNorm-Conf_loss.pth --confidence --offset_memory_size 3 --detach_in_confidence --slant "slant" --slant_norm --dataset eth3d
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-SlantNorm-Conf_loss.pth --confidence --offset_memory_size 3 --detach_in_confidence --slant "slant" --slant_norm --dataset middlebury_H
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-SlantNorm-Conf_loss.pth --confidence --offset_memory_size 3 --detach_in_confidence --slant "slant" --slant_norm --dataset kitti
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-SlantNorm-Conf_loss.pth --confidence --offset_memory_size 3 --detach_in_confidence --slant "slant" --slant_norm --dataset eth3d
+
+
+CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine_Conf_loss.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 4 --refine_start_itr 3 --dataset middlebury_H
+CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine_Conf_loss.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 4 --refine_start_itr 3 --dataset kitti
+CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine_Conf_loss.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 4 --refine_start_itr 3 --dataset eth3d
