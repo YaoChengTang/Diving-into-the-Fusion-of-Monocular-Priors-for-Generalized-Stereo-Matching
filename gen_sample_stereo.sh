@@ -17,3 +17,5 @@
 # CUDA_VISIBLE_DEVICE=2 python3 gen_sample_stereo.py --restore_ckpt pretrained/raftstereo-sceneflow.pth --dataset eth3d --sv_root /home/users/chengtang.yao/Output/raftstereo-confidence
 
 CUDA_VISIBLE_DEVICE=2 python3 gen_sample_stereo.py --restore_ckpt pretrained/raft-stereo-Refine_Conf_loss.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 4 --refine_start_itr 3 --dataset middlebury_H --sv_root /home/users/chengtang.yao/Output/raftstereo-Refine_Conf_loss
+CUDA_VISIBLE_DEVICE=2 python3 gen_sample_stereo.py --restore_ckpt pretrained/raft-stereo-Refine_Conf_loss.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 4 --refine_start_itr 3 --dataset kitti --sv_root /home/users/chengtang.yao/Output/raftstereo-Refine_Conf_loss
+CUDA_VISIBLE_DEVICE=2 python3 gen_sample_stereo.py --restore_ckpt pretrained/raft-stereo-Refine_Conf_loss.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 4 --refine_start_itr 3 --dataset eth3d --sv_root /home/users/chengtang.yao/Output/raftstereo-Refine_Conf_loss
