@@ -368,9 +368,9 @@ class Refinement(nn.Module):
         else:
             reliability = None
         if not if_shift:
-            disparity_refine = self.propagation_1(disparity, guidance, reliability)
+            disparity_refine = self.propagation_1(disparity.detach(), guidance, reliability)
         else:
-            disparity_refine = self.propagation_2(disparity, guidance, reliability)
+            disparity_refine = self.propagation_2(disparity.detach(), guidance, reliability)
         return disparity_refine
     
     
