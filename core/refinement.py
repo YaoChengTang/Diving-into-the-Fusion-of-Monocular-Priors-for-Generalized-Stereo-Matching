@@ -327,7 +327,8 @@ class SwinTransformerBlock(nn.Module):
 
         # FFN
         # x = x + self.drop_path(self.norm2(self.mlp(x)))
-        x = shortcut + self.drop_path(self.norm2(self.mlp(x)))
+        # x = shortcut + self.drop_path(self.norm2(self.mlp(x)))
+        x = shortcut + self.mlp(x)
         x = x.view(B,H,W,C_x).permute((0,3,1,2))
 
         # unpadding
