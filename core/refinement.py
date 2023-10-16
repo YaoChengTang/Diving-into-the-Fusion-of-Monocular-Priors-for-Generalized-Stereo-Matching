@@ -268,6 +268,15 @@ class SwinTransformerBlock(nn.Module):
         return shift_mask
 
     def forward(self, x, guidance, reliability):
+		# padding
+        _,_,H,W = x.shape
+        wh,ww = to_2tuple(self.window_size)
+        padding_H = int(np.ceil(H/wh)*wh-H)
+        padding_W = int(np.ceil(W/ww)*ww-W)
+        x = F.pad(x,(padding_W,0,padding_H,0),mode="replicate")
+        guidance = F.pad(guidance,(padding_W,0,padding_H,0),mode="replicate")
+        reliability = F.pad(reliability,(padding_W,0,padding_H,0),mode="replicate")
+
         x = x.permute((0,2,3,1))
         guidance = guidance.permute((0,2,3,1))
         reliability = reliability.permute((0,2,3,1))
@@ -321,6 +330,8 @@ class SwinTransformerBlock(nn.Module):
         x = shortcut + self.drop_path(self.norm2(self.mlp(x)))
         x = x.view(B,H,W,C_x).permute((0,3,1,2))
 
+        # unpadding
+        x = x[:,:,padding_H:,padding_W:]
         return x
 
     def _init_weights(self, m):
