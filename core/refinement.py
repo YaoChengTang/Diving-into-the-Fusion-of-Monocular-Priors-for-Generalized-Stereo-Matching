@@ -328,7 +328,8 @@ class SwinTransformerBlock(nn.Module):
         # FFN
         # x = x + self.drop_path(self.norm2(self.mlp(x)))
         # x = shortcut + self.drop_path(self.norm2(self.mlp(x)))
-        x = shortcut + self.mlp(x)
+        # x = shortcut + self.mlp(x)
+        x = shortcut + self.mlp(x)*(-shifted_reliability/100)
         x = x.view(B,H,W,C_x).permute((0,3,1,2))
 
         # unpadding
@@ -363,7 +364,7 @@ class Refinement(nn.Module):
         guidance = self.patch_embed(fea)
         if confidence is not None :
             uncertainty = F.sigmoid(confidence.detach())
-            uncertainty = uncertainty.masked_fill(uncertainty>0.98, float(-100.0)).masked_fill(uncertainty<=0.98, float(1.0))
+            uncertainty = uncertainty.masked_fill(uncertainty>0.98, float(-100.0)).masked_fill(uncertainty<=0.98, float(0.0))
             reliability = uncertainty.detach()
         else:
             reliability = None
