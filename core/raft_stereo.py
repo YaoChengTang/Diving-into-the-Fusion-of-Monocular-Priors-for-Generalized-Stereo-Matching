@@ -71,7 +71,7 @@ class RAFTStereo(nn.Module):
             delta_pq = torch.Tensor(delta_pq)
             self.delta_pq = nn.Parameter(delta_pq, requires_grad=False)   # (9,factor,factor,2)
         
-        if args.refinement is not None:
+        if args.refinement is not None and len(args.refinement)>0:
             if self.args.slant is None or len(self.args.slant)==0 :
                 dim_disp = 2
             elif self.args.slant in ["slant", "slant_local"] :
@@ -230,7 +230,7 @@ class RAFTStereo(nn.Module):
 
             ## manifold geometry refinement
             disparity_refine = None
-            if self.args.refinement is not None and enable_refinement:
+            if self.args.refinement is not None and len(self.args.refinement)>0 and enable_refinement:
                 if itr>=self.args.refine_start_itr:
                     disparity_refine = self.refine(disparity, fmap1, confidence, 
                                             if_shift=(itr-self.args.refine_start_itr)%2>0)
@@ -252,14 +252,14 @@ class RAFTStereo(nn.Module):
             # upsample refinement
             if disparity_refine is not None:
                 if up_mask is None:
-                    flow_up = upflow8(disparity_refine)
+                    flow_up_refine = upflow8(disparity_refine)
                 else:
-                    flow_up = self.upsample_flow(disparity_refine, up_mask,
+                    flow_up_refine = self.upsample_flow(disparity_refine, up_mask,
                                                 params=raw_params_list[-1] if self.args.slant in ["slant", "slant_local"] else None)
-                flow_up = flow_up[:,:1]
+                flow_up_refine = flow_up_refine[:,:1]
             else:
-                flow_up = None
-            flow_predictions_refine.append(flow_up)
+                flow_up_refine = None
+            flow_predictions_refine.append(flow_up_refine)
 
             # upsample paramaters
             if self.args.slant is not None and len(self.args.slant)>0 and not test_mode:
