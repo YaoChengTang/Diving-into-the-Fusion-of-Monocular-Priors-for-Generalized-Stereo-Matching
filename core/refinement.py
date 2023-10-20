@@ -375,3 +375,15 @@ class Refinement(nn.Module):
         return disparity_refine
     
     
+class UpdateHistory(nn.Module):
+    def __init__(self, args, in_chans1, in_chans2):
+        super(UpdateHistory, self).__init__()
+        self.update = nn.Sequential(nn.conv2d(in_chans1+in_chans2, in_chans1, kernel_size=3, stride=1, padding=1),)
+        
+        # if "local_rank" not in args or args.local_rank==0 :
+        #     logging.info(f"OffsetConfidence: " + \
+        #                  f"detach: {args.detach_in_confidence}")
+
+    def forward(self, his, disp):
+        hist_update = self.update( torch.cat([his,disp]) )
+        return disparity_refine

@@ -83,10 +83,11 @@ class RAFTStereo(nn.Module):
                 raise Exception("No such refinement: {}".format(args.refinement))
 
         if "local_rank" not in args or args.local_rank==0 :
-            logging.info(f"RAFTStereo: " + \
+            logging.info(f"RAFTStereo: " +\
                          f"Confidence: {args.confidence}, offset_memory_size: {args.offset_memory_size} " +\
                          f"slant: {args.slant}, slant range norm: {args.slant_norm} " +\
-                         f"refine: {args.refinement}, refine_win_size: {args.refine_win_size}, refine_start_itr: {args.refine_start_itr}" )
+                         f"refine: {args.refinement}, refine_win_size: {args.refine_win_size}, refine_start_itr: {args.refine_start_itr} " +\
+                         f"update_his: {args.update_his} " )
 
     def freeze_bn(self):
         for m in self.modules():
@@ -235,6 +236,9 @@ class RAFTStereo(nn.Module):
                     disparity_refine = self.refine(disparity, fmap1, confidence, 
                                             if_shift=(itr-self.args.refine_start_itr)%2>0)
                     coords1 = coords0 + disparity_refine
+
+                    if self.args.update_his:
+                        net_list[0] = self.update_hist(net_list[0])
 
             # We do not need to upsample or output intermediate results in test_mode
             if test_mode and itr < iters-1:
