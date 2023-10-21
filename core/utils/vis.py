@@ -319,39 +319,40 @@ class Visualizer:
             tmp_list = [{"img":flow_pr_sequence[idx], 
                          "title":"Predicted Disparity-{}".format(idx), 
                          "cmap":'jet', },]
-            tmp_list = [{"img":colored_error_map_sequence[idx], 
+            tmp_list += [{"img":colored_error_map_sequence[idx], 
                          "title":"Error Map-{}".format(idx)+": "+info, 
                          "cmap":None, },]
             if self.args.refine_map:
                 info_refine = "epe:{:.2f}".format(vis_refine_epe_sequence[idx]) + ", " + \
                               "3px:{:.1f}".format(vis_refine_xpx_sequence[idx]*100)
-                tmp_list = [{"img":flow_pr_refine_sequence[idx], 
+                tmp_list += [{"img":flow_pr_refine_sequence[idx], 
                              "title":"Refined Disparity-{}".format(idx)+": "+info_refine, 
                              "cmap":'jet', },]
             if self.args.improvement_map:
-                tmp_list = [{"img":colored_improvement_map_sequence[idx], 
+                tmp_list += [{"img":colored_improvement_map_sequence[idx], 
                              "title":"Improvement (err[i]-err[i-1])-{}".format(idx), 
                              "cmap":None, },]
             if self.args.movement_map:
-                tmp_list = [{"img":colored_movement_map_sequence[idx], 
+                tmp_list += [{"img":colored_movement_map_sequence[idx], 
                              "title":"Movement (disp[i]-disp[i-1])-{}".format(idx), 
                              "cmap":None, },]
             if self.args.acceleration_map:
-                tmp_list = [{"img":colored_acceleration_map_sequence[idx], 
+                tmp_list += [{"img":colored_acceleration_map_sequence[idx], 
                              "title":"Acceleration (Move[i]-Move[i-1])-{}".format(idx), 
                              "cmap":None, },]
             if self.args.mask:
-                tmp_list = [{"img":mask_sequence_list[idx], 
+                tmp_list += [{"img":colored_mask_sequence[idx], 
                              "title":"Mask-{}".format(idx), 
                              "cmap":None, },]
             atom_dict_list += tmp_list
         
         pre,lat = os.path.splitext(sv_path)
         sv_path = pre +"-sequence"+ lat
-        group = 2 + self.args.improvement_map+\
-                    self.args.movement_map+\
-                    self.args.acceleration_map+\
-                    self.args.mask
+        group = 2 + self.args.improvement_map +\
+                    self.args.movement_map +\
+                    self.args.acceleration_map +\
+                    self.args.mask +\
+                    self.args.refine_map
         show_imgs(atom_dict_list, 
                   sv_img=True, save2where=sv_path, if_inter=False, 
                   fontsize=20, szWidth=int(group*image1.shape[1]/image1.shape[0]), szHeight=5, 
