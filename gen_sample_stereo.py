@@ -31,6 +31,92 @@ logging.basicConfig(level=logging.INFO,
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
+
+def evalute_metric(flow_pr, flow_gt, valid_gt, d1_thold, dataset_name=None):
+    assert flow_pr.shape == flow_gt.shape, (flow_pr.shape, flow_gt.shape)
+    epe = torch.sum((flow_pr - flow_gt)**2, dim=0).sqrt()
+
+    epe_flattened = epe.flatten()
+    out = (epe_flattened > d1_thold)
+    if dataset_name.lower()=="middlebury":
+        val = (valid_gt.reshape(-1) >= -0.5) & (flow_gt[0].reshape(-1) > -1000)
+    elif dataset_name.lower()=="eth3d":
+        val = valid_gt.flatten() >= 0.5
+    elif dataset_name.lower()=="flyingthings3d":
+        val = (valid_gt.flatten() >= 0.5) & (flow_gt.abs().flatten() < 192)
+    elif dataset_name.lower()=="kitti":
+        val = valid_gt.flatten() >= 0.5
+    else:
+        raise Exception(f"{dataset_name} is not supported")
+    image_out = out[val].float().mean().item()
+    image_epe = epe_flattened[val].mean().item()
+    return image_epe, image_out
+
+
+@torch.no_grad()
+def evalute(flow_pr_sequence, flow_pr_refine_sequence, confidence_list, 
+             image1, image2, flow_gt, valid_gt, imageGT_file, 
+             padder, viser, dataset_name, d1_thold):
+    # fill None in confidence_list with zero-matrix and
+    # unpad confidence map after sigmoid
+    if confidence_list is not None and len(confidence_list)>0:
+        for idx, conf in enumerate(confidence_list):
+            if conf is not None:
+                confidence_list[idx] = F.sigmoid(conf)
+            else:
+                confidence_list[idx] = torch.zeros_like(confidence_list[-1])
+            confidence_list[idx] = padder.unpad(confidence_list[idx]).cpu().squeeze(0)
+    
+    # fill None in flow_pr_refine_sequence with zero-matrix
+    if flow_pr_refine_sequence is not None and len(flow_pr_refine_sequence)>0:
+        for idx, flow_pr_refine in enumerate(flow_pr_refine_sequence):
+            if flow_pr_refine is None:
+                flow_pr_refine_sequence[idx] = torch.zeros_like(flow_pr_sequence[idx])
+    
+    # merge flow_pr_sequence and flow_pr_refine_sequence to process them at once
+    len_sequence = len(flow_pr_sequence)
+    flow_pr_sequence += flow_pr_refine_sequence
+
+    # compute epe and d1 for each each iteration
+    vis_epe_sequence = []
+    vis_xpx_sequence = []
+    for idx, flow_pr in enumerate(flow_pr_sequence):
+        flow_pr = padder.unpad(flow_pr).cpu().squeeze(0)
+        flow_pr_sequence[idx] = flow_pr
+
+        image_epe, image_out = evalute_metric(flow_pr, flow_gt, valid_gt,
+                                              d1_thold=d1_thold, dataset_name=dataset_name)
+        vis_epe_sequence.append(image_epe)
+        vis_xpx_sequence.append(image_out)
+    
+    # split the results from flow_pr_sequence and flow_pr_refine_sequence
+    flow_pr_refine_sequence = flow_pr_sequence[len_sequence:]
+    flow_pr_sequence = flow_pr_sequence[:len_sequence]
+    vis_refine_epe_sequence = vis_epe_sequence[len_sequence:]
+    vis_epe_sequence = vis_epe_sequence[:len_sequence]
+    vis_refine_xpx_sequence = vis_xpx_sequence[len_sequence:]
+    vis_xpx_sequence = vis_xpx_sequence[:len_sequence]
+
+    # save prediction and the corresponding path for visualization
+    viser.save_pred_vis(-flow_pr.data.numpy()[0], imageGT_file)
+    image1 = padder.unpad(image1).cpu().squeeze(0)
+    image2 = padder.unpad(image2).cpu().squeeze(0)
+    viser.analyze([-flow_pr.data.numpy()[0] for flow_pr in flow_pr_sequence], 
+                    image1.data.numpy(), 
+                    image2.data.numpy(), 
+                    -flow_gt.data.numpy()[0], 
+                    valid_gt.data.numpy(),
+                    [conf.data.numpy()[0] for conf in confidence_list],
+                    [-flow_pr_refine.data.numpy()[0] for flow_pr_refine in flow_pr_refine_sequence],
+                    imageGT_file,
+                    vis_epe_sequence,
+                    vis_xpx_sequence,
+                    vis_refine_epe_sequence,
+                    vis_refine_xpx_sequence,)
+
+    return image_epe, image_out
+
+
 @torch.no_grad()
 def validate_eth3d(model, iters=32, root="", sv_root="", mixed_prec=False, args=None):
     """ Peform validation using the ETH3D (train) split """
@@ -49,53 +135,16 @@ def validate_eth3d(model, iters=32, root="", sv_root="", mixed_prec=False, args=
         image1, image2 = padder.pad(image1, image2)
 
         with autocast(enabled=mixed_prec):
-            flow_pr_sequence, flow_predictions_refine = model(image1, image2, iters=iters, test_mode=False, vis_mode=True)
+            flow_pr_sequence, \
+            flow_pr_refine_sequence, \
+            confidence_list = model(image1, image2, iters=iters, test_mode=False, vis_mode=True)
         
-        all_sequence = []
-        if flow_predictions_refine is not None and len(flow_predictions_refine)>0:
-            for idx in range(len(flow_pr_sequence)):
-                all_sequence.append(flow_pr_sequence[idx])
-                if flow_predictions_refine[idx] is None:
-                    tmp = torch.zeros_like(flow_pr_sequence[idx])
-                else:
-                    tmp = flow_predictions_refine[idx]
-                all_sequence.append(tmp)
-            flow_pr_sequence = all_sequence[:30]
-
-        vis_epe_sequence = []
-        vis_xpx_sequence = []
-        for idx, flow_pr in enumerate(flow_pr_sequence):
-            flow_pr = padder.unpad(flow_pr.float()).cpu().squeeze(0)
-            flow_pr_sequence[idx] = flow_pr
-
-            assert flow_pr.shape == flow_gt.shape, (flow_pr.shape, flow_gt.shape)
-            epe = torch.sum((flow_pr - flow_gt)**2, dim=0).sqrt()
-
-            epe_flattened = epe.flatten()
-            val = valid_gt.flatten() >= 0.5
-            out = (epe_flattened > 1.0)
-            image_out = out[val].float().mean().item()
-            image_epe = epe_flattened[val].mean().item()
-
-            vis_epe_sequence.append(image_epe)
-            vis_xpx_sequence.append(image_out)
-
-        logging.info(f"ETH3D {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}")
+        image_epe, image_out = evalute(flow_pr_sequence, flow_pr_refine_sequence, confidence_list, 
+                                       image1, image2, flow_gt, valid_gt, imageGT_file, 
+                                       padder, viser, dataset_name="ETH3D", d1_thold=1.0)
         epe_list.append(image_epe)
         out_list.append(image_out)
-
-        # save prediction and the corresponding path for visualization
-        viser.save_pred_vis(-flow_pr.data.numpy()[0], imageGT_file)
-        image1 = padder.unpad(image1).cpu().squeeze(0)
-        image2 = padder.unpad(image2).cpu().squeeze(0)
-        viser.analyze([-flow_pr.data.numpy()[0] for flow_pr in flow_pr_sequence], 
-                      image1.data.numpy(), 
-                      image2.data.numpy(), 
-                      -flow_gt.data.numpy()[0], 
-                      valid_gt.data.numpy(),
-                      imageGT_file,
-                      vis_epe_sequence,
-                      vis_xpx_sequence)
+        logging.info(f"ETH3D {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}")
     
     epe_list = np.array(epe_list)
     out_list = np.array(out_list)
@@ -127,59 +176,20 @@ def validate_kitti(model, iters=32, root="", sv_root="", mixed_prec=False, args=
 
         with autocast(enabled=mixed_prec):
             start = time.time()
-            flow_pr_sequence, flow_predictions_refine = model(image1, image2, iters=iters, test_mode=False, vis_mode=True)
+            flow_pr_sequence, \
+            flow_pr_refine_sequence, \
+            confidence_list = model(image1, image2, iters=iters, test_mode=False, vis_mode=True)
             end = time.time()
         
-        all_sequence = []
-        if flow_predictions_refine is not None and len(flow_predictions_refine)>0:
-            for idx in range(len(flow_pr_sequence)):
-                all_sequence.append(flow_pr_sequence[idx])
-                if flow_predictions_refine[idx] is None:
-                    tmp = torch.zeros_like(flow_pr_sequence[idx])
-                else:
-                    tmp = flow_predictions_refine[idx]
-                all_sequence.append(tmp)
-            flow_pr_sequence = all_sequence[:30]
-
-        vis_epe_sequence = []
-        vis_xpx_sequence = []
-        for idx, flow_pr in enumerate(flow_pr_sequence):
-
-            if val_id > 50:
-                elapsed_list.append(end-start)
-            flow_pr = padder.unpad(flow_pr).cpu().squeeze(0)
-            flow_pr_sequence[idx] = flow_pr
-
-            assert flow_pr.shape == flow_gt.shape, (flow_pr.shape, flow_gt.shape)
-            epe = torch.sum((flow_pr - flow_gt)**2, dim=0).sqrt()
-
-            epe_flattened = epe.flatten()
-            val = valid_gt.flatten() >= 0.5
-
-            out = (epe_flattened > 3.0)
-            image_out = out[val].float().mean().item()
-            image_epe = epe_flattened[val].mean().item()
-
-            vis_epe_sequence.append(image_epe)
-            vis_xpx_sequence.append(image_out)
-            
+        image_epe, image_out = evalute(flow_pr_sequence, flow_pr_refine_sequence, confidence_list, 
+                                       image1, image2, flow_gt, valid_gt, imageGT_file, 
+                                       padder, viser, dataset_name="kitti", d1_thold=3.0)
+        epe_list.append(image_epe)
+        out_list.append(image_out)
         if val_id < 9 or (val_id+1)%10 == 0:
-            logging.info(f"KITTI Iter {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}. Runtime: {format(end-start, '.3f')}s ({format(1/(end-start), '.2f')}-FPS)")
-        epe_list.append(epe_flattened[val].mean().item())
-        out_list.append(out[val].cpu().numpy())
-
-        # save prediction and the corresponding path for visualization
-        viser.save_pred_vis(-flow_pr.data.numpy()[0], imageGT_file)
-        image1 = padder.unpad(image1).cpu().squeeze(0)
-        image2 = padder.unpad(image2).cpu().squeeze(0)
-        viser.analyze([-flow_pr.data.numpy()[0] for flow_pr in flow_pr_sequence], 
-                      image1.data.numpy(), 
-                      image2.data.numpy(), 
-                      -flow_gt.data.numpy()[0], 
-                      valid_gt.data.numpy(),
-                      imageGT_file,
-                      vis_epe_sequence,
-                      vis_xpx_sequence)
+            logging.info(f"KITTI Iter {val_id+1} out of {len(val_dataset)}. " +\
+                         f"EPE {round(image_epe,4)} D1 {round(image_out,4)}. " +\
+                         f"Runtime: {format(end-start, '.3f')}s ({format(1/(end-start), '.2f')}-FPS)")
     
     epe_list = np.array(epe_list)
     out_list = np.concatenate(out_list)
@@ -209,17 +219,18 @@ def validate_things(model, iters=32, root='', sv_root="", mixed_prec=False, args
         image1, image2 = padder.pad(image1, image2)
 
         with autocast(enabled=mixed_prec):
-            _, flow_pr = model(image1, image2, iters=iters, test_mode=True)
-        flow_pr = padder.unpad(flow_pr).cpu().squeeze(0)
-        assert flow_pr.shape == flow_gt.shape, (flow_pr.shape, flow_gt.shape)
-        epe = torch.sum((flow_pr - flow_gt)**2, dim=0).sqrt()
-
-        epe = epe.flatten()
-        val = (valid_gt.flatten() >= 0.5) & (flow_gt.abs().flatten() < 192)
-
-        out = (epe > 1.0)
-        epe_list.append(epe[val].mean().item())
-        out_list.append(out[val].cpu().numpy())
+            flow_pr_sequence, \
+            flow_pr_refine_sequence, \
+            confidence_list = model(image1, image2, iters=iters, test_mode=True)
+        
+        image_epe, image_out = validate(flow_pr_sequence, flow_pr_refine_sequence, confidence_list, 
+                                        image1, image2, flow_gt, valid_gt, imageGT_file, 
+                                        padder, viser, dataset_name="FlyingThings3D", d1_thold=1.0)
+        epe_list.append(image_epe)
+        out_list.append(image_out)
+        if val_id%100==0:
+            logging.info(f"FlyingThings3D Iter {val_id+1} out of {len(val_dataset)}. " +\
+                         f"EPE {round(image_epe,4)} D1 {round(image_out,4)}")
 
     epe_list = np.array(epe_list)
     out_list = np.concatenate(out_list)
@@ -249,71 +260,17 @@ def validate_middlebury(model, iters=32, split='F', root="", sv_root="", mixed_p
         image1, image2 = padder.pad(image1, image2)
 
         with autocast(enabled=mixed_prec):
-            flow_pr_sequence, flow_pr_refine_sequence, confidence_list = model(image1, image2, iters=iters, test_mode=False, vis_mode=True)
+            flow_pr_sequence, \
+            flow_pr_refine_sequence, \
+            confidence_list = model(image1, image2, iters=iters, test_mode=False, vis_mode=True)
 
-        if confidence_list is not None and len(confidence_list)>0:
-            for idx, conf in enumerate(confidence_list):
-                if conf is not None:
-                    confidence_list[idx] = F.sigmoid(conf)
-                else:
-                    confidence_list[idx] = torch.zeros_like(confidence_list[-1])
-                confidence_list[idx] = padder.unpad(confidence_list[idx]).cpu().squeeze(0)
-        
-        if flow_pr_refine_sequence is not None and len(flow_pr_refine_sequence)>0:
-            for idx, flow_pr_refine in enumerate(flow_pr_refine_sequence):
-                if flow_pr_refine is None:
-                    flow_pr_refine_sequence[idx] = torch.zeros_like(flow_pr_sequence[idx])
-                # flow_pr_refine_sequence[idx] = padder.unpad(flow_pr_refine).cpu().squeeze(0)
-
-        len_sequence = len(flow_pr_sequence)
-        flow_pr_sequence += flow_pr_refine_sequence
-
-        vis_epe_sequence = []
-        vis_xpx_sequence = []
-        for idx, flow_pr in enumerate(flow_pr_sequence):
-            flow_pr = padder.unpad(flow_pr).cpu().squeeze(0)
-            flow_pr_sequence[idx] = flow_pr
-
-            assert flow_pr.shape == flow_gt.shape, (flow_pr.shape, flow_gt.shape)
-            epe = torch.sum((flow_pr - flow_gt)**2, dim=0).sqrt()
-
-            epe_flattened = epe.flatten()
-            val = (valid_gt.reshape(-1) >= -0.5) & (flow_gt[0].reshape(-1) > -1000)
-
-            out = (epe_flattened > 2.0)
-            image_out = out[val].float().mean().item()
-            image_epe = epe_flattened[val].mean().item()
-
-            vis_epe_sequence.append(image_epe)
-            vis_xpx_sequence.append(image_out)
-        
-        flow_pr_refine_sequence = flow_pr_sequence[len_sequence:]
-        flow_pr_sequence = flow_pr_sequence[:len_sequence]
-        vis_refine_epe_sequence = vis_epe_sequence[len_sequence:]
-        vis_epe_sequence = vis_epe_sequence[:len_sequence]
-        vis_refine_xpx_sequence = vis_xpx_sequence[len_sequence:]
-        vis_xpx_sequence = vis_xpx_sequence[:len_sequence]
-
-        logging.info(f"Middlebury Iter {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}")
+        image_epe, image_out = evalute(flow_pr_sequence, flow_pr_refine_sequence, confidence_list, 
+                                       image1, image2, flow_gt, valid_gt, imageGT_file, 
+                                       padder, viser, dataset_name="Middlebury", d1_thold=2.0)
         epe_list.append(image_epe)
         out_list.append(image_out)
-
-        # save prediction and the corresponding path for visualization
-        viser.save_pred_vis(-flow_pr.data.numpy()[0], imageGT_file)
-        image1 = padder.unpad(image1).cpu().squeeze(0)
-        image2 = padder.unpad(image2).cpu().squeeze(0)
-        viser.analyze([-flow_pr.data.numpy()[0] for flow_pr in flow_pr_sequence], 
-                      image1.data.numpy(), 
-                      image2.data.numpy(), 
-                      -flow_gt.data.numpy()[0], 
-                      valid_gt.data.numpy(),
-                      [conf.data.numpy()[0] for conf in confidence_list],
-                      [-flow_pr_refine.data.numpy()[0] for flow_pr_refine in flow_pr_refine_sequence],
-                      imageGT_file,
-                      vis_epe_sequence,
-                      vis_xpx_sequence,
-                      vis_refine_epe_sequence,
-                      vis_refine_xpx_sequence,)
+        logging.info(f"Middlebury Iter {val_id+1} out of {len(val_dataset)}. " +\
+                     f"EPE {round(image_epe,4)} D1 {round(image_out,4)}")
 
     epe_list = np.array(epe_list)
     out_list = np.array(out_list)
