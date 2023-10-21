@@ -8,6 +8,7 @@ import time
 import logging
 import numpy as np
 import torch
+import torch.nn.functional as F
 from tqdm import tqdm
 from datetime import datetime
 
@@ -31,12 +32,12 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 @torch.no_grad()
-def validate_eth3d(model, iters=32, root="", sv_root="", mixed_prec=False):
+def validate_eth3d(model, iters=32, root="", sv_root="", mixed_prec=False, args=None):
     """ Peform validation using the ETH3D (train) split """
     model.eval()
     aug_params = {}
     val_dataset = datasets.ETH3D(aug_params, root=root)
-    viser = Visualizer(root, sv_root, "eth3d", scratch=False)
+    viser = Visualizer(root, sv_root, "eth3d", scratch=False, args=args)
 
     out_list, epe_list = [], []
     for val_id in range(len(val_dataset)):
@@ -107,13 +108,13 @@ def validate_eth3d(model, iters=32, root="", sv_root="", mixed_prec=False):
 
 
 @torch.no_grad()
-def validate_kitti(model, iters=32, root="", sv_root="", mixed_prec=False):
+def validate_kitti(model, iters=32, root="", sv_root="", mixed_prec=False, args=None):
     """ Peform validation using the KITTI-2015 (train) split """
     model.eval()
     aug_params = {}
     val_dataset = datasets.KITTI(aug_params, root=root, image_set='training')
     torch.backends.cudnn.benchmark = True
-    viser = Visualizer(root, sv_root, "kitti2015", scratch=False)
+    viser = Visualizer(root, sv_root, "kitti2015", scratch=False, args=args)
 
     out_list, epe_list, elapsed_list = [], [], []
     for val_id in range(len(val_dataset)):
@@ -193,7 +194,7 @@ def validate_kitti(model, iters=32, root="", sv_root="", mixed_prec=False):
 
 
 @torch.no_grad()
-def validate_things(model, iters=32, root='', sv_root="", mixed_prec=False):
+def validate_things(model, iters=32, root='', sv_root="", mixed_prec=False, args=None):
     """ Peform validation using the FlyingThings3D (TEST) split """
     model.eval()
     val_dataset = datasets.SceneFlowDatasets(dstype='frames_finalpass', root=root, things_test=True)
@@ -231,12 +232,12 @@ def validate_things(model, iters=32, root='', sv_root="", mixed_prec=False):
 
 
 @torch.no_grad()
-def validate_middlebury(model, iters=32, split='F', root="", sv_root="", mixed_prec=False):
+def validate_middlebury(model, iters=32, split='F', root="", sv_root="", mixed_prec=False, args=None):
     """ Peform validation using the Middlebury-V3 dataset """
     model.eval()
     aug_params = {}
     val_dataset = datasets.Middlebury(aug_params, root=root, split=split)
-    viser = Visualizer(root, sv_root, "middlebury", scratch=False)
+    viser = Visualizer(root, sv_root, "middlebury", scratch=False, args=args)
 
     out_list, epe_list = [], []
     for val_id in range(len(val_dataset)):
@@ -248,18 +249,24 @@ def validate_middlebury(model, iters=32, split='F', root="", sv_root="", mixed_p
         image1, image2 = padder.pad(image1, image2)
 
         with autocast(enabled=mixed_prec):
-            flow_pr_sequence, flow_predictions_refine = model(image1, image2, iters=iters, test_mode=False, vis_mode=True)
+            flow_pr_sequence, flow_pr_refine_sequence, confidence_list = model(image1, image2, iters=iters, test_mode=False, vis_mode=True)
 
-        all_sequence = []
-        if flow_predictions_refine is not None and len(flow_predictions_refine)>0:
-            for idx in range(len(flow_pr_sequence)):
-                all_sequence.append(flow_pr_sequence[idx])
-                if flow_predictions_refine[idx] is None:
-                    tmp = torch.zeros_like(flow_pr_sequence[idx])
+        if confidence_list is not None and len(confidence_list)>0:
+            for idx, conf in enumerate(confidence_list):
+                if conf is not None:
+                    confidence_list[idx] = F.sigmoid(conf)
                 else:
-                    tmp = flow_predictions_refine[idx]
-                all_sequence.append(tmp)
-            flow_pr_sequence = all_sequence[:30]
+                    confidence_list[idx] = torch.zeros_like(confidence_list[-1])
+                confidence_list[idx] = padder.unpad(confidence_list[idx]).cpu().squeeze(0)
+        
+        if flow_pr_refine_sequence is not None and len(flow_pr_refine_sequence)>0:
+            for idx, flow_pr_refine in enumerate(flow_pr_refine_sequence):
+                if flow_pr_refine is None:
+                    flow_pr_refine_sequence[idx] = torch.zeros_like(flow_pr_sequence[idx])
+                # flow_pr_refine_sequence[idx] = padder.unpad(flow_pr_refine).cpu().squeeze(0)
+
+        len_sequence = len(flow_pr_sequence)
+        flow_pr_sequence += flow_pr_refine_sequence
 
         vis_epe_sequence = []
         vis_xpx_sequence = []
@@ -279,7 +286,14 @@ def validate_middlebury(model, iters=32, split='F', root="", sv_root="", mixed_p
 
             vis_epe_sequence.append(image_epe)
             vis_xpx_sequence.append(image_out)
-            
+        
+        flow_pr_refine_sequence = flow_pr_sequence[len_sequence:]
+        flow_pr_sequence = flow_pr_sequence[:len_sequence]
+        vis_refine_epe_sequence = vis_epe_sequence[len_sequence:]
+        vis_epe_sequence = vis_epe_sequence[:len_sequence]
+        vis_refine_xpx_sequence = vis_xpx_sequence[len_sequence:]
+        vis_xpx_sequence = vis_xpx_sequence[:len_sequence]
+
         logging.info(f"Middlebury Iter {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}")
         epe_list.append(image_epe)
         out_list.append(image_out)
@@ -293,9 +307,13 @@ def validate_middlebury(model, iters=32, split='F', root="", sv_root="", mixed_p
                       image2.data.numpy(), 
                       -flow_gt.data.numpy()[0], 
                       valid_gt.data.numpy(),
+                      [conf.data.numpy()[0] for conf in confidence_list],
+                      [-flow_pr_refine.data.numpy()[0] for flow_pr_refine in flow_pr_refine_sequence],
                       imageGT_file,
                       vis_epe_sequence,
-                      vis_xpx_sequence)
+                      vis_xpx_sequence,
+                      vis_refine_epe_sequence,
+                      vis_refine_xpx_sequence,)
 
     epe_list = np.array(epe_list)
     out_list = np.array(out_list)
@@ -335,6 +353,12 @@ if __name__ == '__main__':
     parser.add_argument('--refine_win_size', type=int, default=7, help="window size for refinement")
     parser.add_argument('--refine_start_itr', type=int, default=3, help="start to do refinement at which iteration")
     parser.add_argument('--update_his', action='store_true', help="update history using refined disparity")
+
+    parser.add_argument('--improvement_map', action='store_true', help="visualize improvement map")
+    parser.add_argument('--movement_map', action='store_true', help="visualize movement map")
+    parser.add_argument('--acceleration_map', action='store_true', help="visualize acceleration map")
+    parser.add_argument('--mask', action='store_true', help="visualize mask")
+    parser.add_argument('--refine_map', action='store_true', help="visualize refined disparity map")
     args = parser.parse_args()
 
     assert args.sv_root is not None, "Please specify the visualization root"
@@ -365,22 +389,26 @@ if __name__ == '__main__':
         if args.root is None:
             args.root = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/ETH3D"
         validate_eth3d(model, iters=args.valid_iters, root=args.root, 
-                       sv_root=args.sv_root, mixed_prec=use_mixed_precision)
+                       sv_root=args.sv_root, mixed_prec=use_mixed_precision,
+                       args=args)
 
     elif args.dataset == 'kitti':
         if args.root is None:
             args.root = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/KITTI2015"
         validate_kitti(model, iters=args.valid_iters, root=args.root, 
-                       sv_root=args.sv_root, mixed_prec=use_mixed_precision)
+                       sv_root=args.sv_root, mixed_prec=use_mixed_precision,
+                       args=args)
 
     elif args.dataset in [f"middlebury_{s}" for s in 'FHQ']:
         if args.root is None:
             args.root = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/Middlebury"
         validate_middlebury(model, iters=args.valid_iters, root=args.root, split=args.dataset[-1], 
-                            sv_root=args.sv_root, mixed_prec=use_mixed_precision)
+                            sv_root=args.sv_root, mixed_prec=use_mixed_precision,
+                            args=args)
 
     elif args.dataset == 'things':
         if args.root is None:
             args.root = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/Sceneflow"
         validate_things(model, iters=args.valid_iters, root=args.root, 
-                        sv_root=args.sv_root, mixed_prec=use_mixed_precision)
+                        sv_root=args.sv_root, mixed_prec=use_mixed_precision,
+                        args=args)

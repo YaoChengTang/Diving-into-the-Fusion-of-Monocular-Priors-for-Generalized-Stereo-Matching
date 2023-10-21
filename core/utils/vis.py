@@ -146,11 +146,12 @@ def compute_confidence(movement_cur, movement_pre):
 
 
 class Visualizer:
-    def __init__(self, root, sv_root, dataset=None, scratch=True):
+    def __init__(self, root, sv_root, dataset=None, scratch=True, args=None):
         self.root = root.rstrip("/")
         self.sv_root = sv_root.rstrip("/")
         self.dataset = dataset
         self.scratch = scratch
+        self.args    = args
         self.sv_root = self.sv_root if self.sv_root[-(1+len(self.dataset)):]=="/"+self.dataset \
                        else os.path.join(self.sv_root, self.dataset)
         self.vis_root = self.sv_root.replace(self.dataset, os.path.join("analysis", self.dataset))
@@ -184,7 +185,8 @@ class Visualizer:
         return True
         
     def analyze(self, flow_pr_sequence, image1, image2, flow_gt, valid_gt, 
-                imageGT_file, vis_epe_sequence, vis_xpx_sequence):
+                confidence_list, flow_pr_refine_sequence, imageGT_file, 
+                vis_epe_sequence, vis_xpx_sequence, vis_refine_epe_sequence, vis_refine_xpx_sequence):
         # print(" ".join(["{}, {}, {}, {}\r\n".format(ele.shape, ele.dtype, ele.min(), ele.max()) \
         #                 for ele in [flow_pr, image1, image2, flow_gt, valid_gt]]))
         
@@ -215,64 +217,76 @@ class Visualizer:
         
         # get the colored improvement map between adjacent iterations,
         # the improvement map of the first iteration is empty.
-        improvement_map_sequence = []
-        colored_improvement_map_sequence = []
-        for idx in range(0, len(error_map_sequence)):
-            if idx==0 :
-                improvement_map = np.zeros_like(error_map)
-            else :
-                improvement_map = error_map_sequence[idx] - error_map_sequence[idx-1]
-            improvement_map_sequence.append(improvement_map)
-            colored_improvement_map = colorize_improvement_map(improvement_map)
-            colored_improvement_map_sequence.append(colored_improvement_map)
+        if self.args.improvement_map:
+            improvement_map_sequence = []
+            colored_improvement_map_sequence = []
+            for idx in range(0, len(error_map_sequence)):
+                if idx==0 :
+                    improvement_map = np.zeros_like(error_map)
+                else :
+                    improvement_map = error_map_sequence[idx] - error_map_sequence[idx-1]
+                improvement_map_sequence.append(improvement_map)
+                colored_improvement_map = colorize_improvement_map(improvement_map)
+                colored_improvement_map_sequence.append(colored_improvement_map)
         
         # get the movement vector at each step
         start_idx = 1
-        movement_map_sequence = []
-        colored_movement_map_sequence = []
-        for idx in range(0, len(flow_pr_sequence)):
-            if idx<start_idx :
-                movement_map = np.zeros_like(flow_pr_sequence[idx])
-            else :
-                movement_map = flow_pr_sequence[idx] - flow_pr_sequence[idx-1]
-            movement_map_sequence.append(movement_map)
-            colored_movement_map = colorize_improvement_map(movement_map)
-            colored_movement_map_sequence.append(colored_movement_map)
+        if self.args.movement_map:
+            movement_map_sequence = []
+            colored_movement_map_sequence = []
+            for idx in range(0, len(flow_pr_sequence)):
+                if idx<start_idx :
+                    movement_map = np.zeros_like(flow_pr_sequence[idx])
+                else :
+                    movement_map = flow_pr_sequence[idx] - flow_pr_sequence[idx-1]
+                movement_map_sequence.append(movement_map)
+                colored_movement_map = colorize_improvement_map(movement_map)
+                colored_movement_map_sequence.append(colored_movement_map)
         
         # get the difference between movement vector
-        colored_acceleration_map_sequence =[]
-        for idx in range(0, len(movement_map_sequence)):
-            if idx<start_idx+1 :
-                acceleration_map = np.zeros_like(movement_map_sequence[idx])
-            else :
-                acceleration_map = movement_map_sequence[idx] - movement_map_sequence[idx-1]
-            colored_acceleration_map = colorize_improvement_map(acceleration_map)
-            colored_acceleration_map_sequence.append(colored_acceleration_map)
+        if self.args.acceleration_map:
+            colored_acceleration_map_sequence =[]
+            for idx in range(0, len(movement_map_sequence)):
+                if idx<start_idx+1 :
+                    acceleration_map = np.zeros_like(movement_map_sequence[idx])
+                else :
+                    acceleration_map = movement_map_sequence[idx] - movement_map_sequence[idx-1]
+                colored_acceleration_map = colorize_improvement_map(acceleration_map)
+                colored_acceleration_map_sequence.append(colored_acceleration_map)
 
         # get confidence
-        static_improvement_list = []
-        mask_sequence_list = []
-        for idx in range(0, len(flow_pr_sequence)):
-            if idx<=start_idx :
-                static_improvement_list.append([0,0,0,0])
-                confidence = np.ones_like(error_map_sequence[-1])
-                confidence[:1,:1] = 0
+        if self.args.mask:
+            static_improvement_list = []
+            mask_sequence_list = []
+            colored_mask_sequence = []
+            for idx in range(0, len(flow_pr_sequence)):
+                if idx<=start_idx or len(confidence_list)==0 or confidence_list[idx] is None :
+                    static_improvement_list.append([0,0,0,0])
+                    confidence = np.ones_like(error_map_sequence[-1])
+                    confidence[:1,:1] = 0
+                    mask_sequence_list.append(confidence)
+                else:
+                    if len(confidence_list)>0 and confidence_list[idx] is not None:
+                        confidence = confidence_list[idx]
+                    else:
+                        improvement_map = improvement_map_sequence[idx]
+                        TP = (improvement_map<-1).sum() / ((improvement_map<-1)|(improvement_map>1)).sum()
+                        FN = (improvement_map>1).sum() / ((improvement_map<-1)|(improvement_map>1)).sum()
+                        confidence = compute_confidence(movement_map_sequence[idx], movement_map_sequence[idx-1])
+                        TP_conf = (improvement_map*confidence<-1).sum() / ((improvement_map<-1)|(improvement_map>1)).sum()
+                        FN_conf = (improvement_map*confidence>1).sum() / ((improvement_map<-1)|(improvement_map>1)).sum()
+                        static_improvement_list.append([TP,FN,TP_conf,FN_conf])
+                
+                colored_mask = colorize_confidence(confidence)
                 mask_sequence_list.append(confidence)
-            else:
-                improvement_map = improvement_map_sequence[idx]
-                TP = (improvement_map<-1).sum() / ((improvement_map<-1)|(improvement_map>1)).sum()
-                FN = (improvement_map>1).sum() / ((improvement_map<-1)|(improvement_map>1)).sum()
-                confidence = compute_confidence(movement_map_sequence[idx], movement_map_sequence[idx-1])
-                TP_conf = (improvement_map*confidence<-1).sum() / ((improvement_map<-1)|(improvement_map>1)).sum()
-                FN_conf = (improvement_map*confidence>1).sum() / ((improvement_map<-1)|(improvement_map>1)).sum()
-                static_improvement_list.append([TP,FN,TP_conf,FN_conf])
-                mask_sequence_list.append(confidence)
-            H,W = confidence.shape
-            confidence = confidence[..., np.newaxis]
-            ratio = 0.2
-            colored_movement_map_sequence[idx][:H] = ((1-ratio*(1-confidence))*colored_movement_map_sequence[idx][:H]).astype(np.uint8)
-            colored_improvement_map_sequence[idx][:H] = ((1-ratio*(1-confidence))*colored_improvement_map_sequence[idx][:H]).astype(np.uint8) 
-            colored_acceleration_map_sequence[idx][:H] = ((1-ratio*(1-confidence))*colored_acceleration_map_sequence[idx][:H]).astype(np.uint8)
+                colored_mask_sequence.append(colored_mask)
+                
+                # H,W = confidence.shape
+                # confidence = confidence[..., np.newaxis]
+                # ratio = 0.2
+                # colored_movement_map_sequence[idx][:H] = ((1-ratio*(1-confidence))*colored_movement_map_sequence[idx][:H]).astype(np.uint8)
+                # colored_improvement_map_sequence[idx][:H] = ((1-ratio*(1-confidence))*colored_improvement_map_sequence[idx][:H]).astype(np.uint8) 
+                # colored_acceleration_map_sequence[idx][:H] = ((1-ratio*(1-confidence))*colored_acceleration_map_sequence[idx][:H]).astype(np.uint8)
 
         # vis
         ## visualize GT and the final prediction
@@ -291,40 +305,57 @@ class Visualizer:
         ## visuzalize the prediction sequence
         atom_dict_list = [{"img":flow_gt, "title":"GT Disparity", "cmap":'jet'},
                           {"img":image1, "title":"Left Image", },
-                          {"img":image2, "title":"Right Image", },
-                          {"img":np.zeros_like(image2), "title":"", },
-                          {"img":np.zeros_like(image2), "title":"", },
-                          {"img":np.zeros_like(image2), "title":"", },]
+                          {"img":image2, "title":"Right Image", },] +\
+                         [{"img":np.zeros_like(image2), "title":"", }]*(self.args.refine_map+\
+                                                                        self.args.improvement_map+\
+                                                                        self.args.movement_map+\
+                                                                        self.args.acceleration_map+\
+                                                                        self.args.mask)
         for idx in range(0, len(error_map_sequence)):
             if idx>20:
                 break
             info = "epe:{:.2f}".format(vis_epe_sequence[idx]) + ", " + \
                    "3px:{:.1f}".format(vis_xpx_sequence[idx]*100)
-            atom_dict_list += [{"img":flow_pr_sequence[idx], 
-                                "title":"Predicted Disparity-{}".format(idx), 
-                                "cmap":'jet', 
-                                "alpha": mask_sequence_list[idx]+(mask_sequence_list[idx]<0.5)*0.5, },
-                               {"img":colored_error_map_sequence[idx], 
-                                "title":"Error Map-{}".format(idx)+": "+info, 
-                                "cmap":None, },
-                               {"img":colored_improvement_map_sequence[idx], 
-                                "title":"Improvement (err[i]-err[i-1])-{}".format(idx), 
-                                "cmap":None, },
-                               {"img":colored_movement_map_sequence[idx], 
-                                "title":"Movement (disp[i]-disp[i-1])-{}".format(idx), 
-                                "cmap":None, },
-                               {"img":colored_acceleration_map_sequence[idx], 
-                                "title":"Acceleration (Move[i]-Move[i-1])-{}".format(idx), 
-                                "cmap":None, },
-                               {"img":mask_sequence_list[idx], 
-                                "title":"Mask-{}".format(idx), 
-                                "cmap":'gray', },]
+            tmp_list = [{"img":flow_pr_sequence[idx], 
+                         "title":"Predicted Disparity-{}".format(idx), 
+                         "cmap":'jet', },]
+            tmp_list = [{"img":colored_error_map_sequence[idx], 
+                         "title":"Error Map-{}".format(idx)+": "+info, 
+                         "cmap":None, },]
+            if self.args.refine_map:
+                info_refine = "epe:{:.2f}".format(vis_refine_epe_sequence[idx]) + ", " + \
+                              "3px:{:.1f}".format(vis_refine_xpx_sequence[idx]*100)
+                tmp_list = [{"img":flow_pr_refine_sequence[idx], 
+                             "title":"Refined Disparity-{}".format(idx)+": "+info_refine, 
+                             "cmap":'jet', },]
+            if self.args.improvement_map:
+                tmp_list = [{"img":colored_improvement_map_sequence[idx], 
+                             "title":"Improvement (err[i]-err[i-1])-{}".format(idx), 
+                             "cmap":None, },]
+            if self.args.movement_map:
+                tmp_list = [{"img":colored_movement_map_sequence[idx], 
+                             "title":"Movement (disp[i]-disp[i-1])-{}".format(idx), 
+                             "cmap":None, },]
+            if self.args.acceleration_map:
+                tmp_list = [{"img":colored_acceleration_map_sequence[idx], 
+                             "title":"Acceleration (Move[i]-Move[i-1])-{}".format(idx), 
+                             "cmap":None, },]
+            if self.args.mask:
+                tmp_list = [{"img":mask_sequence_list[idx], 
+                             "title":"Mask-{}".format(idx), 
+                             "cmap":None, },]
+            atom_dict_list += tmp_list
+        
         pre,lat = os.path.splitext(sv_path)
         sv_path = pre +"-sequence"+ lat
+        group = 2 + self.args.improvement_map+\
+                    self.args.movement_map+\
+                    self.args.acceleration_map+\
+                    self.args.mask
         show_imgs(atom_dict_list, 
                   sv_img=True, save2where=sv_path, if_inter=False, 
-                  fontsize=20, szWidth=int(5*image1.shape[1]/image1.shape[0]), szHeight=5, 
-                  group=6, dpi=300)
+                  fontsize=20, szWidth=int(group*image1.shape[1]/image1.shape[0]), szHeight=5, 
+                  group=group, dpi=300)
         # print("saving {}".format(sv_path))
         pass
 # {"img":colored_improvement_map_sequence[idx], 
@@ -374,6 +405,45 @@ def colorize_error_map(error_map):
         x = i * step + step // 8
         y = 11
         cv2.putText(color_bar, str(i), (x, y), font, font_scale, font_color, font_thickness)
+    
+    colored_map = np.vstack((colored_map, color_bar))
+    return colored_map.astype(np.uint8)
+
+
+def colorize_confidence(confidence):
+    # Define a custom colormap for errors within 10 (shades of red)
+    colors_map = [
+        (255, 219, 172),  # Navajo White
+        (241, 194, 125),  # Mellow Apricot
+        (224, 172, 105),  # Fawn
+        (198, 134, 66 ),  # Peru
+        (141, 85 , 36 ),  # Russet
+    ]
+    num_colors = len(colors_map)
+
+    # Create a blank colored map with the same dimensions as the error map
+    colored_map = np.zeros((confidence.shape[0], confidence.shape[1], 3), dtype=np.uint8)
+
+    # Map error values within 10 to custom colors
+    for i in range(1, num_colors+1):
+        colored_map[(confidence>=(i-1)/num_colors) & (confidence<i/num_colors)] = colors_map[i-1]
+    colored_map[confidence>=i/num_colors] = colors_map[i-1]
+
+    # create corlor bar
+    color_bar = np.ones((15, confidence.shape[1], 3))*255
+    step = confidence.shape[1]//num_colors
+    for i in range(1,1+num_colors):
+        color_bar[5:, (i-1)*step:i*step] = colors_map[i-1]
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.45
+    font_color = (0, 0, 0)  # Black
+    font_thickness = 1
+    for i in range(1+num_colors):
+        x = i * step
+        x = x + step // 8 if i<num_colors else x - step // 8
+        y = 11
+        cv2.putText(color_bar, "{:.1f}".format(i/num_colors), (x, y), 
+                    font, font_scale, font_color, font_thickness)
     
     colored_map = np.vstack((colored_map, color_bar))
     return colored_map.astype(np.uint8)
