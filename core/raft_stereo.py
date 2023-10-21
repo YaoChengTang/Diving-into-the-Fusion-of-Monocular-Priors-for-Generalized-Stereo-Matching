@@ -90,7 +90,7 @@ class RAFTStereo(nn.Module):
                          f"Confidence: {args.confidence}, offset_memory_size: {args.offset_memory_size} " +\
                          f"slant: {args.slant}, slant range norm: {args.slant_norm} " +\
                          f"refine: {args.refinement}, refine_win_size: {args.refine_win_size}, refine_start_itr: {args.refine_start_itr} " +\
-                         f"update_his: {args.update_his} " )
+                         f"update_his: {args.update_his} U_thold: {args.U_thold}" )
 
     def freeze_bn(self):
         for m in self.modules():

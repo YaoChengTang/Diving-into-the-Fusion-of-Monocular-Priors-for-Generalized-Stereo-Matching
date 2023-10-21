@@ -270,6 +270,7 @@ if __name__ == '__main__':
     parser.add_argument('--refine_win_size', type=int, default=7, help="window size for refinement")
     parser.add_argument('--refine_start_itr', type=int, default=3, help="start to do refinement at which iteration")
     parser.add_argument('--update_his', action='store_true', help="update history using refined disparity")
+    parser.add_argument('--U_thold', type=float, default=0.98, help="thold used to filter out noise diaprity with uncertainty/confidence")
     
     # Loss parameters
     parser.add_argument('--loss_smooth', type=str, default=None, choices=["", "gradient", "curvature"], help="use smoothness loss")

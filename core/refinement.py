@@ -355,6 +355,7 @@ class Refinement(nn.Module):
                                 window_size=self.window_size, shift_size=0,)
         self.propagation_2 = SwinTransformerBlock(args, dim_fea, dim_disp, num_heads, 
                                 window_size=self.window_size, shift_size=self.window_size//2,)
+        self.U_thold = args.U_thold
         
         # if "local_rank" not in args or args.local_rank==0 :
         #     logging.info(f"OffsetConfidence: " + \
@@ -364,7 +365,7 @@ class Refinement(nn.Module):
         guidance = self.patch_embed(fea)
         if confidence is not None :
             uncertainty = F.sigmoid(confidence.detach())
-            uncertainty = uncertainty.masked_fill(uncertainty>0.98, float(-100.0)).masked_fill(uncertainty<=0.98, float(0.0))
+            uncertainty = uncertainty.masked_fill(uncertainty>self.U_thold, float(-100.0)).masked_fill(uncertainty<=self.U_thold, float(0.0))
             reliability = uncertainty.detach()
         else:
             reliability = None
