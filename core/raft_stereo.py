@@ -15,7 +15,7 @@ from core.extractor import BasicEncoder, MultiBasicEncoder, ResidualBlock
 from core.corr import CorrBlock1D, PytorchAlternateCorrBlock1D, CorrBlockFast1D, AlternateCorrBlock
 from core.utils.utils import coords_grid, upflow8
 from core.confidence import OffsetConfidence
-from core.refinement import Refinement
+from core.refinement import Refinement, UpdateHistory
 
 
 try:
@@ -81,6 +81,9 @@ class RAFTStereo(nn.Module):
                 self.refine = Refinement(args, in_chans=256, dim_fea=96, dim_disp=dim_disp, num_heads=3)
             else:
                 raise Exception("No such refinement: {}".format(args.refinement))
+        
+        if self.args.update_his:
+            self.update_hist = UpdateHistory(args, 128, dim_disp)
 
         if "local_rank" not in args or args.local_rank==0 :
             logging.info(f"RAFTStereo: " +\
@@ -238,7 +241,7 @@ class RAFTStereo(nn.Module):
                     coords1 = coords0 + disparity_refine
 
                     if self.args.update_his:
-                        net_list[0] = self.update_hist(net_list[0])
+                        net_list[0] = self.update_hist(net_list[0], disparity_refine)
 
             # We do not need to upsample or output intermediate results in test_mode
             if test_mode and itr < iters-1:
