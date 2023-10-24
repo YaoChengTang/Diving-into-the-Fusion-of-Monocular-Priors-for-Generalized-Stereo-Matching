@@ -81,8 +81,14 @@ class Loss(nn.Module):
                     gt_error = (flow_preds[i].detach() - flow_gt).abs().detach()
                     gt_error = F.interpolate(gt_error,scale_factor=1/4,mode='bilinear')
                     # confidence_loss += i_weight * F.smooth_l1_loss(confidence_list[i], gt_error)
-                    confidence_loss += i_weight * F.binary_cross_entropy_with_logits(confidence_list[i], 
-                                                                         torch.sigmoid(gt_error-4))
+                    # confidence_loss += i_weight * F.binary_cross_entropy_with_logits(confidence_list[i], 
+                    #                                                      torch.sigmoid(gt_error-4))
+                    gt_conf = (gt_error>4).float()
+                    weight = torch.pow(F.sigmoid(confidence_list[i])-gt_conf, 2)
+                    tmp_confidence_loss = (1+gt_conf*0.5) * weight *\
+                                          F.binary_cross_entropy_with_logits(confidence_list[i], 
+                                                                            gt_conf, reduction='none')
+                    confidence_loss += i_weight * tmp_confidence_loss.mean()
 
             # disprity loss
             i_loss = (flow_preds[i] - flow_gt).abs()
