@@ -416,9 +416,14 @@ def colorize_confidence(confidence):
     colors_map = [
         (255, 219, 172),  # Navajo White
         (241, 194, 125),  # Mellow Apricot
+        (233, 159, 51 ),
         (224, 172, 105),  # Fawn
         (198, 134, 66 ),  # Peru
+        (168, 112, 50 ),
         (141, 85 , 36 ),  # Russet
+        (121, 81 , 37 ),
+        (103, 63 , 27 ),
+        (53 , 32 , 13 ),
     ]
     num_colors = len(colors_map)
 
@@ -431,12 +436,12 @@ def colorize_confidence(confidence):
     colored_map[confidence>=i/num_colors] = colors_map[i-1]
 
     # create corlor bar
-    color_bar = np.ones((15, confidence.shape[1], 3))*255
+    color_bar = np.ones((4, confidence.shape[1], 3))*255
     step = confidence.shape[1]//num_colors
     for i in range(1,1+num_colors):
         color_bar[5:, (i-1)*step:i*step] = colors_map[i-1]
     font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 0.45
+    font_scale = 0.35
     font_color = (0, 0, 0)  # Black
     font_thickness = 1
     for i in range(1+num_colors):
