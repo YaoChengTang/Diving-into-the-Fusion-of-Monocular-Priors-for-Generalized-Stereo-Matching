@@ -348,7 +348,7 @@ class Visualizer:
         
         pre,lat = os.path.splitext(sv_path)
         sv_path = pre +"-sequence"+ lat
-        group = 2 + self.args.improvement_map +\
+        group = 3 + self.args.improvement_map +\
                     self.args.movement_map +\
                     self.args.acceleration_map +\
                     self.args.mask +\
