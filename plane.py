@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import numpy as np
 sys.path.append('core')
 
@@ -12,52 +13,161 @@ from core.utils import frame_utils
 from core.utils import vis
 
 
+def get_pos(H,W,disp=None):
+    u,v = torch.arange(W), torch.arange(H)
+    grid_u, grid_v  = torch.meshgrid(u, v, indexing="xy")
+    # print(grid_u.shape, grid_v.shape)
+    # print(grid_u[0:2,:10], grid_v[0:2, :10], sep="\r\n")
+    grid_u = grid_u.view((1,1,H,W))
+    grid_v = grid_v.view((1,1,H,W))
+    if disp is not None:
+        pos = torch.cat([grid_u,grid_v,disp],dim=1)
+    else:
+        pos = torch.cat([grid_u,grid_v],dim=1)
+    return pos.float()
+
+def convert2patch(data, patch_size):
+    B,C,H,W = data.shape
+    assert H%patch_size==0 and W%patch_size==0
+    patch_data = F.unfold(data, kernel_size=patch_size, dilation=1, padding=0, stride=patch_size)
+    patch_data = patch_data.view((-1,C,patch_size*patch_size,H//patch_size,W//patch_size))
+    return patch_data
+
+def intra_dist4patch(patch_data, patch_size):
+    """
+    patch_data: B,C,patch_size*patch_size,H,W
+    """
+    src = patch_data.unsqueeze(3).tile((1,1,1,patch_size*patch_size,1,1))
+    tar = patch_data.unsqueeze(2).tile((1,1,patch_size*patch_size,1,1,1))
+    dist = torch.sqrt(torch.square(src-tar).sum(dim=1))
+    return dist
+
+def get_adjacent_matrix(dist,patch_size,thold=3):
+    connect = (dist<thold).float()
+    for _ in range(patch_size*patch_size//2):
+        connect = torch.einsum('bijhw,bjkhw->bikhw', connect, connect)
+        connect = (connect>0).float()
+    connect = (connect>0).sum(dim=2)
+    return connect
+
+def reduce_noise(patch_coord, mask):
+    """
+    patch_coord: B,C,patch_size*patch_size,H,W;
+    mask: B,patch_size*patch_size,H,W;
+    """
+    # replace the other clique with center point of the largest clique
+    center_coord = (patch_coord*mask.unsqueeze(1)).sum(dim=2) / mask.sum(dim=1)
+    chs_coord = patch_coord*mask.unsqueeze(1) + (~mask.unsqueeze(1)) * center_coord.unsqueeze(2)
+    # print(mask.shape, coord.shape, patch_coord.shape, chs_coord.shape)
+    return chs_coord
+
+def get_plane_lstsq(chs_coord):
+    """
+    chs_coord: B,C,patch_size*patch_size,H,W;
+    mask: B,patch_size*patch_size,H,W;
+    """
+    # get a*u + b*v - d + c = 0 through least squares
+    chs_coord = chs_coord.flatten(-2,-1).transpose(-2,-1)
+    u_coord = chs_coord[:,0]
+    v_coord = chs_coord[:,1]
+    d_coord = chs_coord[:,2]
+    A = torch.stack((u_coord, v_coord, torch.ones_like(u_coord)), dim=3)
+    # print(chs_coord.shape, A.shape, d_coord.shape)
+    abc = torch.linalg.lstsq(A, d_coord).solution
+    return abc
+
+def extract_plane(disp,patch_size=4,thold=3):
+    """
+    disp: B,1,H,W;
+    """
+    # cluster through nearest search
+    patch_pos = convert2patch(disp, patch_size=patch_size)
+    dist = intra_dist4patch(patch_pos, patch_size=patch_size)
+    connect = get_adjacent_matrix(dist, patch_size=patch_size, thold=thold)
+
+    # get the largest clique
+    mask = connect - torch.amax(connect,dim=1).unsqueeze(1)
+    mask = mask >= -0.0001
+    print((mask==0).sum(), (mask>0.5).sum(), mask.size())
+    # print(disp[0,0,8:12,0:4], patch_pos[0,0,:,2,0], dist[0,:,:,2,0], connect[0,:,2,0], mask[0,:,2,0], sep="\r\n")
+
+    # get the 3d coordinate (u,v,d) of each point
+    B,_,H,W = disp.shape
+    coord = get_pos(H,W,disp)
+    patch_coord = convert2patch(coord, patch_size=patch_size)
+    # replace the other clique with center point of the largest clique
+    chs_coord = reduce_noise(patch_coord, mask)
+    # get a*u + b*v - d + c = 0 through least squares
+    abc = get_plane_lstsq(chs_coord)
+    abc = abc.transpose(1,2).view((-1,3,H//patch_size,W//patch_size))
+    # print(abc.shape)
+    return abc, mask
+
+def predict_disp(abc, uv_coord):
+    """
+    abc: B,3,H,W;
+    uv_coord: B,2,patch_size*patch_size,H,W;
+    """
+    u_coord = uv_coord[:,0]
+    v_coord = uv_coord[:,1]
+    A = torch.stack((u_coord, v_coord, torch.ones_like(u_coord)), dim=1)
+    d_coord = (A * abc.unsqueeze(dim=2)).sum(dim=1)
+    # print(d_coord.shape)
+    return d_coord
+
+
+patch_size = 4
 disp_path = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/Sceneflow/flyingthings3d/disparity/TRAIN/A/0717/left/0006.pfm"
 left_path = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/Sceneflow/flyingthings3d/frames_cleanpass/TRAIN/A/0717/left/0006.png"
 sv_path   = "./tmp.png"
 
-disp = np.array(frame_utils.readPFM(disp_path))
 img0 = np.array(Image.open(left_path))
+disp = np.array(frame_utils.readPFM(disp_path))
+# disp = np.zeros((20,20))
+# disp[9:] = 10
 H,W = disp.shape
 
-disp = torch.from_numpy(disp).view((1,1,H,W))
-img0 = torch.from_numpy(img0).permute((2,0,1)).view((1,3,H,W))
+start_time = time.time()
+disp = torch.from_numpy(disp).unsqueeze(0).unsqueeze(0)
+img0 = torch.from_numpy(img0).permute((2,0,1)).unsqueeze(0)
 
-u,v = torch.arange(W), torch.arange(H)
-grid_u, grid_v  = torch.meshgrid(u, v, indexing="xy")
-# print(grid_u.shape, grid_v.shape)
-# print(grid_u[0:2,:10], grid_v[0:2, :10], sep="\r\n")
-# grid_u = grid_u.view((1,1,H,W))
-# grid_v = grid_v.view((1,1,H,W))
-# pos = torch.cat([grid_u,grid_v,disp],dim=1)
-pos = disp
-pos_len = pos.shape[1]
+# extract planes a*u + b*v - d + c = 0
+abc, mask = extract_plane(disp,patch_size=patch_size,thold=3)
 
-patch_pos = F.unfold(pos, kernel_size=4, dilation=1, padding=0, stride=4)
-patch_pos = patch_pos.view((1,pos_len,16,H//4,W//4))
-src = patch_pos.view((1,pos_len,16,1,H//4,W//4)).tile((1,1,1,16,1,1))
-tar = patch_pos.view((1,pos_len,1,16,H//4,W//4)).tile((1,1,16,1,1,1))
-dist = torch.sqrt(torch.square(src-tar).sum(dim=1))
-connect = (dist<3).float()
-for _ in range(10):
-    connect = torch.einsum('bijhw,bjkhw->bikhw', connect, connect)
-connect = (connect>0).sum(dim=2)
-mask = connect - torch.amax(connect,dim=1).view((1,1,H//4,W//4))
-mask = mask >= -0.0001
+uv_coord = get_pos(H,W)
+patch_uv_coord = convert2patch(uv_coord, patch_size=patch_size)
+d_coord = predict_disp(abc, patch_uv_coord)
+
+patch_disp = convert2patch(disp, patch_size=patch_size)
+rec_disp = F.fold(d_coord.flatten(-2,-1), disp.shape[-2:], kernel_size=patch_size, stride=patch_size).view(1,1,H,W)
+rec_mask = F.fold(mask.flatten(-2,-1).float(), disp.shape[-2:], kernel_size=patch_size, stride=patch_size).view(1,1,H,W).bool()
+# print(rec_disp.shape, patch_disp.shape, disp.shape[-2:])
+
 # print(disp.shape, img0.shape, patch_pos.shape, dist.shape, connect.shape, mask.shape)
 # test_v, test_u = 100,100
 # torch.set_printoptions(precision=2)
 # print(src[0,:,0,:,test_v, test_u], tar[0,:,0,:,test_v, test_u], patch_pos[0,:,:,test_v, test_u], dist[0,:,:,test_v, test_u], sep="\r\n")
 # print(connect[0,:,test_v, test_u], mask[0,:,test_v, test_u], sep="\r\n")
 
+end_time = time.time()
+print("cost time: {}".format(end_time-start_time))
 
-disp = disp.view((H,W)).cpu().data.numpy()
-img0 = img0.view((3,H,W)).permute((1,2,0)).cpu().data.numpy()
-# patch_disp = patch_disp[0,0,...].cpu().data.numpy()
+disp = disp.squeeze(0).squeeze(0).cpu().data.numpy()
+img0 = img0.squeeze(0).permute((1,2,0)).cpu().data.numpy()
+patch_disp = patch_disp[0,0,0,...].cpu().data.numpy()
+rec_disp = rec_disp[0,0,...].cpu().data.numpy()
+rec_mask = rec_mask[0,0,...].cpu().data.numpy()
 
-# vis.show_imgs([{"img":img0, "title":"Left Image", },
-#                {"img":disp, "title":"GT Disparity", "cmap":'jet', },
-#                {"img":patch_disp, "title":"GT Patch Disparity", "cmap":'jet', },
-#             ], 
-#             sv_img=True, save2where=sv_path, if_inter=False, 
-#             fontsize=20, szWidth=10, szHeight=5, group=3)
+error_map = np.abs(rec_disp-disp)
+color_error_map = vis.colorize_error_map(error_map)
+
+atom_dict = [{"img":img0, "title":"Left Image", },
+             {"img":disp, "title":"GT Disparity", "cmap":'jet', },
+             {"img":patch_disp, "title":"GT Patch Disparity", "cmap":'jet', },
+             {"img":rec_disp, "title":"GT recover Disparity", "cmap":'jet', },
+             {"img":rec_mask, "title":"rec_mask", "cmap": "gray"},
+             {"img":color_error_map, "title":"color_error_map", },
+            ]
+vis.show_imgs(atom_dict, 
+            sv_img=True, save2where=sv_path, if_inter=False, 
+            fontsize=20, szWidth=10, szHeight=5, group=2)
