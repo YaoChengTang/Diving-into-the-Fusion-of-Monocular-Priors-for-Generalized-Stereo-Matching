@@ -44,7 +44,8 @@ def intra_dist4patch(patch_data, patch_size):
 
 def get_adjacent_matrix(dist,patch_size,thold=3):
     connect = (dist<thold).float()
-    for _ in range(patch_size*patch_size//2):
+    max_loop = int(np.ceil(np.log2(patch_size*patch_size)))
+    for _ in range(max_loop):
         connect = torch.einsum('bijhw,bjkhw->bikhw', connect, connect)
         connect = (connect>0).float()
     connect = (connect>0).sum(dim=2)
