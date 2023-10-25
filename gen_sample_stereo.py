@@ -128,7 +128,7 @@ def validate_eth3d(model, iters=32, root="", sv_root="", mixed_prec=False, args=
 
     out_list, epe_list = [], []
     for val_id in range(len(val_dataset)):
-        (imageL_file, imageR_file, imageGT_file), image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+        (imageL_file, imageR_file, imageGT_file), image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 
@@ -168,7 +168,7 @@ def validate_kitti(model, iters=32, root="", sv_root="", mixed_prec=False, args=
 
     out_list, epe_list, elapsed_list = [], [], []
     for val_id in range(len(val_dataset)):
-        (imageL_file, imageR_file, imageGT_file), image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+        (imageL_file, imageR_file, imageGT_file), image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 
@@ -253,7 +253,7 @@ def validate_middlebury(model, iters=32, split='F', root="", sv_root="", mixed_p
 
     out_list, epe_list = [], []
     for val_id in range(len(val_dataset)):
-        (imageL_file, imageR_file, imageGT_file), image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+        (imageL_file, imageR_file, imageGT_file), image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 

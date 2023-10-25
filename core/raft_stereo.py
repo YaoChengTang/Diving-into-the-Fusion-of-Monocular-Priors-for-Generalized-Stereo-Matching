@@ -270,12 +270,13 @@ class RAFTStereo(nn.Module):
 
             # upsample paramaters
             if self.args.slant is not None and len(self.args.slant)>0 and not test_mode:
-                if up_mask is None:
-                    params = upflow8(raw_params_list[-1])
-                else:
-                    params = self.upsample_flow(raw_params_list[-1], up_mask)
-                params = torch.concat([params[:,0:1], params[:,2:3], params[:,4:5]], dim=1)
-                params_list.append(params)
+                # if up_mask is None:
+                #     params = upflow8(raw_params_list[-1])
+                # else:
+                #     params = self.upsample_flow(raw_params_list[-1], up_mask)
+                # params = torch.concat([params[:,0:1], params[:,2:3], params[:,4:5]], dim=1)
+                # params_list.append(params)
+                params_list = [torch.concat([params[:,0:1], params[:,2:3], params[:,4:5]], dim=1) for params in raw_params_list]
 
         if test_mode:
             return coords1 - coords0, flow_up

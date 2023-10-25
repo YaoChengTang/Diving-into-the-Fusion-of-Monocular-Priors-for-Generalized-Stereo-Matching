@@ -38,7 +38,7 @@ def validate_eth3d(model, iters=32, root="", mixed_prec=False):
 
     out_list, epe_list = [], []
     for val_id in range(len(val_dataset)):
-        _, image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+        _, image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 
@@ -80,7 +80,7 @@ def validate_kitti(model, iters=32, root="", mixed_prec=False):
 
     out_list, epe_list, elapsed_list = [], [], []
     for val_id in range(len(val_dataset)):
-        _, image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+        _, image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 
@@ -131,7 +131,7 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None):
     out_list, epe_list = [], []
     tqdm_disable = args is not None and args.local_rank>0
     for val_id in tqdm(range(len(val_dataset)), disable=tqdm_disable):
-        _, image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+        _, image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 
@@ -175,7 +175,7 @@ def validate_middlebury(model, iters=32, split='F', root="", mixed_prec=False):
     out_nocc_list, epe_nocc_list = [], []
     out_mask_list, epe_mask_list = [], []
     for val_id in range(len(val_dataset)):
-        (imageL_file, _, _), image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+        (imageL_file, _, _), image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 

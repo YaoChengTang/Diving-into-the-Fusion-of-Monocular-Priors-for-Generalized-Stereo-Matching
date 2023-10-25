@@ -14,6 +14,9 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
+sys.path.append('core')
+sys.path.append('core/utils')
+
 LOG_ROOT     = os.getenv('LOG_ROOT', default="")
 TB_ROOT      = os.getenv('TB_ROOT', default="")
 CKPOINT_ROOT = os.getenv('CKPOINT_ROOT', default="")
@@ -143,7 +146,7 @@ def train(args):
         
         for i_batch, (_, *data_blob) in enumerate(tqdm(train_loader, disable=args.local_rank>0)):
             optimizer.zero_grad()
-            image1, image2, flow, valid = [x.cuda() for x in data_blob]
+            image1, image2, flow, valid, plane_abc = [x.cuda() for x in data_blob]
 
             assert model.training
             flow_predictions, flow_predictions_refine, \
@@ -154,10 +157,11 @@ def train(args):
             try:
                 loss, metrics, \
                 flow_loss, confidence_loss, \
-                smooth_loss = myLoss(flow_predictions, flow_predictions_refine, flow, valid, global_batch_num,
+                smooth_loss, \
+                params_loss = myLoss(flow_predictions, flow_predictions_refine, flow, valid, global_batch_num,
                                     confidence_list=confidence_list,
                                     params_list=params_list, 
-                                    imgL=image1, imgR=None)
+                                    imgL=image1, imgR=None, plane_abc=plane_abc)
             except Exception as err:
                 if args.local_rank==0:
                     debug_info = ""
@@ -179,8 +183,12 @@ def train(args):
                 logger.push(metrics)
                 logger.writer.add_scalar("live_loss", loss.item(), global_batch_num)
                 logger.writer.add_scalar("live_flow_loss", flow_loss.item(), global_batch_num)
-                logger.writer.add_scalar("live_confidence_loss", confidence_loss.item(), global_batch_num)
-                logger.writer.add_scalar("live_smooth_loss", smooth_loss.item(), global_batch_num)
+                if confidence_loss>0:
+                    logger.writer.add_scalar("live_confidence_loss", confidence_loss.item(), global_batch_num)
+                if smooth_loss>0:
+                    logger.writer.add_scalar("live_smooth_loss", smooth_loss.item(), global_batch_num)
+                if params_loss>0:
+                    logger.writer.add_scalar("params_loss", params_loss.item(), global_batch_num)
                 logger.writer.add_scalar(f'learning_rate', optimizer.param_groups[0]['lr'], global_batch_num)
             
             global_batch_num += 1

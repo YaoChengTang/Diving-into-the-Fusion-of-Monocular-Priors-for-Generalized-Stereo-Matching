@@ -2,7 +2,6 @@ import os
 import sys
 import time
 import numpy as np
-print(os.getcwd())
 
 import torch
 from torch import nn
@@ -92,7 +91,7 @@ def extract_plane(disp,slant="slant", slant_norm=False, patch_size=4,thold=3):
     # get the largest clique
     mask = connect - torch.amax(connect,dim=1).unsqueeze(1)
     mask = mask >= -0.0001
-    print((mask==0).sum(), (mask>0.5).sum(), mask.size())
+    # print((mask==0).sum(), (mask>0.5).sum(), mask.size())
     # print(disp[0,0,8:12,0:4], patch_pos[0,0,:,2,0], dist[0,:,:,2,0], connect[0,:,2,0], mask[0,:,2,0], sep="\r\n")
 
     # get the 3d coordinate (u,v,d) of each point
@@ -105,7 +104,7 @@ def extract_plane(disp,slant="slant", slant_norm=False, patch_size=4,thold=3):
     abc = get_plane_lstsq(chs_coord)
     abc = abc.transpose(1,2).view((-1,3,H//patch_size,W//patch_size))
     # print(abc.shape)
-    return abc, mask
+    return abc
 
 def predict_disp(abc, uv_coord):
     """
@@ -120,64 +119,65 @@ def predict_disp(abc, uv_coord):
     return d_coord
 
 
-slant = "slant"
-# slant = "slant_local"
-slant_norm = True
-# slant_norm = False
-patch_size = 4
-disp_path = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/Sceneflow/flyingthings3d/disparity/TRAIN/A/0717/left/0006.pfm"
-left_path = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/Sceneflow/flyingthings3d/frames_cleanpass/TRAIN/A/0717/left/0006.png"
-sv_path   = "./tmp.png"
+if __name__ == '__main__':
+    slant = "slant"
+    # slant = "slant_local"
+    slant_norm = True
+    # slant_norm = False
+    patch_size = 4
+    disp_path = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/Sceneflow/flyingthings3d/disparity/TRAIN/A/0717/left/0006.pfm"
+    left_path = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/Sceneflow/flyingthings3d/frames_cleanpass/TRAIN/A/0717/left/0006.png"
+    sv_path   = "./tmp.png"
 
-img0 = np.array(Image.open(left_path))
-disp = np.array(frame_utils.readPFM(disp_path))
-# disp = np.zeros((20,20))
-# disp[9:] = 10
-H,W = disp.shape
+    img0 = np.array(Image.open(left_path))
+    disp = np.array(frame_utils.readPFM(disp_path))
+    # disp = np.zeros((20,20))
+    # disp[9:] = 10
+    H,W = disp.shape
 
-start_time = time.time()
-disp = torch.from_numpy(disp).unsqueeze(0).unsqueeze(0)
-img0 = torch.from_numpy(img0).permute((2,0,1)).unsqueeze(0)
+    start_time = time.time()
+    disp = torch.from_numpy(disp).unsqueeze(0).unsqueeze(0)
+    img0 = torch.from_numpy(img0).permute((2,0,1)).unsqueeze(0)
 
-# extract planes a*u + b*v - d + c = 0
-abc, mask = extract_plane(disp, 
-                          slant=slant, slant_norm=slant_norm,
-                          patch_size=patch_size, thold=3)
+    # extract planes a*u + b*v - d + c = 0
+    abc = extract_plane(disp, 
+                        slant=slant, slant_norm=slant_norm,
+                        patch_size=patch_size, thold=3)
 
-uv_coord = get_pos(H,W, slant_norm=slant_norm)
-patch_uv_coord = convert2patch(uv_coord, patch_size=patch_size)
-d_coord = predict_disp(abc, patch_uv_coord)
+    uv_coord = get_pos(H,W, slant_norm=slant_norm)
+    patch_uv_coord = convert2patch(uv_coord, patch_size=patch_size)
+    d_coord = predict_disp(abc, patch_uv_coord)
 
-patch_disp = convert2patch(disp, patch_size=patch_size)
-rec_disp = F.fold(d_coord.flatten(-2,-1), disp.shape[-2:], kernel_size=patch_size, stride=patch_size).view(1,1,H,W)
-rec_mask = F.fold(mask.flatten(-2,-1).float(), disp.shape[-2:], kernel_size=patch_size, stride=patch_size).view(1,1,H,W).bool()
-# print(rec_disp.shape, patch_disp.shape, disp.shape[-2:])
+    patch_disp = convert2patch(disp, patch_size=patch_size)
+    rec_disp = F.fold(d_coord.flatten(-2,-1), disp.shape[-2:], kernel_size=patch_size, stride=patch_size).view(1,1,H,W)
+    rec_mask = F.fold(mask.flatten(-2,-1).float(), disp.shape[-2:], kernel_size=patch_size, stride=patch_size).view(1,1,H,W).bool()
+    # print(rec_disp.shape, patch_disp.shape, disp.shape[-2:])
 
-# print(disp.shape, img0.shape, patch_pos.shape, dist.shape, connect.shape, mask.shape)
-# test_v, test_u = 100,100
-# torch.set_printoptions(precision=2)
-# print(src[0,:,0,:,test_v, test_u], tar[0,:,0,:,test_v, test_u], patch_pos[0,:,:,test_v, test_u], dist[0,:,:,test_v, test_u], sep="\r\n")
-# print(connect[0,:,test_v, test_u], mask[0,:,test_v, test_u], sep="\r\n")
+    # print(disp.shape, img0.shape, patch_pos.shape, dist.shape, connect.shape, mask.shape)
+    # test_v, test_u = 100,100
+    # torch.set_printoptions(precision=2)
+    # print(src[0,:,0,:,test_v, test_u], tar[0,:,0,:,test_v, test_u], patch_pos[0,:,:,test_v, test_u], dist[0,:,:,test_v, test_u], sep="\r\n")
+    # print(connect[0,:,test_v, test_u], mask[0,:,test_v, test_u], sep="\r\n")
 
-end_time = time.time()
-print("cost time: {}".format(end_time-start_time))
+    end_time = time.time()
+    print("cost time: {}".format(end_time-start_time))
 
-disp = disp.squeeze(0).squeeze(0).cpu().data.numpy()
-img0 = img0.squeeze(0).permute((1,2,0)).cpu().data.numpy()
-patch_disp = patch_disp[0,0,0,...].cpu().data.numpy()
-rec_disp = rec_disp[0,0,...].cpu().data.numpy()
-rec_mask = rec_mask[0,0,...].cpu().data.numpy()
+    disp = disp.squeeze(0).squeeze(0).cpu().data.numpy()
+    img0 = img0.squeeze(0).permute((1,2,0)).cpu().data.numpy()
+    patch_disp = patch_disp[0,0,0,...].cpu().data.numpy()
+    rec_disp = rec_disp[0,0,...].cpu().data.numpy()
+    rec_mask = rec_mask[0,0,...].cpu().data.numpy()
 
-error_map = np.abs(rec_disp-disp)
-color_error_map = vis.colorize_error_map(error_map)
+    error_map = np.abs(rec_disp-disp)
+    color_error_map = vis.colorize_error_map(error_map)
 
-atom_dict = [{"img":img0, "title":"Left Image", },
-             {"img":disp, "title":"GT Disparity", "cmap":'jet', },
-             {"img":patch_disp, "title":"GT Patch Disparity", "cmap":'jet', },
-             {"img":rec_disp, "title":"GT recover Disparity", "cmap":'jet', },
-             {"img":rec_mask, "title":"rec_mask", "cmap": "gray"},
-             {"img":color_error_map, "title":"color_error_map", },
-            ]
-vis.show_imgs(atom_dict, 
-            sv_img=True, save2where=sv_path, if_inter=False, 
-            fontsize=20, szWidth=10, szHeight=5, group=2)
+    atom_dict = [{"img":img0, "title":"Left Image", },
+                {"img":disp, "title":"GT Disparity", "cmap":'jet', },
+                {"img":patch_disp, "title":"GT Patch Disparity", "cmap":'jet', },
+                {"img":rec_disp, "title":"GT recover Disparity", "cmap":'jet', },
+                {"img":rec_mask, "title":"rec_mask", "cmap": "gray"},
+                {"img":color_error_map, "title":"color_error_map", },
+                ]
+    vis.show_imgs(atom_dict, 
+                sv_img=True, save2where=sv_path, if_inter=False, 
+                fontsize=20, szWidth=10, szHeight=5, group=2)

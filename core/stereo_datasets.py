@@ -14,6 +14,7 @@ from pathlib import Path
 from glob import glob
 import os.path as osp
 
+from core.utils import plane
 from core.utils import frame_utils
 from core.utils.ddp import get_loader
 from core.utils.augmentor import FlowAugmentor, SparseFlowAugmentor
@@ -21,7 +22,7 @@ DATASET_ROOT = os.getenv('DATASET_ROOT')
 
 
 class StereoDataset(data.Dataset):
-    def __init__(self, aug_params=None, sparse=False, reader=None):
+    def __init__(self, aug_params=None, sparse=False, reader=None, args=None):
         self.augmentor = None
         self.sparse = sparse
         self.img_pad = aug_params.pop("img_pad", None) if aug_params is not None else None
@@ -35,6 +36,15 @@ class StereoDataset(data.Dataset):
             self.disparity_reader = frame_utils.read_gen
         else:
             self.disparity_reader = reader        
+
+        if args is not None:
+            # self.plane = args.plane_datset
+            self.slant = args.slant 
+            self.slant_norm = args.slant_norm
+        else:
+            # self.plane = False
+            self.slant = None 
+            self.slant_norm = False
 
         self.is_test = False
         self.init_seed = False
@@ -107,7 +117,16 @@ class StereoDataset(data.Dataset):
             img2 = F.pad(img2, [padW]*2 + [padH]*2)
 
         flow = flow[:1]
-        return self.image_list[index] + [self.disparity_list[index]], img1, img2, flow, valid.float()
+
+        if self.slant is None:
+            plane_abc = torch.zeros_like(flow)
+        else:
+            plane_abc = plane.extract_plane(-flow.unsqueeze(0),
+                                            slant=self.slant, 
+                                            slant_norm=self.slant_norm, 
+                                            patch_size=4, thold=3)
+            plane_abc = plane_abc.squeeze(0)
+        return self.image_list[index] + [self.disparity_list[index]], img1, img2, flow, valid.float(), plane_abc
 
 
     def __mul__(self, v):
@@ -123,8 +142,9 @@ class StereoDataset(data.Dataset):
 
 
 class SceneFlowDatasets(StereoDataset):
-    def __init__(self, aug_params=None, root='', dstype='frames_cleanpass', things_test=False, caching=False):
-        super(SceneFlowDatasets, self).__init__(aug_params)
+    def __init__(self, aug_params=None, root='', dstype='frames_cleanpass', 
+                 things_test=False, caching=False, args=None):
+        super(SceneFlowDatasets, self).__init__(aug_params, args=args)
         self.root = root if len(root)>0 else DATASET_ROOT
         self.dstype = dstype
         self.caching = caching
@@ -203,8 +223,8 @@ class SceneFlowDatasets(StereoDataset):
 
 
 class ETH3D(StereoDataset):
-    def __init__(self, aug_params=None, root='datasets/ETH3D', split='training'):
-        super(ETH3D, self).__init__(aug_params, sparse=True)
+    def __init__(self, aug_params=None, root='datasets/ETH3D', split='training', args=None):
+        super(ETH3D, self).__init__(aug_params, sparse=True, args=args)
         root = root if len(root)>0 else DATASET_ROOT
         assert os.path.exists(root), "check the existence: {}".format(root)
 
@@ -217,8 +237,8 @@ class ETH3D(StereoDataset):
             self.disparity_list += [ disp ]
 
 class SintelStereo(StereoDataset):
-    def __init__(self, aug_params=None, root='datasets/SintelStereo'):
-        super().__init__(aug_params, sparse=True, reader=frame_utils.readDispSintelStereo)
+    def __init__(self, aug_params=None, root='datasets/SintelStereo', args=None):
+        super().__init__(aug_params, sparse=True, reader=frame_utils.readDispSintelStereo, args=args)
         root = root if len(root)>0 else DATASET_ROOT
 
         image1_list = sorted( glob(osp.join(root, 'training/*_left/*/frame_*.png')) )
@@ -231,8 +251,8 @@ class SintelStereo(StereoDataset):
             self.disparity_list += [ disp ]
 
 class FallingThings(StereoDataset):
-    def __init__(self, aug_params=None, root='datasets/FallingThings'):
-        super().__init__(aug_params, reader=frame_utils.readDispFallingThings)
+    def __init__(self, aug_params=None, root='datasets/FallingThings', args=None):
+        super().__init__(aug_params, reader=frame_utils.readDispFallingThings, args=args)
         root = root if len(root)>0 else DATASET_ROOT
         assert os.path.exists(root)
 
@@ -267,8 +287,8 @@ class TartanAir(StereoDataset):
             self.disparity_list += [ disp ]
 
 class KITTI(StereoDataset):
-    def __init__(self, aug_params=None, root='datasets/KITTI', image_set='training'):
-        super(KITTI, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispKITTI)
+    def __init__(self, aug_params=None, root='datasets/KITTI', image_set='training', args=None):
+        super(KITTI, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispKITTI, args=args)
         root = root if len(root)>0 else DATASET_ROOT
         assert os.path.exists(root), "check the existence: {}".format(self.root)
 
@@ -282,8 +302,8 @@ class KITTI(StereoDataset):
 
 
 class Middlebury(StereoDataset):
-    def __init__(self, aug_params=None, root='datasets/Middlebury', split='F'):
-        super(Middlebury, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispMiddlebury)
+    def __init__(self, aug_params=None, root='datasets/Middlebury', split='F', args=None):
+        super(Middlebury, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispMiddlebury, args=args)
         root = root if len(root)>0 else DATASET_ROOT
         assert os.path.exists(root), "check the existence: {}".format(self.root)
         assert split in ["F", "H", "Q", "2014"]
@@ -319,21 +339,21 @@ def fetch_dataloader(args):
     train_dataset = None
     for dataset_name in args.train_datasets:
         if dataset_name.startswith("middlebury_"):
-            new_dataset = Middlebury(aug_params, split=dataset_name.replace('middlebury_',''))
+            new_dataset = Middlebury(aug_params, split=dataset_name.replace('middlebury_',''), args=args)
             logging.info(f"Adding {len(new_dataset)} samples from Middlebury")
         elif dataset_name == 'sceneflow':
-            clean_dataset = SceneFlowDatasets(aug_params, dstype='frames_cleanpass')
-            final_dataset = SceneFlowDatasets(aug_params, dstype='frames_finalpass')
+            clean_dataset = SceneFlowDatasets(aug_params, dstype='frames_cleanpass', args=args)
+            final_dataset = SceneFlowDatasets(aug_params, dstype='frames_finalpass', args=args)
             new_dataset = (clean_dataset*4) + (final_dataset*4)
             logging.info(f"Adding {len(new_dataset)} samples from SceneFlow")
         elif 'kitti' in dataset_name:
-            new_dataset = KITTI(aug_params, split=dataset_name)
+            new_dataset = KITTI(aug_params, split=dataset_name, args=args)
             logging.info(f"Adding {len(new_dataset)} samples from KITTI")
         elif dataset_name == 'sintel_stereo':
-            new_dataset = SintelStereo(aug_params)*140
+            new_dataset = SintelStereo(aug_params, args=args)*140
             logging.info(f"Adding {len(new_dataset)} samples from Sintel Stereo")
         elif dataset_name == 'falling_things':
-            new_dataset = FallingThings(aug_params)*5
+            new_dataset = FallingThings(aug_params, args=args)*5
             logging.info(f"Adding {len(new_dataset)} samples from FallingThings")
         elif dataset_name.startswith('tartan_air'):
             new_dataset = TartanAir(aug_params, keywords=dataset_name.split('_')[2:])
