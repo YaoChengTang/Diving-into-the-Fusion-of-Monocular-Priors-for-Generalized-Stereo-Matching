@@ -2,15 +2,15 @@ import os
 import sys
 import time
 import numpy as np
-sys.path.append('core')
+print(os.getcwd())
 
 import torch
 from torch import nn
 from torch.nn import functional as F
 from PIL import Image
 
-from core.utils import frame_utils
-from core.utils import vis
+import frame_utils
+import vis
 
 
 def get_pos(H,W,disp=None,slant_norm=False):

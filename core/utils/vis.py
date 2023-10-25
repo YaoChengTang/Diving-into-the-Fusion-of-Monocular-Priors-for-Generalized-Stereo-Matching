@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from utils.frame_utils import writeDispMiddlebury, writeDispKITTI, write_gen
+from frame_utils import writeDispMiddlebury, writeDispKITTI, write_gen
 
 
 
