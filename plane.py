@@ -13,9 +13,12 @@ from core.utils import frame_utils
 from core.utils import vis
 
 
-def get_pos(H,W,disp=None):
+def get_pos(H,W,disp=None,slant_norm=False):
     u,v = torch.arange(W), torch.arange(H)
     grid_u, grid_v  = torch.meshgrid(u, v, indexing="xy")
+    if slant_norm:
+        grid_u = grid_u/W
+        grid_v = grid_v/H
     # print(grid_u.shape, grid_v.shape)
     # print(grid_u[0:2,:10], grid_v[0:2, :10], sep="\r\n")
     grid_u = grid_u.view((1,1,H,W))
@@ -77,7 +80,7 @@ def get_plane_lstsq(chs_coord):
     abc = torch.linalg.lstsq(A, d_coord).solution
     return abc
 
-def extract_plane(disp,patch_size=4,thold=3):
+def extract_plane(disp,slant="slant", slant_norm=False, patch_size=4,thold=3):
     """
     disp: B,1,H,W;
     """
@@ -94,7 +97,7 @@ def extract_plane(disp,patch_size=4,thold=3):
 
     # get the 3d coordinate (u,v,d) of each point
     B,_,H,W = disp.shape
-    coord = get_pos(H,W,disp)
+    coord = get_pos(H,W,disp,slant_norm)
     patch_coord = convert2patch(coord, patch_size=patch_size)
     # replace the other clique with center point of the largest clique
     chs_coord = reduce_noise(patch_coord, mask)
@@ -117,6 +120,10 @@ def predict_disp(abc, uv_coord):
     return d_coord
 
 
+slant = "slant"
+# slant = "slant_local"
+slant_norm = True
+# slant_norm = False
 patch_size = 4
 disp_path = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/Sceneflow/flyingthings3d/disparity/TRAIN/A/0717/left/0006.pfm"
 left_path = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/Sceneflow/flyingthings3d/frames_cleanpass/TRAIN/A/0717/left/0006.png"
@@ -133,9 +140,11 @@ disp = torch.from_numpy(disp).unsqueeze(0).unsqueeze(0)
 img0 = torch.from_numpy(img0).permute((2,0,1)).unsqueeze(0)
 
 # extract planes a*u + b*v - d + c = 0
-abc, mask = extract_plane(disp,patch_size=patch_size,thold=3)
+abc, mask = extract_plane(disp, 
+                          slant=slant, slant_norm=slant_norm,
+                          patch_size=patch_size, thold=3)
 
-uv_coord = get_pos(H,W)
+uv_coord = get_pos(H,W, slant_norm=slant_norm)
 patch_uv_coord = convert2patch(uv_coord, patch_size=patch_size)
 d_coord = predict_disp(abc, patch_uv_coord)
 
