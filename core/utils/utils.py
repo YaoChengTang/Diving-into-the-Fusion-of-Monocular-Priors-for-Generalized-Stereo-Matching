@@ -113,4 +113,8 @@ def disparity_computation(params, slant=None, slant_norm=False, coords0=None):
             offset = params[:,0] * coords0[:,0] + \
                      params[:,1] * coords0[:,1] + \
                      params[:,2]
+    elif slant=="slant_local":
+        raise Exception("slant_local is not supported")
+    else:
+        raise Exception(f"{slant} is not supported")
     return offset

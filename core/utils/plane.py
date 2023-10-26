@@ -12,9 +12,9 @@ import frame_utils
 import vis
 
 
-def get_pos(H,W,disp=None,slant="slant",slant_norm=False,patch_size=None):
+def get_pos(H,W,disp=None,slant="slant",slant_norm=False,patch_size=None,device=None):
     if slant=="slant":
-        u,v = torch.arange(W), torch.arange(H)
+        u,v = torch.arange(W,device=device), torch.arange(H,device=device)
         grid_u, grid_v = torch.meshgrid(u, v, indexing="xy")
         if slant_norm:
             grid_u = grid_u/W
@@ -22,12 +22,12 @@ def get_pos(H,W,disp=None,slant="slant",slant_norm=False,patch_size=None):
     elif slant=="slant_local":
         assert H%patch_size==0 and W%patch_size==0
         if not slant_norm:
-            u = torch.arange(-patch_size/2+0.5, patch_size/2-0.5 + 1, step=1)
-            v = torch.arange(-patch_size/2+0.5, patch_size/2-0.5 + 1, step=1)
+            u = torch.arange(-patch_size/2+0.5, patch_size/2-0.5 + 1, step=1, device=device)
+            v = torch.arange(-patch_size/2+0.5, patch_size/2-0.5 + 1, step=1, device=device)
         else:
             # restrict into (-1,1)
-            u = torch.arange(-1+1/patch_size, 1, step=2/patch_size)
-            v = torch.arange(-1+1/patch_size, 1, step=2/patch_size)
+            u = torch.arange(-1+1/patch_size, 1, step=2/patch_size, device=device)
+            v = torch.arange(-1+1/patch_size, 1, step=2/patch_size, device=device)
         # print(u,v,sep="\r\n")
         u = u.tile((W//patch_size))
         v = v.tile((H//patch_size))

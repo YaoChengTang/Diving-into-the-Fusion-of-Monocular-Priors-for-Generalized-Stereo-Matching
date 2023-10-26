@@ -16,6 +16,7 @@ from core.corr import CorrBlock1D, PytorchAlternateCorrBlock1D, CorrBlockFast1D,
 from core.utils.utils import coords_grid, upflow8
 from core.confidence import OffsetConfidence
 from core.refinement import Refinement, UpdateHistory
+from core.utils.plane import get_pos, convert2patch, predict_disp
 
 
 try:
@@ -52,24 +53,24 @@ class RAFTStereo(nn.Module):
         if args.confidence:
             self.confidence_computer = OffsetConfidence(args)
 
-        # build offset for interpolation in slant plane
-        # d_p = d_q + a_q\cdot\Delta u_{q\to p} + b_q\cdot\Delta v_{q\to p}
-        if self.args.slant in ["slant_local"]:
-            factor = 2 ** self.args.n_downsample
-            delta_center = []
-            for sub_row_idx in range(0, factor):
-                for sub_col_idx in range(0, factor):
-                    delta = [-factor/2 + 0.5 + sub_row_idx, -factor/2 + 0.5 + sub_col_idx]
-                    delta_center.append(delta)
-            delta_center = np.array(delta_center)
-            delta_pq = []
-            for row_idx in [-1,0,1]:
-                for col_idx in [-1,0,1]:
-                    delta = delta_center - np.array([row_idx,col_idx])*factor
-                    delta_pq.append(delta)
-            delta_pq = np.array(delta_pq).reshape(9,factor,factor,2)
-            delta_pq = torch.Tensor(delta_pq)
-            self.delta_pq = nn.Parameter(delta_pq, requires_grad=False)   # (9,factor,factor,2)
+        # # build offset for interpolation in slant plane
+        # # d_p = d_q + a_q\cdot\Delta u_{q\to p} + b_q\cdot\Delta v_{q\to p}
+        # if self.args.slant in ["slant_local"]:
+        #     factor = 2 ** self.args.n_downsample
+        #     delta_center = []
+        #     for sub_row_idx in range(0, factor):
+        #         for sub_col_idx in range(0, factor):
+        #             delta = [-factor/2 + 0.5 + sub_row_idx, -factor/2 + 0.5 + sub_col_idx]
+        #             delta_center.append(delta)
+        #     delta_center = np.array(delta_center)
+        #     delta_pq = []
+        #     for row_idx in [-1,0,1]:
+        #         for col_idx in [-1,0,1]:
+        #             delta = delta_center - np.array([row_idx,col_idx])*factor
+        #             delta_pq.append(delta)
+        #     delta_pq = np.array(delta_pq).reshape(9,factor,factor,2)
+        #     delta_pq = torch.Tensor(delta_pq)
+        #     self.delta_pq = nn.Parameter(delta_pq, requires_grad=False)   # (9,factor,factor,2)
         
         if args.refinement is not None and len(args.refinement)>0:
             if self.args.slant is None or len(self.args.slant)==0 :
@@ -114,15 +115,34 @@ class RAFTStereo(nn.Module):
         mask = torch.softmax(mask, dim=2)
 
         if self.args.slant in ["slant_local"] and params is not None:
-            up_flow = F.unfold(factor * flow, [3,3], padding=1)
-            up_flow = up_flow.view(N, D, 9, 1, 1, H, W)
-            a = F.unfold(params[:,2:4], [3,3], padding=1)
-            a = a.view(N, D, 9, 1, 1, H, W)
-            b = F.unfold(params[:,4:6], [3,3], padding=1)
-            b = b.view(N, D, 9, 1, 1, H, W)
-            # d_p = d_q + a_q\cdot\Delta u_{q\to p} + b_q\cdot\Delta v_{q\to p}
-            delta_pq = self.delta_pq.view(1,1,9,factor,factor,1,1,2)
-            up_flow = up_flow + a*delta_pq[...,1] + b*delta_pq[...,0]
+            # d_p = a_q\cdot\Delta u_{q\to p} + b_q\cdot\Delta v_{q\to p} + d_q
+            delta_pq = get_pos(H*factor, W*factor, disp=None,
+                              slant=self.args.slant,
+                              slant_norm=self.args.slant_norm,
+                              patch_size=factor,
+                              device=flow.device)                                                # (1,2,H*factor,W*factor)
+            patch_delta_pq = convert2patch(delta_pq, patch_size=factor, div_last=False).detach() # (1,2,factor*factor,H,W)
+            a_p, a_p_flow, \
+            b_p, b_p_flow, \
+            d_p, d_p_flow  = torch.split(params, 1, dim=1)              # (B,1,H,W)
+            abd      = torch.cat([a_p, b_p, d_p], dim=1)                # (B,3,H,W)
+            abd_flow = torch.cat([a_p_flow, b_p_flow, d_p_flow], dim=1) # (B,3,H,W)
+            d_coord      = predict_disp(abd, patch_delta_pq, patch_size=factor, mul_last=True)      # (B,factor*factor,H,W)
+            d_coord_flow = predict_disp(abd_flow, patch_delta_pq, patch_size=factor, mul_last=True) # (B,factor*factor,H,W)
+            up_flow      = torch.stack([d_coord, d_coord_flow], dim=1)                              # (B,2,factor*factor,H,W)
+            up_flow      = up_flow.view(N, 2*factor*factor, H, W)                                   # (B,2*factor*factor,H,W)
+            up_flow      = F.unfold(up_flow, [3,3], padding=1)                                      # (B,2*factor*factor*9,H,W)
+            up_flow      = up_flow.view(N, 2, factor, factor, 9, H, W)                              # (B,2,factor,factor,9,H,W)
+            up_flow      = up_flow.permute((0,1,4,2,3,5,6))                                         # (B,2,9,factor,factor,H,W)
+
+            # up_flow = F.unfold(factor * flow, [3,3], padding=1)
+            # up_flow = up_flow.view(N, D, 9, 1, 1, H, W)
+            # a = F.unfold(params[:,:2], [3,3], padding=1)
+            # a = a.view(N, D, 9, 1, 1, H, W)
+            # b = F.unfold(params[:,2:4], [3,3], padding=1)
+            # b = b.view(N, D, 9, 1, 1, H, W)
+            # delta_pq = self.delta_pq.view(1,1,9,factor,factor,1,1,2)
+            # up_flow = up_flow + a*delta_pq[...,1] + b*delta_pq[...,0]
         else:
             up_flow = F.unfold(factor * flow, [3,3], padding=1)
             up_flow = up_flow.view(N, D, 9, 1, 1, H, W)
@@ -201,7 +221,12 @@ class RAFTStereo(nn.Module):
                 confidence_list.append(confidence)
 
             # in stereo mode, project flow onto epipolar
-            delta_flow[:,1] = 0.0
+            if self.args.slant in ["slant", "slant_local"]:
+                delta_flow[:,1] = 0.0
+                delta_flow[:,3] = 0.0
+                delta_flow[:,5] = 0.0
+            else:
+                delta_flow[:,1] = 0.0
 
             ## compute current position for following exploration
             if self.args.slant is None or len(self.args.slant)==0 :
@@ -220,7 +245,7 @@ class RAFTStereo(nn.Module):
                                  delta_flow[:,2:3] * coords0[:,[1,0]] + \
                                  delta_flow[:,4:5]
                 elif self.args.slant=="slant_local" :
-                    offset = delta_flow[:,:2]
+                    offset = delta_flow[:,4:6]
                 
                 if len(params_list)==0:
                     raw_params_list.append(delta_flow)
