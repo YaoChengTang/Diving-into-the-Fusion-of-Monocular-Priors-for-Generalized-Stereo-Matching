@@ -12,12 +12,26 @@ import frame_utils
 import vis
 
 
-def get_pos(H,W,disp=None,slant_norm=False):
-    u,v = torch.arange(W), torch.arange(H)
-    grid_u, grid_v  = torch.meshgrid(u, v, indexing="xy")
-    if slant_norm:
-        grid_u = grid_u/W
-        grid_v = grid_v/H
+def get_pos(H,W,disp=None,slant="slant",slant_norm=False,patch_size=None):
+    if slant=="slant":
+        u,v = torch.arange(W), torch.arange(H)
+        grid_u, grid_v = torch.meshgrid(u, v, indexing="xy")
+        if slant_norm:
+            grid_u = grid_u/W
+            grid_v = grid_v/H
+    elif slant=="slant_local":
+        assert H%patch_size==0 and W%patch_size==0
+        if not slant_norm:
+            u = torch.arange(-patch_size/2+0.5, patch_size/2-0.5 + 1, step=1)
+            v = torch.arange(-patch_size/2+0.5, patch_size/2-0.5 + 1, step=1)
+        else:
+            # restrict into (-1,1)
+            u = torch.arange(-1+1/patch_size, 1, step=2/patch_size)
+            v = torch.arange(-1+1/patch_size, 1, step=2/patch_size)
+        # print(u,v,sep="\r\n")
+        u = u.tile((W//patch_size))
+        v = v.tile((H//patch_size))
+        grid_u, grid_v = torch.meshgrid(u, v, indexing="xy")
     # print(grid_u.shape, grid_v.shape)
     # print(grid_u[0:2,:10], grid_v[0:2, :10], sep="\r\n")
     grid_u = grid_u.view((1,1,H,W))
@@ -28,11 +42,16 @@ def get_pos(H,W,disp=None,slant_norm=False):
         pos = torch.cat([grid_u,grid_v],dim=1)
     return pos.float()
 
-def convert2patch(data, patch_size):
+def convert2patch(data, patch_size, div_last=False):
+    """ 
+    data: B,C,H,W;
+    """
     B,C,H,W = data.shape
     assert H%patch_size==0 and W%patch_size==0
     patch_data = F.unfold(data, kernel_size=patch_size, dilation=1, padding=0, stride=patch_size)
     patch_data = patch_data.view((-1,C,patch_size*patch_size,H//patch_size,W//patch_size))
+    if div_last:
+        patch_data[:,-1] /= patch_size
     return patch_data
 
 def intra_dist4patch(patch_data, patch_size):
@@ -64,22 +83,36 @@ def reduce_noise(patch_coord, mask):
     # print(mask.shape, coord.shape, patch_coord.shape, chs_coord.shape)
     return chs_coord
 
-def get_plane_lstsq(chs_coord):
+# def abs2relative(patch_coord):
+#     """
+#     patch_coord: B,C,patch_size*patch_size,H,W;
+#     """
+#     center_patch_coord = patch_coord.mean(dim=2)
+#     rel_patch_coord = patch_coord - center_patch_coord.unsqueeze(2)
+#     return rel_patch_coord, center_patch_coord
+
+def get_plane_lstsq(chs_coord, slant, patch_coord=None):
     """
     chs_coord: B,C,patch_size*patch_size,H,W;
     mask: B,patch_size*patch_size,H,W;
+    return:
+        abc: B,H*W,patch_size*patch_size;
     """
-    # get a*u + b*v - d + c = 0 through least squares
+    # "slant": get a*u + b*v - d + c = 0 through least squares
+    # "slant_local": a*(u-u_p) + b*(b-b_p) - (d-d_p) = 0
+    B,C,L,H,W = chs_coord.shape
     chs_coord = chs_coord.flatten(-2,-1).transpose(-2,-1)
     u_coord = chs_coord[:,0]
     v_coord = chs_coord[:,1]
     d_coord = chs_coord[:,2]
     A = torch.stack((u_coord, v_coord, torch.ones_like(u_coord)), dim=3)
     # print(chs_coord.shape, A.shape, d_coord.shape)
-    abc = torch.linalg.lstsq(A, d_coord).solution
+    abc = torch.linalg.lstsq(A, d_coord).solution   # B,H*W,C
+    abc = abc.transpose(1,2).view((-1,3,H,W))
+
     return abc
 
-def extract_plane(disp,slant="slant", slant_norm=False, patch_size=4,thold=3):
+def extract_plane(disp,slant="slant", slant_norm=False, patch_size=4,thold=3,vis=False):
     """
     disp: B,1,H,W;
     """
@@ -96,17 +129,22 @@ def extract_plane(disp,slant="slant", slant_norm=False, patch_size=4,thold=3):
 
     # get the 3d coordinate (u,v,d) of each point
     B,_,H,W = disp.shape
-    coord = get_pos(H,W,disp,slant_norm)
-    patch_coord = convert2patch(coord, patch_size=patch_size)
+    coord = get_pos(H,W,disp=disp,slant=slant,slant_norm=slant_norm,patch_size=patch_size)
+    patch_coord = convert2patch(coord, patch_size=patch_size, div_last=True)
+
     # replace the other clique with center point of the largest clique
     chs_coord = reduce_noise(patch_coord, mask)
-    # get a*u + b*v - d + c = 0 through least squares
-    abc = get_plane_lstsq(chs_coord)
-    abc = abc.transpose(1,2).view((-1,3,H//patch_size,W//patch_size))
-    # print(abc.shape)
+    # print(coord[0,:,400:404,400:404], patch_coord[0,:,:,100,100], chs_coord[0,:,:,100,100], sep="\r\n")
+
+    # "slant": get a*u + b*v - d + c = 0 through least squares
+    # "slant_local": a*(u-u_p) + b*(b-b_p) - (d-d_p) = 0
+    abc = get_plane_lstsq(chs_coord, slant, patch_coord)
+    
+    if vis:
+        return abc, mask
     return abc
 
-def predict_disp(abc, uv_coord):
+def predict_disp(abc, uv_coord, patch_size, mul_last=False):
     """
     abc: B,3,H,W;
     uv_coord: B,2,patch_size*patch_size,H,W;
@@ -115,6 +153,8 @@ def predict_disp(abc, uv_coord):
     v_coord = uv_coord[:,1]
     A = torch.stack((u_coord, v_coord, torch.ones_like(u_coord)), dim=1)
     d_coord = (A * abc.unsqueeze(dim=2)).sum(dim=1)
+    if mul_last:
+        d_coord *= patch_size
     # print(d_coord.shape)
     return d_coord
 
@@ -140,15 +180,16 @@ if __name__ == '__main__':
     img0 = torch.from_numpy(img0).permute((2,0,1)).unsqueeze(0)
 
     # extract planes a*u + b*v - d + c = 0
-    abc = extract_plane(disp, 
+    abc, mask = extract_plane(disp, 
                         slant=slant, slant_norm=slant_norm,
-                        patch_size=patch_size, thold=3)
+                        patch_size=patch_size, thold=3, vis=True)
+    # print(abc.shape)
 
-    uv_coord = get_pos(H,W, slant_norm=slant_norm)
+    uv_coord = get_pos(H,W, slant=slant, slant_norm=slant_norm, patch_size=patch_size)
     patch_uv_coord = convert2patch(uv_coord, patch_size=patch_size)
-    d_coord = predict_disp(abc, patch_uv_coord)
+    d_coord = predict_disp(abc, patch_uv_coord, patch_size=patch_size, mul_last=True)
 
-    patch_disp = convert2patch(disp, patch_size=patch_size)
+    patch_disp = convert2patch(disp, patch_size=patch_size, div_last=True)
     rec_disp = F.fold(d_coord.flatten(-2,-1), disp.shape[-2:], kernel_size=patch_size, stride=patch_size).view(1,1,H,W)
     rec_mask = F.fold(mask.flatten(-2,-1).float(), disp.shape[-2:], kernel_size=patch_size, stride=patch_size).view(1,1,H,W).bool()
     # print(rec_disp.shape, patch_disp.shape, disp.shape[-2:])
@@ -178,6 +219,15 @@ if __name__ == '__main__':
                 {"img":rec_mask, "title":"rec_mask", "cmap": "gray"},
                 {"img":color_error_map, "title":"color_error_map", },
                 ]
+    
+    if slant=="slant_local":
+        d_p = abc[0,-1]
+        error_map = np.abs(d_p-patch_disp)
+        color_error_map = vis.colorize_error_map(error_map)
+        tmp_dict = [{"img":d_p, "title":"GT Disparity of Plane", "cmap":'jet', },
+                    {"img":color_error_map, "title":"color_error_map of Plane", },]
+        atom_dict += tmp_dict
+
     vis.show_imgs(atom_dict, 
                 sv_img=True, save2where=sv_path, if_inter=False, 
                 fontsize=20, szWidth=10, szHeight=5, group=2)
