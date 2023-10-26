@@ -22,11 +22,10 @@ class OffsetConfidence(nn.Module):
         self.conv_offset = nn.Conv2d(2*args.offset_memory_size, 16, 3, padding=1)
         self.fusion = nn.Sequential(OrderedDict([
                         ('conv1', nn.Conv2d(32, 8, 3, padding=1)),
-                        ('relu1', nn.ReLU(inplace=True)),
+                        ('relu1', nn.LeakyReLU(inplace=True)),
                         ('conv2', nn.Conv2d(8, 2, 3, padding=1)),
-                        ('relu2', nn.ReLU(inplace=True)),
+                        ('relu2', nn.LeakyReLU(inplace=True)),
                         ('conv3', nn.Conv2d(2, 1, 1, padding=0)),
-                        ('relu3', nn.ReLU(inplace=True))
                         ]))
         
         if "local_rank" not in args or args.local_rank==0 :
