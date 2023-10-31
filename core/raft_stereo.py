@@ -215,7 +215,13 @@ class RAFTStereo(nn.Module):
                     if itr<self.args.offset_memory_size:
                         confidence = None
                     else:
-                        confidence = self.confidence_computer(fmap1, offset_memory[-self.args.offset_memory_size:])
+                        if self.args.offset_memory_last_iter<0 or itr<=self.args.offset_memory_last_iter:
+                            input_offset_mem = offset_memory[-self.args.offset_memory_size:]
+                        else:
+                            start_itr = self.args.offset_memory_last_iter - self.args.offset_memory_size
+                            end_itr   = self.args.offset_memory_last_iter
+                            input_offset_mem = offset_memory[start_itr:end_itr]
+                        confidence = self.confidence_computer(fmap1, input_offset_mem)
                 else:
                     confidence = None
                 confidence_list.append(confidence)

@@ -306,6 +306,7 @@ if __name__ == '__main__':
     parser.add_argument('--slant_norm', action='store_true', help="use normalization in slanted stereo matching")
     parser.add_argument('--confidence', action='store_true', help="use confidence learning")
     parser.add_argument('--offset_memory_size', type=int, default=2, help="size of offset memory in confidence learning")
+    parser.add_argument('--offset_memory_last_iter', type=int, default=-1, help="only predict confidence using offset before xxx iters")
     parser.add_argument('--detach_in_confidence', action='store_true', help="detach for feature and offset in confidence learning")
     parser.add_argument('--refinement', type=str, default="", help="refinement for disparity map")
     parser.add_argument('--refine_win_size', type=int, default=7, help="window size for refinement")
