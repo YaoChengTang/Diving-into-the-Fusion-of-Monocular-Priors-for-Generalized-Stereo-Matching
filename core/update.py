@@ -101,7 +101,8 @@ class BasicMultiUpdateBlock(nn.Module):
         self.encoder = BasicMotionEncoder(args)
 
         encoder_output_dim = 128
-        if args.slant is None or len(args.slant)==0:
+        if args.slant is None or len(args.slant)==0 or \
+           (args.slant_builder is not None and len(args.slant_builder)>0):
             output_dim = 2
         elif args.slant in ["slant", "slant_local"]:
             output_dim = 6

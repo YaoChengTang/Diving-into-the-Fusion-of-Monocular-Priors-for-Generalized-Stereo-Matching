@@ -389,3 +389,18 @@ class UpdateHistory(nn.Module):
     def forward(self, his, disp):
         hist_update = self.update( torch.cat([his,self.conv(disp)], dim=1) )
         return hist_update
+
+
+class Geometry(nn.Module):
+    def __init__(self, args):
+        super(Geometry, self).__init__()
+        self.conv = nn.Conv2d(in_chans2, in_chans2, kernel_size=1, stride=1, padding=0)
+        self.update = nn.Sequential(nn.Conv2d(in_chans1+in_chans2, in_chans1, kernel_size=3, stride=1, padding=1),)
+        
+        # if "local_rank" not in args or args.local_rank==0 :
+        #     logging.info(f"OffsetConfidence: " + \
+        #                  f"detach: {args.detach_in_confidence}")
+
+    def forward(self, his, disp):
+        hist_update = self.update( torch.cat([his,self.conv(disp)], dim=1) )
+        return hist_update

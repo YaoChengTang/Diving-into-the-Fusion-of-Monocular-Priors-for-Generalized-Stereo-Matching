@@ -15,7 +15,7 @@ from core.extractor import BasicEncoder, MultiBasicEncoder, ResidualBlock
 from core.corr import CorrBlock1D, PytorchAlternateCorrBlock1D, CorrBlockFast1D, AlternateCorrBlock
 from core.utils.utils import coords_grid, upflow8
 from core.confidence import OffsetConfidence
-from core.refinement import Refinement, UpdateHistory
+from core.refinement import Geometry, Refinement, UpdateHistory
 from core.utils.plane import get_pos, convert2patch, predict_disp
 
 
@@ -53,6 +53,9 @@ class RAFTStereo(nn.Module):
         if args.confidence:
             self.confidence_computer = OffsetConfidence(args)
 
+        if args.slant_builder=="geometry":
+            self.geometry_builder = Geometry()
+        
         # # build offset for interpolation in slant plane
         # # d_p = d_q + a_q\cdot\Delta u_{q\to p} + b_q\cdot\Delta v_{q\to p}
         # if self.args.slant in ["slant_local"]:
@@ -87,10 +90,10 @@ class RAFTStereo(nn.Module):
             self.update_hist = UpdateHistory(args, 128, dim_disp)
 
         if "local_rank" not in args or args.local_rank==0 :
-            logging.info(f"RAFTStereo: " +\
-                         f"Confidence: {args.confidence}, offset_memory_size: {args.offset_memory_size} " +\
-                         f"slant: {args.slant}, slant range norm: {args.slant_norm} " +\
-                         f"refine: {args.refinement}, refine_win_size: {args.refine_win_size}, refine_start_itr: {args.refine_start_itr} " +\
+            logging.info(f"RAFTStereo ~ " +\
+                         f"Confidence: {args.confidence}, offset_memory_size: {args.offset_memory_size}, " +\
+                         f"slant: {args.slant}, slant range norm: {args.slant_norm}, slant builder: {args.slant_builder}, " +\
+                         f"refine: {args.refinement}, refine_win_size: {args.refine_win_size}, refine_start_itr: {args.refine_start_itr}, " +\
                          f"update_his: {args.update_his} U_thold: {args.U_thold}" )
 
     def freeze_bn(self):
@@ -114,7 +117,8 @@ class RAFTStereo(nn.Module):
         mask = mask.view(N, 1, 9, factor, factor, H, W)
         mask = torch.softmax(mask, dim=2)
 
-        if self.args.slant in ["slant_local"] and params is not None:
+        if (self.args.slant_builder is None or len(self.args.slant_builder)==0) and\
+           self.args.slant in ["slant_local"] and params is not None:
             # d_p = a_q\cdot\Delta u_{q\to p} + b_q\cdot\Delta v_{q\to p} + d_q
             delta_pq = get_pos(H*factor, W*factor, disp=None,
                               slant=self.args.slant,
@@ -148,8 +152,12 @@ class RAFTStereo(nn.Module):
             up_flow = up_flow.view(N, D, 9, 1, 1, H, W)
 
         up_flow = torch.sum(mask * up_flow, dim=2)
+        if self.args.slant_builder is not None and len(self.args.slant_builder)>0:
+            fit_points = up_flow.reshape(N,D,factor*factor,H,W)
+        else:
+            fit_points = None
         up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
-        return up_flow.reshape(N, D, factor*H, factor*W)
+        return up_flow.reshape(N, D, factor*H, factor*W), fit_points
 
 
     def forward(self, image1, image2, iters=12, flow_init=None, 
@@ -227,7 +235,8 @@ class RAFTStereo(nn.Module):
                 confidence_list.append(confidence)
 
             # in stereo mode, project flow onto epipolar
-            if self.args.slant in ["slant", "slant_local"]:
+            if self.args.slant_builder is None and \
+               self.args.slant in ["slant", "slant_local"]:
                 delta_flow[:,1] = 0.0
                 delta_flow[:,3] = 0.0
                 delta_flow[:,5] = 0.0
@@ -235,7 +244,8 @@ class RAFTStereo(nn.Module):
                 delta_flow[:,1] = 0.0
 
             ## compute current position for following exploration
-            if self.args.slant is None or len(self.args.slant)==0 :
+            if self.args.slant_builder is not None or \
+               self.args.slant is None or len(self.args.slant)==0 :
                 offset = delta_flow
             elif self.args.slant in ["slant", "slant_local"] :
                 # d = a*u + b*v + c
@@ -253,7 +263,7 @@ class RAFTStereo(nn.Module):
                 elif self.args.slant=="slant_local" :
                     offset = delta_flow[:,4:6]
                 
-                if len(params_list)==0:
+                if len(raw_params_list)==0:
                     raw_params_list.append(delta_flow)
                 else:
                     raw_params_list.append(raw_params_list[-1].detach() + delta_flow)
@@ -262,6 +272,25 @@ class RAFTStereo(nn.Module):
             # F(t+1) = F(t) + \Delta(t)
             coords1 = coords1 + offset
             disparity = coords1 - coords0
+
+            # We do not need to upsample or output intermediate results in test_mode
+            if test_mode and itr < iters-1 and \
+               (self.args.slant is None or len(self.args.slant)==0) and \
+               (self.args.refinement is None or len(self.args.refinement)==0 or not enable_refinement):
+                continue
+            
+            # upsample predictions
+            if up_mask is None:
+                flow_up = upflow8(disparity)
+            else:
+                params = raw_params_list[-1] if self.args.slant in ["slant", "slant_local"] else None
+                flow_up, fit_points = self.upsample_flow(disparity, up_mask, params=params)
+            flow_up = flow_up[:,:1]
+            flow_predictions.append(flow_up)
+
+            # compute geometry
+            if self.args.slant_builder is not None and len(self.args.slant_builder)>0:
+                geo = self.geometry_builder(flow_up)
 
             ## manifold geometry refinement
             disparity_refine = None
@@ -273,27 +302,14 @@ class RAFTStereo(nn.Module):
 
                     if self.args.update_his:
                         net_list[0] = self.update_hist(net_list[0], disparity_refine)
-
-            # We do not need to upsample or output intermediate results in test_mode
-            if test_mode and itr < iters-1:
-                continue
             
-            # upsample predictions
-            if up_mask is None:
-                flow_up = upflow8(disparity)
-            else:
-                flow_up = self.upsample_flow(disparity, up_mask,
-                                             params=raw_params_list[-1] if self.args.slant in ["slant", "slant_local"] else None)
-            flow_up = flow_up[:,:1]
-            flow_predictions.append(flow_up)
-
             # upsample refinement
             if disparity_refine is not None:
                 if up_mask is None:
                     flow_up_refine = upflow8(disparity_refine)
                 else:
-                    flow_up_refine = self.upsample_flow(disparity_refine, up_mask,
-                                                params=raw_params_list[-1] if self.args.slant in ["slant", "slant_local"] else None)
+                    params = raw_params_list[-1] if self.args.slant in ["slant", "slant_local"] else None
+                    flow_up_refine, fit_points = self.upsample_flow(disparity_refine, up_mask, params=params)
                 flow_up_refine = flow_up_refine[:,:1]
             else:
                 flow_up_refine = None
@@ -310,6 +326,8 @@ class RAFTStereo(nn.Module):
                 params_list = [torch.concat([params[:,0:1], params[:,2:3], params[:,4:5]], dim=1) for params in raw_params_list]
 
         if test_mode:
+            if disparity_refine is not None:
+                return coords1 - coords0, flow_up_refine
             return coords1 - coords0, flow_up
 
         if vis_mode:
