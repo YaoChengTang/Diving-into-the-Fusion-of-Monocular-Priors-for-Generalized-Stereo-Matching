@@ -36,6 +36,7 @@ class Loss(nn.Module):
         self.smoothness = smoothness
         self.mixed_precision = mixed_precision
         self.conf_disp = args.conf_disp
+        self.args = args
 
         if self.smoothness is not None and len(self.smoothness)>0:
             self.smooth_loss_computer = SmoothLoss(self.smoothness, 
@@ -77,7 +78,9 @@ class Loss(nn.Module):
             i_weight = adjusted_loss_gamma**(n_predictions - i - 1)
 
             # confidence loss
-            if confidence_list[i] is not None:
+            if confidence_list[i] is not None and \
+               (self.args.offset_memory_last_iter<0 or \
+               (self.args.offset_memory_last_iter>0 and i<=self.args.offset_memory_last_iter)):
                 with autocast(enabled=self.mixed_precision):
                     gt_error = (flow_preds[i].detach() - flow_gt).abs().detach()
                     gt_error = F.interpolate(gt_error,scale_factor=1/4,mode='bilinear')

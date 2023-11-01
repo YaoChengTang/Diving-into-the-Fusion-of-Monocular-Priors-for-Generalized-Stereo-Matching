@@ -92,7 +92,8 @@ class RAFTStereo(nn.Module):
         if "local_rank" not in args or args.local_rank==0 :
             logging.info(f"RAFTStereo ~ " +\
                          f"Confidence: {args.confidence}, offset_memory_size: {args.offset_memory_size}, " +\
-                         f"slant: {args.slant}, slant range norm: {args.slant_norm}, slant builder: {args.slant_builder}, " +\
+                         f"offset_memory_last_iter: {args.offset_memory_last_iter}, " +\
+                         f"slant: {args.slant}, slant_norm: {args.slant_norm}, slant builder: {args.slant_builder}, " +\
                          f"refine: {args.refinement}, refine_win_size: {args.refine_win_size}, refine_start_itr: {args.refine_start_itr}, " +\
                          f"update_his: {args.update_his} U_thold: {args.U_thold}" )
 
