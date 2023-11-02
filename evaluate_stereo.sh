@@ -117,6 +117,10 @@
 # CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-paramsLoss_gt_slantLocal-20231026-220752.pth --slant "slant_local" --dataset kitti
 # CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-paramsLoss_gt_slantLocal-20231026-220752.pth --slant "slant_local" --dataset eth3d
 
-CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-paramsLoss_gt_slantLocal_noNorm-20231026-221215.pth --slant "slant_local" --slant_norm --dataset middlebury_H
-CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-paramsLoss_gt_slantLocal_noNorm-20231026-221215.pth --slant "slant_local" --slant_norm --dataset kitti
-CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-paramsLoss_gt_slantLocal_noNorm-20231026-221215.pth --slant "slant_local" --slant_norm --dataset eth3d
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-paramsLoss_gt_slantLocal_noNorm-20231026-221215.pth --slant "slant_local" --slant_norm --dataset middlebury_H
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-paramsLoss_gt_slantLocal_noNorm-20231026-221215.pth --slant "slant_local" --slant_norm --dataset kitti
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-paramsLoss_gt_slantLocal_noNorm-20231026-221215.pth --slant "slant_local" --slant_norm --dataset eth3d
+
+CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slant_norm-20231101-083700.pth --slant "slant_local" --slant_norm --dataset middlebury_H
+CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slant_norm-20231101-083700.pth --slant "slant_local" --slant_norm --dataset kitti
+CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slant_norm-20231101-083700.pth --slant "slant_local" --slant_norm --dataset eth3d

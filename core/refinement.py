@@ -394,13 +394,22 @@ class UpdateHistory(nn.Module):
 class Geometry(nn.Module):
     def __init__(self, args):
         super(Geometry, self).__init__()
-        self.conv = nn.Conv2d(in_chans2, in_chans2, kernel_size=1, stride=1, padding=0)
-        self.update = nn.Sequential(nn.Conv2d(in_chans1+in_chans2, in_chans1, kernel_size=3, stride=1, padding=1),)
+        self.reg = nn.Sequential(
+            nn.Linear(3,3),
+            nn.Linear(3,2),
+        )
+        if args.geo_fusion.lower()=="max":
+            self.fusion = nn.AdaptiveMaxPool1d(1)
+        elif args.geo_fusion.lower()=="mean":
+            self.fusion = nn.AdaptiveAvgPool1d(1)
+        else:
+            raise Exception(f"{args.geo_fusion} is not supported")
         
-        # if "local_rank" not in args or args.local_rank==0 :
-        #     logging.info(f"OffsetConfidence: " + \
-        #                  f"detach: {args.detach_in_confidence}")
-
-    def forward(self, his, disp):
-        hist_update = self.update( torch.cat([his,self.conv(disp)], dim=1) )
-        return hist_update
+    def forward(self, fit_points):
+        # (1,4,factor*factor,H,W)
+        A = fit_points[:,:3].permute((0,2,3,4,1))                    # (1,factor*factor,H,W,3)
+        ab_proposals = self.reg(A)                                   # (1,factor*factor,H,W,2)
+        B,L,H,W,C = ab_proposals.shape
+        ab = self.fusion(ab_proposals.view(B,L,-1).transpose(-1,-2)) # (1,H*W*2,1)
+        ab = ab.view(B,H,W,C).permute((0,3,1,2))                     # (1,2,H,W)
+        return ab

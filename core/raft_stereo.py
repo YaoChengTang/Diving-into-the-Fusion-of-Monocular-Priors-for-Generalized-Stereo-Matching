@@ -54,7 +54,7 @@ class RAFTStereo(nn.Module):
             self.confidence_computer = OffsetConfidence(args)
 
         if args.slant_builder=="geometry":
-            self.geometry_builder = Geometry()
+            self.geometry_builder = Geometry(args)
         
         # # build offset for interpolation in slant plane
         # # d_p = d_q + a_q\cdot\Delta u_{q\to p} + b_q\cdot\Delta v_{q\to p}
@@ -93,7 +93,8 @@ class RAFTStereo(nn.Module):
             logging.info(f"RAFTStereo ~ " +\
                          f"Confidence: {args.confidence}, offset_memory_size: {args.offset_memory_size}, " +\
                          f"offset_memory_last_iter: {args.offset_memory_last_iter}, " +\
-                         f"slant: {args.slant}, slant_norm: {args.slant_norm}, slant builder: {args.slant_builder}, " +\
+                         f"slant: {args.slant}, slant_norm: {args.slant_norm}, " +\
+                         f"slant builder: {args.slant_builder}, geo_fusion: {args.geo_fusion}, " +\
                          f"refine: {args.refinement}, refine_win_size: {args.refine_win_size}, refine_start_itr: {args.refine_start_itr}, " +\
                          f"update_his: {args.update_his} U_thold: {args.U_thold}" )
 
@@ -154,7 +155,14 @@ class RAFTStereo(nn.Module):
 
         up_flow = torch.sum(mask * up_flow, dim=2)
         if self.args.slant_builder is not None and len(self.args.slant_builder)>0:
-            fit_points = up_flow.reshape(N,D,factor*factor,H,W)
+            delta_pq = get_pos(H*factor, W*factor, disp=None,
+                              slant=self.args.slant,
+                              slant_norm=self.args.slant_norm,
+                              patch_size=factor,
+                              device=flow.device)                                                # (1,2,H*factor,W*factor)
+            patch_delta_pq = convert2patch(delta_pq, patch_size=factor, div_last=False).detach() # (1,2,factor*factor,H,W)
+            fit_points = up_flow.reshape(N,D,factor*factor,H,W)                                  # (1,2,factor*factor,H,W)
+            fit_points = torch.cat([patch_delta_pq,fit_points], dim=1)                           # (1,4,factor*factor,H,W)
         else:
             fit_points = None
         up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
@@ -276,6 +284,7 @@ class RAFTStereo(nn.Module):
 
             # We do not need to upsample or output intermediate results in test_mode
             if test_mode and itr < iters-1 and \
+               self.args.slant_builder is None and \
                (self.args.slant is None or len(self.args.slant)==0) and \
                (self.args.refinement is None or len(self.args.refinement)==0 or not enable_refinement):
                 continue
@@ -284,14 +293,17 @@ class RAFTStereo(nn.Module):
             if up_mask is None:
                 flow_up = upflow8(disparity)
             else:
-                params = raw_params_list[-1] if self.args.slant in ["slant", "slant_local"] else None
+                params = raw_params_list[-1] if self.args.slant_builder is None and \
+                                                self.args.slant in ["slant", "slant_local"] else None
                 flow_up, fit_points = self.upsample_flow(disparity, up_mask, params=params)
             flow_up = flow_up[:,:1]
             flow_predictions.append(flow_up)
 
             # compute geometry
             if self.args.slant_builder is not None and len(self.args.slant_builder)>0:
-                geo = self.geometry_builder(flow_up)
+                ab = self.geometry_builder(fit_points)
+                geo = torch.cat([disparity[:,:1],ab], dim=1)
+                raw_params_list.append(geo)
 
             ## manifold geometry refinement
             disparity_refine = None
@@ -317,7 +329,9 @@ class RAFTStereo(nn.Module):
             flow_predictions_refine.append(flow_up_refine)
 
             # upsample paramaters
-            if self.args.slant is not None and len(self.args.slant)>0 and not test_mode:
+            if self.args.slant_builder is not None:
+                params_list = raw_params_list
+            elif self.args.slant is not None and len(self.args.slant)>0 and not test_mode:
                 # if up_mask is None:
                 #     params = upflow8(raw_params_list[-1])
                 # else:

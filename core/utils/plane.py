@@ -106,9 +106,22 @@ def get_plane_lstsq(chs_coord, slant, patch_coord=None):
     v_coord = chs_coord[:,1]
     d_coord = chs_coord[:,2]
     A = torch.stack((u_coord, v_coord, torch.ones_like(u_coord)), dim=3)
+
     # print(chs_coord.shape, A.shape, d_coord.shape)
     abc = torch.linalg.lstsq(A, d_coord).solution   # B,H*W,C
     abc = abc.transpose(1,2).view((-1,3,H,W))
+
+    # # A(B,N,P,C) X(B,N,C) Y(B,N,P)
+    # # print("-"*10, A.shape, d_coord.shape, abc.shape)
+    # left_top = torch.einsum('aijk,aikh->aijh', A.transpose(-1,-2), A)                         # (B,N,C,C)
+    # right_top = -torch.einsum('aijk,aikh->aijh', A.transpose(-1,-2), d_coord.unsqueeze(-1))   # (B,N,C,1)
+    # left_bottom = right_top.transpose(-1,-2)                                                  # (B,N,1,C)
+    # right_bottom = d_coord.square().sum(dim=-1,keepdim=True).unsqueeze(-1)                    # (B,N,1,1)
+    # top = torch.cat([left_top,right_top], dim=3)
+    # bottom = torch.cat([left_bottom,right_bottom], dim=3)
+    # B = torch.cat([top,bottom], dim=2)
+    # L, V = torch.linalg.eig(B)
+    # print(L, V.shape)
 
     return abc
 
@@ -228,6 +241,6 @@ if __name__ == '__main__':
                     {"img":color_error_map, "title":"color_error_map of Plane", },]
         atom_dict += tmp_dict
 
-    vis.show_imgs(atom_dict, 
-                sv_img=True, save2where=sv_path, if_inter=False, 
-                fontsize=20, szWidth=10, szHeight=5, group=2)
+    # vis.show_imgs(atom_dict, 
+    #             sv_img=True, save2where=sv_path, if_inter=False, 
+    #             fontsize=20, szWidth=10, szHeight=5, group=2)
