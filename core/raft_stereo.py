@@ -161,6 +161,7 @@ class RAFTStereo(nn.Module):
                               patch_size=factor,
                               device=flow.device)                                                # (1,2,H*factor,W*factor)
             patch_delta_pq = convert2patch(delta_pq, patch_size=factor, div_last=False).detach() # (1,2,factor*factor,H,W)
+            patch_delta_pq = patch_delta_pq.repeat(N,1,1,1,1)
             fit_points = up_flow.reshape(N,D,factor*factor,H,W)                                  # (1,2,factor*factor,H,W)
             fit_points = torch.cat([patch_delta_pq,fit_points], dim=1)                           # (1,4,factor*factor,H,W)
         else:
