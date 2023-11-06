@@ -82,7 +82,7 @@ class RAFTStereo(nn.Module):
                 dim_disp = 2*3
 
             if args.refinement.lower()=="refinement":
-                self.refine = Refinement(args, in_chans=256, dim_fea=96, dim_disp=dim_disp, num_heads=3)
+                self.refine = Refinement(args, in_chans=256, dim_fea=96, dim_disp=dim_disp)
             else:
                 raise Exception("No such refinement: {}".format(args.refinement))
         
@@ -95,7 +95,7 @@ class RAFTStereo(nn.Module):
                          f"offset_memory_last_iter: {args.offset_memory_last_iter}, " +\
                          f"slant: {args.slant}, slant_norm: {args.slant_norm}, " +\
                          f"slant builder: {args.slant_builder}, geo_fusion: {args.geo_fusion}, " +\
-                         f"refine: {args.refinement}, refine_win_size: {args.refine_win_size}, " +\
+                         f"refine: {args.refinement}, refine_win_size: {args.refine_win_size}, num_heads:{args.num_heads}, " +\
                          f"split_win: {args.split_win}, refine_start_itr: {args.refine_start_itr}, " +\
                          f"update_his: {args.update_his} U_thold: {args.U_thold}" )
 

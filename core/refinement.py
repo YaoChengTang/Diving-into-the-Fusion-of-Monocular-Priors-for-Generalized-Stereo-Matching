@@ -354,22 +354,22 @@ class SwinTransformerBlock(nn.Module):
 
 
 class Refinement(nn.Module):
-    def __init__(self, args, in_chans, dim_fea, dim_disp, num_heads):
+    def __init__(self, args, in_chans, dim_fea, dim_disp):
         super(Refinement, self).__init__()
         self.args = args
         self.window_size = to_2tuple(args.refine_win_size)
         self.shift_size  = (self.window_size[0]//2, self.window_size[1]//2)
         self.patch_embed = nn.Conv2d(in_chans, dim_fea, kernel_size=3, stride=1, padding=1)
-        self.propagation_1 = SwinTransformerBlock(args, dim_fea, dim_disp, num_heads, 
+        self.propagation_1 = SwinTransformerBlock(args, dim_fea, dim_disp, self.args.num_heads, 
                                 window_size=self.window_size, shift_size=0,)
-        self.propagation_2 = SwinTransformerBlock(args, dim_fea, dim_disp, num_heads, 
+        self.propagation_2 = SwinTransformerBlock(args, dim_fea, dim_disp, self.args.num_heads, 
                                 window_size=self.window_size, shift_size=self.shift_size,)
         if self.args.split_win:
             rev_win_size = [self.window_size[1], self.window_size[0]]
             rev_shift_size = [self.shift_size[1], self.shift_size[0]]
-            self.propagation_1_2 = SwinTransformerBlock(args, dim_fea, dim_disp, num_heads, 
+            self.propagation_1_2 = SwinTransformerBlock(args, dim_fea, dim_disp, self.args.num_heads, 
                                         window_size=rev_win_size, shift_size=0,)
-            self.propagation_2_2 = SwinTransformerBlock(args, dim_fea, dim_disp, num_heads, 
+            self.propagation_2_2 = SwinTransformerBlock(args, dim_fea, dim_disp, self.args.num_heads, 
                                         window_size=rev_win_size, shift_size=rev_shift_size,)
         
         # if "local_rank" not in args or args.local_rank==0 :
