@@ -151,7 +151,7 @@ def train(args):
             assert model.training
             flow_predictions, flow_predictions_refine, \
             confidence_list, params_list = model(image1, image2, iters=args.train_iters,
-                                                 enable_refinement=total_steps>30000)
+                                                 enable_refinement=total_steps>args.enable_refine_step)
             assert model.training
 
             try:
@@ -255,6 +255,7 @@ if __name__ == '__main__':
     parser.add_argument('--image_size', type=int, nargs='+', default=[320, 720], help="size of the random image crops used during training.")
     parser.add_argument('--train_iters', type=int, default=16, help="number of updates to the disparity field in each forward pass.")
     parser.add_argument('--wdecay', type=float, default=.00001, help="Weight decay in optimizer.")
+    parser.add_argument('--enable_refine_step', type=int, default=3000, help="enable refinement after xxx steps.")
 
     # Validation parameters
     parser.add_argument('--valid_iters', type=int, default=32, help='number of flow-field updates during validation forward pass')
@@ -278,7 +279,8 @@ if __name__ == '__main__':
     parser.add_argument('--offset_memory_last_iter', type=int, default=-1, help="only predict confidence using offset before xxx iters")
     parser.add_argument('--detach_in_confidence', action='store_true', help="detach for feature and offset in confidence learning")
     parser.add_argument('--refinement', type=str, default="", help="refinement for disparity map")
-    parser.add_argument('--refine_win_size', type=int, default=7, help="window size for refinement")
+    parser.add_argument('--refine_win_size', type=int, default=7, nargs='+', help="window size for refinement")
+    parser.add_argument('--split_win', action='store_true', help="given 3*10 win, using 3*10 and 10*3 for refinement")
     parser.add_argument('--refine_start_itr', type=int, default=3, help="start to do refinement at which iteration")
     parser.add_argument('--update_his', action='store_true', help="update history using refined disparity")
     parser.add_argument('--U_thold', type=float, default=0.98, help="thold used to filter out noise diaprity with uncertainty/confidence")
@@ -303,8 +305,12 @@ if __name__ == '__main__':
     parser.add_argument("--local_rank", type=int, default=os.getenv("LOCAL_RANK"))
     parser.add_argument('--world_size', type=int, default=os.getenv("WORLD_SIZE"))
 
-
     args = parser.parse_args()
+
+    if len(args.refine_win_size)==1:
+        args.refine_win_size = [args.refine_win_size[0], args.refine_win_size[0]]
+    elif len(args.refine_win_size)>2:
+        raise Exception("only support one-tuple or two-tuple.")
 
     torch.manual_seed(1234)
     np.random.seed(1234)

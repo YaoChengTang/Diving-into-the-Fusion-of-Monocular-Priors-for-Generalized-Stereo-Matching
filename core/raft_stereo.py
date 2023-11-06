@@ -95,7 +95,8 @@ class RAFTStereo(nn.Module):
                          f"offset_memory_last_iter: {args.offset_memory_last_iter}, " +\
                          f"slant: {args.slant}, slant_norm: {args.slant_norm}, " +\
                          f"slant builder: {args.slant_builder}, geo_fusion: {args.geo_fusion}, " +\
-                         f"refine: {args.refinement}, refine_win_size: {args.refine_win_size}, refine_start_itr: {args.refine_start_itr}, " +\
+                         f"refine: {args.refinement}, refine_win_size: {args.refine_win_size}, " +\
+                         f"split_win: {args.split_win}, refine_start_itr: {args.refine_start_itr}, " +\
                          f"update_his: {args.update_his} U_thold: {args.U_thold}" )
 
     def freeze_bn(self):

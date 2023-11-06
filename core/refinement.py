@@ -50,9 +50,10 @@ def window_partition(x, window_size):
     Returns:
         windows: (num_windows*B, window_size, window_size, C)
     """
+    window_size = to_2tuple(window_size)
     B, H, W, C = x.shape
-    x = x.view(B, H // window_size, window_size, W // window_size, window_size, C)
-    windows = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(-1, window_size, window_size, C)
+    x = x.view(B, H // window_size[0], window_size[0], W // window_size[1], window_size[1], C)
+    windows = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(-1, window_size[0], window_size[1], C)
     return windows
 
 
@@ -67,8 +68,9 @@ def window_reverse(windows, window_size, H, W):
     Returns:
         x: (B, H, W, C)
     """
-    B = int(windows.shape[0] / (H * W / window_size / window_size))
-    x = windows.view(B, H // window_size, W // window_size, window_size, window_size, -1)
+    window_size = to_2tuple(window_size)
+    B = int(windows.shape[0] / (H * W / window_size[0] / window_size[1]))
+    x = windows.view(B, H // window_size[0], W // window_size[1], window_size[0], window_size[1], -1)
     x = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(B, H, W, -1)
     return x
 
@@ -93,8 +95,8 @@ class WindowAttention(nn.Module):
         super().__init__()
         self.dim_fea = dim_fea
         self.dim_disp = dim_disp
-        self.window_size = window_size  # Wh, Ww
-        self.pretrained_window_size = pretrained_window_size
+        self.window_size = to_2tuple(window_size)  # Wh, Ww
+        self.pretrained_window_size = to_2tuple(pretrained_window_size)
         self.num_heads = num_heads
 
         self.logit_scale = nn.Parameter(torch.log(10 * torch.ones((num_heads, 1, 1))), requires_grad=True)
@@ -222,10 +224,11 @@ class SwinTransformerBlock(nn.Module):
         self.dim_fea = dim_fea
         self.dim_disp = dim_disp
         self.num_heads = num_heads
-        self.window_size = window_size
-        self.shift_size = shift_size
+        self.window_size = to_2tuple(window_size)
+        self.shift_size = to_2tuple(shift_size)
         self.mlp_ratio = mlp_ratio
-        assert 0 <= self.shift_size < self.window_size, "shift_size must in 0-window_size"
+        assert 0 <= self.shift_size[0] < self.window_size[0], "shift_size must in 0-window_size"
+        assert 0 <= self.shift_size[1] < self.window_size[1], "shift_size must in 0-window_size"
 
         self.norm1 = norm_layer(dim_disp)
         self.attn = WindowAttention(
@@ -244,15 +247,19 @@ class SwinTransformerBlock(nn.Module):
         self.apply(self._init_weights)
 
     def get_shift_mask(self, H, W, device):
-        if self.shift_size > 0:
+        if self.shift_size[0]>0 or self.shift_size[1]>0:
             # calculate attention mask for SW-MSA
             img_mask = torch.zeros((1, H, W, 1), device=device)  # 1 H W 1
-            h_slices = (slice(0, -self.window_size),
-                        slice(-self.window_size, -self.shift_size),
-                        slice(-self.shift_size, None))
-            w_slices = (slice(0, -self.window_size),
-                        slice(-self.window_size, -self.shift_size),
-                        slice(-self.shift_size, None))
+            first_end  = -self.window_size[0] if self.window_size[0]>0 else None
+            second_end = -self.shift_size[0] if self.shift_size[0]>0 else None
+            h_slices = (slice(0, first_end),
+                        slice(first_end, second_end),
+                        slice(second_end, None))
+            first_end  = -self.window_size[1] if self.window_size[1]>0 else None
+            second_end = -self.shift_size[1] if self.shift_size[1]>0 else None
+            w_slices = (slice(0, first_end),
+                        slice(first_end, second_end),
+                        slice(second_end, None))
             cnt = 0
             for h in h_slices:
                 for w in w_slices:
@@ -260,7 +267,7 @@ class SwinTransformerBlock(nn.Module):
                     cnt += 1
 
             mask_windows = window_partition(img_mask, self.window_size)  # nW, window_size, window_size, 1
-            mask_windows = mask_windows.view(-1, self.window_size * self.window_size)
+            mask_windows = mask_windows.view(-1, self.window_size[0] * self.window_size[1])
             shift_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
             shift_mask = shift_mask.masked_fill(shift_mask != 0, float(-100.0)).masked_fill(shift_mask == 0, float(0.0))
         else:
@@ -291,10 +298,10 @@ class SwinTransformerBlock(nn.Module):
         # x = x.view(B, H, W, C)
 
         # cyclic shift
-        if self.shift_size > 0:
-            shifted_x = torch.roll(x, shifts=(-self.shift_size, -self.shift_size), dims=(1, 2))   # (80, 180)
-            shifted_guidance = torch.roll(guidance, shifts=(-self.shift_size, -self.shift_size), dims=(1, 2))
-            shifted_reliability = torch.roll(reliability, shifts=(-self.shift_size, -self.shift_size), dims=(1, 2))
+        if self.shift_size[0]>0 or self.shift_size[1]>0:
+            shifted_x = torch.roll(x, shifts=(-self.shift_size[0], -self.shift_size[1]), dims=(1, 2))   # (80, 180)
+            shifted_guidance = torch.roll(guidance, shifts=(-self.shift_size[0], -self.shift_size[1]), dims=(1, 2))
+            shifted_reliability = torch.roll(reliability, shifts=(-self.shift_size[0], -self.shift_size[1]), dims=(1, 2))
         else:
             shifted_x = x
             shifted_guidance = guidance
@@ -302,11 +309,11 @@ class SwinTransformerBlock(nn.Module):
 
         # partition windows
         x_windows = window_partition(shifted_x, self.window_size)  # nW*B, window_size, window_size, C_x
-        x_windows = x_windows.view(-1, self.window_size * self.window_size, C_x)  # nW*B, window_size*window_size, C_x
+        x_windows = x_windows.view(-1, self.window_size[0] * self.window_size[1], C_x)  # nW*B, window_size*window_size, C_x
         guidance_windows = window_partition(shifted_guidance, self.window_size)  # nW*B, window_size, window_size, C_fea
-        guidance_windows = guidance_windows.view(-1, self.window_size * self.window_size, C_fea)  # nW*B, window_size*window_size, C_fea
+        guidance_windows = guidance_windows.view(-1, self.window_size[0] * self.window_size[1], C_fea)  # nW*B, window_size*window_size, C_fea
         reliability_windows = window_partition(shifted_reliability, self.window_size)  # nW*B, window_size, window_size, 1
-        reliability_windows = reliability_windows.view(-1, self.window_size * self.window_size)  # nW*B, window_size*window_size
+        reliability_windows = reliability_windows.view(-1, self.window_size[0] * self.window_size[1])  # nW*B, window_size*window_size
 
         # W-MSA/SW-MSA
         attn_windows = self.attn(x_windows, guidance_windows, 
@@ -314,12 +321,12 @@ class SwinTransformerBlock(nn.Module):
                             reliability_mask=reliability_windows)  # nW*B, window_size*window_size, C_x
 
         # merge windows
-        attn_windows = attn_windows.view(-1, self.window_size, self.window_size, C_x)
+        attn_windows = attn_windows.view(-1, self.window_size[0], self.window_size[1], C_x)
         shifted_x = window_reverse(attn_windows, self.window_size, H, W)  # B H' W' C
 
         # reverse cyclic shift
-        if self.shift_size > 0:
-            x = torch.roll(shifted_x, shifts=(self.shift_size, self.shift_size), dims=(1, 2))
+        if self.shift_size[0]>0 or self.shift_size[1]>0:
+            x = torch.roll(shifted_x, shifts=(self.shift_size[0], self.shift_size[1]), dims=(1, 2))
         else:
             x = shifted_x
         x = x.view(B, H, W, C_x)
@@ -349,13 +356,21 @@ class SwinTransformerBlock(nn.Module):
 class Refinement(nn.Module):
     def __init__(self, args, in_chans, dim_fea, dim_disp, num_heads):
         super(Refinement, self).__init__()
-        self.window_size = args.refine_win_size
+        self.args = args
+        self.window_size = to_2tuple(args.refine_win_size)
+        self.shift_size  = (self.window_size[0]//2, self.window_size[1]//2)
         self.patch_embed = nn.Conv2d(in_chans, dim_fea, kernel_size=3, stride=1, padding=1)
         self.propagation_1 = SwinTransformerBlock(args, dim_fea, dim_disp, num_heads, 
                                 window_size=self.window_size, shift_size=0,)
         self.propagation_2 = SwinTransformerBlock(args, dim_fea, dim_disp, num_heads, 
-                                window_size=self.window_size, shift_size=self.window_size//2,)
-        self.U_thold = args.U_thold
+                                window_size=self.window_size, shift_size=self.shift_size,)
+        if self.args.split_win:
+            rev_win_size = [self.window_size[1], self.window_size[0]]
+            rev_shift_size = [self.shift_size[1], self.shift_size[0]]
+            self.propagation_1_2 = SwinTransformerBlock(args, dim_fea, dim_disp, num_heads, 
+                                        window_size=rev_win_size, shift_size=0,)
+            self.propagation_2_2 = SwinTransformerBlock(args, dim_fea, dim_disp, num_heads, 
+                                        window_size=rev_win_size, shift_size=rev_shift_size,)
         
         # if "local_rank" not in args or args.local_rank==0 :
         #     logging.info(f"OffsetConfidence: " + \
@@ -365,14 +380,18 @@ class Refinement(nn.Module):
         guidance = self.patch_embed(fea)
         if confidence is not None :
             uncertainty = F.sigmoid(confidence.detach())
-            uncertainty = uncertainty.masked_fill(uncertainty>self.U_thold, float(-100.0)).masked_fill(uncertainty<=self.U_thold, float(0.0))
+            uncertainty = uncertainty.masked_fill(uncertainty>self.args.U_thold, float(-100.0)).masked_fill(uncertainty<=self.args.U_thold, float(0.0))
             reliability = uncertainty.detach()
         else:
             reliability = None
         if not if_shift:
             disparity_refine = self.propagation_1(disparity.detach(), guidance, reliability)
+            if self.args.split_win:
+                disparity_refine = self.propagation_1_2(disparity_refine, guidance, reliability)
         else:
             disparity_refine = self.propagation_2(disparity.detach(), guidance, reliability)
+            if self.args.split_win:
+                disparity_refine = self.propagation_2_2(disparity_refine, guidance, reliability)
         return disparity_refine
     
     
