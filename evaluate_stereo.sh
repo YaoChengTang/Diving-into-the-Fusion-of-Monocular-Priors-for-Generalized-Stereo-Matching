@@ -121,18 +121,34 @@
 # CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-paramsLoss_gt_slantLocal_noNorm-20231026-221215.pth --slant "slant_local" --slant_norm --dataset kitti
 # CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-paramsLoss_gt_slantLocal_noNorm-20231026-221215.pth --slant "slant_local" --slant_norm --dataset eth3d
 
-# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slant_norm-20231101-083700.pth --slant "slant" --slant_norm --dataset middlebury_H
-# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slant_norm-20231101-083700.pth --slant "slant" --slant_norm --dataset kitti
-# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slant_norm-20231101-083700.pth --slant "slant" --slant_norm --dataset eth3d
+CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slant_norm-20231101-083700.pth --slant "slant" --slant_norm --dataset middlebury_H
+CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slant_norm-20231101-083700.pth --slant "slant" --slant_norm --dataset kitti
+CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slant_norm-20231101-083700.pth --slant "slant" --slant_norm --dataset eth3d
 
-# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slantLocal-20231101-083140.pth --slant "slant_local" --dataset middlebury_H
-# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slantLocal-20231101-083140.pth --slant "slant_local" --dataset kitti
-# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slantLocal-20231101-083140.pth --slant "slant_local" --dataset eth3d
+CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slantLocal-20231101-083140.pth --slant "slant_local" --dataset middlebury_H
+CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slantLocal-20231101-083140.pth --slant "slant_local" --dataset kitti
+CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slantLocal-20231101-083140.pth --slant "slant_local" --dataset eth3d
 
-# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slantLocal_norm-20231101-083429.pth --slant "slant_local" --slant_norm --dataset middlebury_H
-# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slantLocal_norm-20231101-083429.pth --slant "slant_local" --slant_norm --dataset kitti
-# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slantLocal_norm-20231101-083429.pth --slant "slant_local" --slant_norm --dataset eth3d
+CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slantLocal_norm-20231101-083429.pth --slant "slant_local" --slant_norm --dataset middlebury_H
+CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slantLocal_norm-20231101-083429.pth --slant "slant_local" --slant_norm --dataset kitti
+CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_slantLocal_norm-20231101-083429.pth --slant "slant_local" --slant_norm --dataset eth3d
 
-CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_conf_10iter-20231101-095614.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 10 --refine_start_itr 3 --update_his --U_thold 0.5 --dataset middlebury_H
-CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_conf_10iter-20231101-095614.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 10 --refine_start_itr 3 --update_his --U_thold 0.5 --dataset kitti
-CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_conf_10iter-20231101-095614.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 10 --refine_start_itr 3 --update_his --U_thold 0.5 --dataset eth3d
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_conf_10iter-20231101-095614.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 10 --refine_start_itr 3 --update_his --U_thold 0.5 --dataset middlebury_H
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_conf_10iter-20231101-095614.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 10 --refine_start_itr 3 --update_his --U_thold 0.5 --dataset kitti
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-repair_conf_10iter-20231101-095614.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 10 --refine_start_itr 3 --update_his --U_thold 0.5 --dataset eth3d
+
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-PostGeo_slantl_norm_max-20231104-132129.pth --slant "slant" --slant_norm --slant_builder "geometry" --geo_fusion "max" --dataset middlebury_H
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-PostGeo_slantl_norm_max-20231104-132129.pth --slant "slant" --slant_norm --slant_builder "geometry" --geo_fusion "max" --dataset kitti
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-PostGeo_slantl_norm_max-20231104-132129.pth --slant "slant" --slant_norm --slant_builder "geometry" --geo_fusion "max" --dataset eth3d
+
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-PostGeo_slantlocal_max-20231104-131911.pth --slant "slant_local" --slant_builder "geometry" --geo_fusion "max" --dataset middlebury_H
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-PostGeo_slantlocal_max-20231104-131911.pth --slant "slant_local" --slant_builder "geometry" --geo_fusion "max" --dataset kitti
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-PostGeo_slantlocal_max-20231104-131911.pth --slant "slant_local" --slant_builder "geometry" --geo_fusion "max" --dataset eth3d
+
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-PostGeo_slantlocal_norm_max-20231104-131648.pth --slant "slant_local" --slant_norm --slant_builder "geometry" --geo_fusion "max" --dataset middlebury_H
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-PostGeo_slantlocal_norm_max-20231104-131648.pth --slant "slant_local" --slant_norm --slant_builder "geometry" --geo_fusion "max" --dataset kitti
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-PostGeo_slantlocal_norm_max-20231104-131648.pth --slant "slant_local" --slant_norm --slant_builder "geometry" --geo_fusion "max" --dataset eth3d
+
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-PostGeo_slantlocal_norm-20231104-131340.pth --slant "slant_local" --slant_norm --slant_builder "geometry" --geo_fusion "mean" --dataset middlebury_H
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-PostGeo_slantlocal_norm-20231104-131340.pth --slant "slant_local" --slant_norm --slant_builder "geometry" --geo_fusion "mean" --dataset kitti
+# CUDA_VISIBLE_DEVICE=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-PostGeo_slantlocal_norm-20231104-131340.pth --slant "slant_local" --slant_norm --slant_builder "geometry" --geo_fusion "mean" --dataset eth3d

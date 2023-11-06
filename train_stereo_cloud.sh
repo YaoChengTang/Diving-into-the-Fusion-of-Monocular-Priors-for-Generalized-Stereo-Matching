@@ -82,4 +82,10 @@ cd $WORKING_PATH
 
 # python3 -m torch.distributed.launch --master_port=20000 --nproc_per_node 8 train_stereo.py --batch_size 4 --num_workers 4 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 70000 --mixed_precision --slant "slant_local" --slant_norm --slant_builder "geometry" --geo_fusion "max"
 
-python3 -m torch.distributed.launch --master_port=20000 --nproc_per_node 8 train_stereo.py --batch_size 4 --num_workers 4 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 70000 --mixed_precision --slant "slant_local" --slant_norm --slant_builder "geometry" --geo_fusion "mean"
+# python3 -m torch.distributed.launch --master_port=20000 --nproc_per_node 8 train_stereo.py --batch_size 4 --num_workers 4 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 70000 --mixed_precision --slant "slant_local" --slant_norm --slant_builder "geometry" --geo_fusion "mean"
+
+# python3 -m torch.distributed.launch --master_port=20000 --nproc_per_node 8 train_stereo.py --batch_size 4 --num_workers 4 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 70000 --mixed_precision --slant "slant_local" --slant_builder "geometry" --geo_fusion "mean"
+
+# python3 -m torch.distributed.launch --master_port=20000 --nproc_per_node 8 train_stereo.py --batch_size 4 --num_workers 4 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision --slant "slant_local" --slant_builder "geometry" --geo_fusion "mean"
+
+python3 -m torch.distributed.launch --master_port=20000 --nproc_per_node 8 train_stereo.py --batch_size 3 --num_workers 2 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 70000 --mixed_precision --slant "slant" --slant_norm --slant_builder "geometry" --geo_fusion "mean"
