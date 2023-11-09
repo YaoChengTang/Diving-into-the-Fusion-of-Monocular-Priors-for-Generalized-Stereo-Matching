@@ -325,6 +325,13 @@ if __name__ == '__main__':
     parser.add_argument('--refine_map', action='store_true', help="visualize refined disparity map")
     args = parser.parse_args()
 
+    if len(args.refine_win_size)==0:
+        args.refine_win_size = None
+    elif len(args.refine_win_size)==1:
+        args.refine_win_size = [args.refine_win_size[0], args.refine_win_size[0]]
+    elif len(args.refine_win_size)>2:
+        raise Exception("only support one-tuple or two-tuple.")
+
     assert args.sv_root is not None, "Please specify the visualization root"
 
     model = torch.nn.DataParallel(RAFTStereo(args), device_ids=[0])

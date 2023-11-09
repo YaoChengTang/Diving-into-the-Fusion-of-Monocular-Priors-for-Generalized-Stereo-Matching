@@ -303,14 +303,16 @@ class Visualizer:
                   fontsize=20, szWidth=10, szHeight=5, group=2)
         # print("saving {}".format(sv_path))
         ## visuzalize the prediction sequence
+        group = self.args.improvement_map +\
+                self.args.movement_map +\
+                self.args.acceleration_map +\
+                self.args.mask +\
+                self.args.refine_map
+        group = max(group+2, 3)
         atom_dict_list = [{"img":flow_gt, "title":"GT Disparity", "cmap":'jet'},
                           {"img":image1, "title":"Left Image", },
                           {"img":image2, "title":"Right Image", },] +\
-                         [{"img":np.zeros_like(image2), "title":"", }]*(self.args.refine_map+\
-                                                                        self.args.improvement_map+\
-                                                                        self.args.movement_map+\
-                                                                        self.args.acceleration_map+\
-                                                                        self.args.mask)
+                         [{"img":np.zeros_like(image2), "title":"", }]*(group-3)
         for idx in range(0, len(error_map_sequence)):
             if idx>20:
                 break
@@ -348,11 +350,6 @@ class Visualizer:
         
         pre,lat = os.path.splitext(sv_path)
         sv_path = pre +"-sequence"+ lat
-        group = 3 + self.args.improvement_map +\
-                    self.args.movement_map +\
-                    self.args.acceleration_map +\
-                    self.args.mask +\
-                    self.args.refine_map
         show_imgs(atom_dict_list, 
                   sv_img=True, save2where=sv_path, if_inter=False, 
                   fontsize=20, szWidth=int(group*image1.shape[1]/image1.shape[0]), szHeight=5, 
@@ -436,7 +433,7 @@ def colorize_confidence(confidence):
     colored_map[confidence>=i/num_colors] = colors_map[i-1]
 
     # create corlor bar
-    color_bar = np.ones((4, confidence.shape[1], 3))*255
+    color_bar = np.ones((8, confidence.shape[1], 3))*255
     step = confidence.shape[1]//num_colors
     for i in range(1,1+num_colors):
         color_bar[5:, (i-1)*step:i*step] = colors_map[i-1]
@@ -450,7 +447,6 @@ def colorize_confidence(confidence):
         y = 11
         cv2.putText(color_bar, "{:.1f}".format(i/num_colors), (x, y), 
                     font, font_scale, font_color, font_thickness)
-    
     colored_map = np.vstack((colored_map, color_bar))
     return colored_map.astype(np.uint8)
 

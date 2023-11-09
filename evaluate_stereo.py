@@ -271,6 +271,13 @@ if __name__ == '__main__':
     parser.add_argument('--U_thold', type=float, default=0.98, help="thold used to filter out noise diaprity with uncertainty/confidence")
     args = parser.parse_args()
 
+    if len(args.refine_win_size)==0:
+        args.refine_win_size = None
+    elif len(args.refine_win_size)==1:
+        args.refine_win_size = [args.refine_win_size[0], args.refine_win_size[0]]
+    elif len(args.refine_win_size)>2:
+        raise Exception("only support one-tuple or two-tuple.")
+
     model = torch.nn.DataParallel(RAFTStereo(args), device_ids=[0])
 
     logging.basicConfig(level=logging.INFO,
