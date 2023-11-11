@@ -228,7 +228,7 @@ class RAFTStereo(nn.Module):
                     net_list = self.update_block(net_list, inp_list, iter32=self.args.n_gru_layers==3, iter16=True, iter08=False, update=False)
                 net_list, up_mask, delta_flow = self.update_block(net_list, inp_list, corr, flow, iter32=self.args.n_gru_layers==3, iter16=self.args.n_gru_layers>=2)
 
-                ## acquire confidence
+                ## region detection: acquire confidence
                 if self.args.confidence:
                     offset_memory.append(delta_flow[:,0:2])
                     if itr<self.args.offset_memory_size:

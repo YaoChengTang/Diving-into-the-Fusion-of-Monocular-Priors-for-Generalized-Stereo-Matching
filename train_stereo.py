@@ -14,8 +14,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
-sys.path.append('core')
-sys.path.append('core/utils')
+sys.path.insert(0,'core')
+sys.path.insert(0,'core/utils')
 
 LOG_ROOT     = os.getenv('LOG_ROOT', default="")
 TB_ROOT      = os.getenv('TB_ROOT', default="")

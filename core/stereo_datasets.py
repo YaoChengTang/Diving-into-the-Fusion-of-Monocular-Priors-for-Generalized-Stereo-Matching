@@ -301,6 +301,21 @@ class KITTI(StereoDataset):
             self.disparity_list += [ disp ]
 
 
+class KITTI2012(StereoDataset):
+    def __init__(self, aug_params=None, root='datasets/KITTI2012', image_set='training', args=None):
+        super(KITTI2012, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispKITTI, args=args)
+        root = root if len(root)>0 else DATASET_ROOT
+        assert os.path.exists(root), "check the existence: {}".format(self.root)
+
+        image1_list = sorted(glob(os.path.join(root, image_set, 'image_0/*_10.png')))
+        image2_list = sorted(glob(os.path.join(root, image_set, 'image_1/*_10.png')))
+        disp_list = sorted(glob(os.path.join(root, 'training', 'disp_occ/*_10.png'))) if image_set == 'training' else [osp.join(root, 'training/disp_occ_0/000085_10.png')]*len(image1_list)
+
+        for idx, (img1, img2, disp) in enumerate(zip(image1_list, image2_list, disp_list)):
+            self.image_list += [ [img1, img2] ]
+            self.disparity_list += [ disp ]
+
+
 class Middlebury(StereoDataset):
     def __init__(self, aug_params=None, root='datasets/Middlebury', split='F', args=None):
         super(Middlebury, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispMiddlebury, args=args)
