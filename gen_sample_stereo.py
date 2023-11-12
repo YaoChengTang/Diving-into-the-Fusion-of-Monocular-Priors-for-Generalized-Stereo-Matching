@@ -208,7 +208,7 @@ def validate_kitti(model, iters=32, root="", sv_root="", mixed_prec=False, args=
 def validate_things(model, iters=32, root='', sv_root="", mixed_prec=False, args=None):
     """ Peform validation using the FlyingThings3D (TEST) split """
     model.eval()
-    val_dataset = datasets.SceneFlowDatasets(dstype='frames_finalpass', root=root, things_test=True)
+    val_dataset = datasets.SceneFlowDatasets(dstype='frames_finalpass', root=root, things_test=True, eval=True)
 
     out_list, epe_list = [], []
     for val_id in tqdm(range(len(val_dataset))):
@@ -334,7 +334,7 @@ if __name__ == '__main__':
         raise Exception("only support one-tuple or two-tuple.")
 
     args.eval = True
-    
+
     assert args.sv_root is not None, "Please specify the visualization root"
 
     model = torch.nn.DataParallel(RAFTStereo(args), device_ids=[0])

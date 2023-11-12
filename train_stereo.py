@@ -315,7 +315,6 @@ if __name__ == '__main__':
         args.refine_win_size = [args.refine_win_size[0], args.refine_win_size[0]]
     elif len(args.refine_win_size)>2:
         raise Exception("only support one-tuple or two-tuple.")
-    print("-"*10, "eval: ", args.eval)
 
     torch.manual_seed(1234)
     np.random.seed(1234)

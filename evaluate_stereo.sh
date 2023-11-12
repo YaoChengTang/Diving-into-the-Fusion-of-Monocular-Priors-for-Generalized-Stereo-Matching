@@ -9,7 +9,7 @@
 # CUDA_VISIBLE_DEVICES=1 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-raw.pth --dataset eth3d
 
 # CUDA_VISIBLE_DEVICES=1 python3 evaluate_stereo.py --restore_ckpt pretrained/raftstereo-sceneflow-raw.pth --dataset middlebury_H
-# CUDA_VISIBLE_DEVICES=1 python3 evaluate_stereo.py --restore_ckpt pretrained/raftstereo-sceneflow-raw.pth --dataset things
+# CUDA_VISIBLE_DEVICES=1 python3 evaluate_stereo.py --restore_ckpt pretrained/raftstereo-sceneflow-raw.pth --eval --dataset things
 
 # CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-largeBatch.pth --dataset middlebury_H
 # CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-largeBatch.pth --dataset kitti
@@ -19,7 +19,7 @@
 # CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raftstereo-NS.tar --dataset kitti
 # CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raftstereo-NS.tar --dataset kitti2012
 # CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raftstereo-NS.tar --dataset eth3d
-# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raftstereo-NS.tar --dataset things
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raftstereo-NS.tar --eval --dataset things
 
 # CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-slant.pth --slant "slant" --dataset middlebury_H
 # CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-slant.pth --slant "slant" --dataset kitti
@@ -106,7 +106,7 @@
 # CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine3_mask_Conf_loss_repair_updatehis-W10-B3-20231022-001620.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 10 --refine_start_itr 3 --update_his --dataset kitti
 # CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine3_mask_Conf_loss_repair_updatehis-W10-B3-20231022-001620.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 10 --refine_start_itr 3 --update_his --dataset kitti2012
 # CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine3_mask_Conf_loss_repair_updatehis-W10-B3-20231022-001620.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 10 --refine_start_itr 3 --update_his --dataset eth3d
-CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine3_mask_Conf_loss_repair_updatehis-W10-B3-20231022-001620.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 10 --refine_start_itr 3 --update_his --dataset things
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine3_mask_Conf_loss_repair_updatehis-W10-B3-20231022-001620.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 10 --refine_start_itr 3 --update_his --eval --dataset things
 
 # CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine4_focal-W10-B3-20231024-170201.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 10 --refine_start_itr 3 --update_his --dataset middlebury_H
 # CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine4_focal-W10-B3-20231024-170201.pth --confidence --offset_memory_size 3 --detach_in_confidence --refinement "Refinement" --refine_win_size 10 --refine_start_itr 3 --update_his --dataset kitti
@@ -171,3 +171,15 @@ CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft
 # CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-PostGeo_slantlocal_mean_moreIter-20231106-155308.pth --slant "slant_local" --slant_builder "geometry" --geo_fusion "mean" --dataset middlebury_H
 # CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-PostGeo_slantlocal_mean_moreIter-20231106-155308.pth --slant "slant_local" --slant_builder "geometry" --geo_fusion "mean" --dataset kitti
 # CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-PostGeo_slantlocal_mean_moreIter-20231106-155308.pth --slant "slant_local" --slant_builder "geometry" --geo_fusion "mean" --dataset eth3d
+
+CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine_head1-20231107-004554.pth --confidence --offset_memory_size 3 --offset_memory_last_iter 10 --detach_in_confidence --refinement "Refinement" --refine_win_size 10 10 --refine_start_itr 3 --update_his --U_thold 0.5 --num_heads 1 --dataset middlebury_H
+CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine_head1-20231107-004554.pth --confidence --offset_memory_size 3 --offset_memory_last_iter 10 --detach_in_confidence --refinement "Refinement" --refine_win_size 10 10 --refine_start_itr 3 --update_his --U_thold 0.5 --num_heads 1 --dataset kitti
+CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine_head1-20231107-004554.pth --confidence --offset_memory_size 3 --offset_memory_last_iter 10 --detach_in_confidence --refinement "Refinement" --refine_win_size 10 10 --refine_start_itr 3 --update_his --U_thold 0.5 --num_heads 1 --dataset eth3d
+
+CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine_win_2_10-20231107-002009.pth --confidence --offset_memory_size 3 --offset_memory_last_iter 10 --detach_in_confidence --refinement "Refinement" --refine_win_size 2 10 --refine_start_itr 3 --update_his --U_thold 0.5 --num_heads 3 --dataset middlebury_H
+CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine_win_2_10-20231107-002009.pth --confidence --offset_memory_size 3 --offset_memory_last_iter 10 --detach_in_confidence --refinement "Refinement" --refine_win_size 2 10 --refine_start_itr 3 --update_his --U_thold 0.5 --num_heads 3 --dataset kitti
+CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine_win_2_10-20231107-002009.pth --confidence --offset_memory_size 3 --offset_memory_last_iter 10 --detach_in_confidence --refinement "Refinement" --refine_win_size 2 10 --refine_start_itr 3 --update_his --U_thold 0.5 --num_heads 3 --dataset eth3d
+
+CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine_win_2_10_split-20231107-002500.pth --confidence --offset_memory_size 3 --offset_memory_last_iter 10 --detach_in_confidence --refinement "Refinement" --refine_win_size 2 10 --refine_start_itr 3 --update_his --U_thold 0.5 --num_heads 3 --split_win --dataset middlebury_H
+CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine_win_2_10_split-20231107-002500.pth --confidence --offset_memory_size 3 --offset_memory_last_iter 10 --detach_in_confidence --refinement "Refinement" --refine_win_size 2 10 --refine_start_itr 3 --update_his --U_thold 0.5 --num_heads 3 --split_win --dataset kitti
+CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/raft-stereo-Refine_win_2_10_split-20231107-002500.pth --confidence --offset_memory_size 3 --offset_memory_last_iter 10 --detach_in_confidence --refinement "Refinement" --refine_win_size 2 10 --refine_start_itr 3 --update_his --U_thold 0.5 --num_heads 3 --split_win --dataset eth3d

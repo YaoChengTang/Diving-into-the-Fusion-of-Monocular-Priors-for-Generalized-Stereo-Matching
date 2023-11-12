@@ -175,10 +175,11 @@ def validate_kitti2012(model, iters=32, root="", mixed_prec=False):
     return {'kitti-epe': epe, 'kitti-d1': d1}
 
 @torch.no_grad()
-def validate_things(model, iters=32, root='', mixed_prec=False, args=None):
+def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=False):
     """ Peform validation using the FlyingThings3D (TEST) split """
+    eval = args.eval if args is not None else eval
     model.eval()
-    val_dataset = datasets.SceneFlowDatasets(dstype='frames_finalpass', root=root, things_test=True)
+    val_dataset = datasets.SceneFlowDatasets(dstype='frames_finalpass', root=root, things_test=True, eval=True)
 
     out_list_1, epe_list = [], []
     out_list_2, out_list_3 = [], []
@@ -219,7 +220,7 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None):
         out_list_2.append(image_out_2)
         out_list_3.append(image_out_3)
         
-        if not args.eval and val_id>10:
+        if not eval and val_id>10:
             break
         
         logging.info(f"FlyingThings Iter {val_id+1} out of {len(val_dataset)}. " + \
