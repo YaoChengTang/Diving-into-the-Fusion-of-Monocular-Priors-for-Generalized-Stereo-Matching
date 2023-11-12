@@ -180,10 +180,11 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None):
     model.eval()
     val_dataset = datasets.SceneFlowDatasets(dstype='frames_finalpass', root=root, things_test=True)
 
-    out_list, epe_list = [], []
+    out_list_1, epe_list = [], []
+    out_list_2, out_list_3 = [], []
     tqdm_disable = args is not None and args.local_rank>0
     for val_id in tqdm(range(len(val_dataset)), disable=tqdm_disable):
-        _, image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
+        paths, image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 
@@ -197,23 +198,47 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None):
         epe = torch.sum((flow_pr - flow_gt)**2, dim=0).sqrt()
 
         epe = epe.flatten()
-        val = (valid_gt.flatten() >= 0.5) & (flow_gt.abs().flatten() < 192)
+        val = (valid_gt.flatten() >= -0.5) & (flow_gt.abs().flatten() < 192)
+        # val_nocc = (valid_gt.flatten() >= 0.5) & (flow_gt.abs().flatten() < 192)
 
-        out = (epe > 1.0)
-        epe_list.append(epe[val].mean().item())
-        out_list.append(out[val].cpu().numpy())
+        out_1 = (epe > 1.0)
+        out_2 = (epe > 2.0)
+        out_3 = (epe > 3.0)
+        image_out_1 = out_1[val].float().mean().item()
+        image_out_2 = out_2[val].float().mean().item()
+        image_out_3 = out_3[val].float().mean().item()
+        image_epe   = epe[val].mean().item()
+
+        # avoid corrupted data
+        if val.sum()<10 or image_epe>20 or image_out_1>0.95:
+            print("Corrupted data", paths)
+            continue
+
+        epe_list.append(image_epe)
+        out_list_1.append(image_out_1)
+        out_list_2.append(image_out_2)
+        out_list_3.append(image_out_3)
         
-        if val_id>10:
+        if not args.eval and val_id>10:
             break
+        
+        logging.info(f"FlyingThings Iter {val_id+1} out of {len(val_dataset)}. " + \
+                     f"EPE {round(image_epe,4)}, BAD1 {round(image_out_1,4)}, " +\
+                     f"BAD2 {round(image_out_2,4)}, BAD3 {round(image_out_3,4)} ")
+        
 
     epe_list = np.array(epe_list)
-    out_list = np.concatenate(out_list)
+    out_list_1 = np.array(out_list_1)
+    out_list_2 = np.array(out_list_2)
+    out_list_3 = np.array(out_list_3)
 
     epe = np.mean(epe_list)
-    d1 = 100 * np.mean(out_list)
+    bad1 = 100 * np.mean(out_list_1)
+    bad2 = 100 * np.mean(out_list_2)
+    bad3 = 100 * np.mean(out_list_3)
 
-    logging.info("Validation FlyingThings: %f, %f" % (epe, d1))
-    return {'things-epe': epe, 'things-d1': d1}
+    logging.info("Validation FlyingThings: %f, %f, %f, %f" % (epe, bad1, bad2, bad3))
+    return {'things-epe': epe, 'things-bad1': bad1, 'things-bad2': bad2, 'things-bad3': bad3}
 
 
 @torch.no_grad()
@@ -294,6 +319,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', help="dataset for evaluation", required=True, choices=["eth3d", "kitti", 'kitti2012', "things"] + [f"middlebury_{s}" for s in 'FHQ'])
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--valid_iters', type=int, default=32, help='number of flow-field updates during forward pass')
+    parser.add_argument('--eval', action='store_true', help='evaluation mode')
 
     # Architecure choices
     parser.add_argument('--hidden_dims', nargs='+', type=int, default=[128]*3, help="hidden state and context dimensions")
@@ -314,7 +340,7 @@ if __name__ == '__main__':
     parser.add_argument('--offset_memory_last_iter', type=int, default=-1, help="only predict confidence using offset before xxx iters")
     parser.add_argument('--detach_in_confidence', action='store_true', help="detach for feature and offset in confidence learning")
     parser.add_argument('--refinement', type=str, default="", help="refinement for disparity map")
-    parser.add_argument('--refine_win_size', type=int, default=7, nargs='+', help="window size for refinement")
+    parser.add_argument('--refine_win_size', type=int, default=[], nargs='+', help="window size for refinement")
     parser.add_argument('--split_win', action='store_true', help="given 3*10 win, using 3*10 and 10*3 for refinement")
     parser.add_argument('--num_heads', type=int, default=3, help="number of head in Transformer")
     parser.add_argument('--refine_start_itr', type=int, default=3, help="start to do refinement at which iteration")
@@ -328,6 +354,8 @@ if __name__ == '__main__':
         args.refine_win_size = [args.refine_win_size[0], args.refine_win_size[0]]
     elif len(args.refine_win_size)>2:
         raise Exception("only support one-tuple or two-tuple.")
+
+    args.eval = True
 
     model = torch.nn.DataParallel(RAFTStereo(args), device_ids=[0])
 

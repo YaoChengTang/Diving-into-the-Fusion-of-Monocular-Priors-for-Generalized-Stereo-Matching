@@ -291,6 +291,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', help="dataset for evaluation", required=True, choices=["eth3d", "kitti", "things"] + [f"middlebury_{s}" for s in 'FHQ'])
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--valid_iters', type=int, default=32, help='number of flow-field updates during forward pass')
+    parser.add_argument('--eval', action='store_true', help='evaluation mode')
 
     # Architecure choices
     parser.add_argument('--hidden_dims', nargs='+', type=int, default=[128]*3, help="hidden state and context dimensions")
@@ -332,6 +333,8 @@ if __name__ == '__main__':
     elif len(args.refine_win_size)>2:
         raise Exception("only support one-tuple or two-tuple.")
 
+    args.eval = True
+    
     assert args.sv_root is not None, "Please specify the visualization root"
 
     model = torch.nn.DataParallel(RAFTStereo(args), device_ids=[0])

@@ -145,6 +145,7 @@ class SceneFlowDatasets(StereoDataset):
     def __init__(self, aug_params=None, root='', dstype='frames_cleanpass', 
                  things_test=False, caching=False, args=None):
         super(SceneFlowDatasets, self).__init__(aug_params, args=args)
+        self.args = args
         self.root = root if len(root)>0 else DATASET_ROOT
         self.dstype = dstype
         self.caching = caching
@@ -183,7 +184,10 @@ class SceneFlowDatasets(StereoDataset):
         # Choose a random subset of 400 images for validation
         state = np.random.get_state()
         np.random.seed(1000)
-        val_idxs = set(np.random.permutation(len(left_images))[:400])
+        if not self.args.eval:
+            val_idxs = set(np.random.permutation(len(left_images))[:400])
+        else:
+            val_idxs = set(np.random.permutation(len(left_images)))
         np.random.set_state(state)
 
         for idx, (img1, img2, disp) in enumerate(zip(left_images, right_images, disparity_images)):

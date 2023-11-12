@@ -245,6 +245,7 @@ if __name__ == '__main__':
     parser.add_argument('--name', default='raft-stereo', help="name your experiment")
     parser.add_argument('--restore_ckpt', help="restore checkpoint")
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
+    parser.add_argument('--eval', action='store_true', help='evaluation mode')
 
     # Training parameters
     parser.add_argument('--batch_size', type=int, default=6, help="batch size used during training.")
@@ -314,6 +315,7 @@ if __name__ == '__main__':
         args.refine_win_size = [args.refine_win_size[0], args.refine_win_size[0]]
     elif len(args.refine_win_size)>2:
         raise Exception("only support one-tuple or two-tuple.")
+    print("-"*10, "eval: ", args.eval)
 
     torch.manual_seed(1234)
     np.random.seed(1234)
