@@ -1,7 +1,7 @@
 from __future__ import print_function, division
 import sys
 sys.path.insert(0,'core')
-sys.path.insert(0,'core/utils')
+sys.path.append('core/utils')
 
 import os
 import argparse
