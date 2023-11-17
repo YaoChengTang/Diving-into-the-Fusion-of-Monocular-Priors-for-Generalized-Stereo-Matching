@@ -324,6 +324,7 @@ if __name__ == '__main__':
     parser.add_argument('--acceleration_map', action='store_true', help="visualize acceleration map")
     parser.add_argument('--mask', action='store_true', help="visualize mask")
     parser.add_argument('--refine_map', action='store_true', help="visualize refined disparity map")
+    parser.add_argument('--mask_binary', action='store_true', help="visualize binary mask")
     args = parser.parse_args()
 
     if len(args.refine_win_size)==0:

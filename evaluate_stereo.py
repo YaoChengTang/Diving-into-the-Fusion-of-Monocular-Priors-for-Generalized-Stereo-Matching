@@ -39,7 +39,7 @@ def validate_eth3d(model, iters=32, root="", mixed_prec=False):
 
     out_list, epe_list = [], []
     for val_id in range(len(val_dataset)):
-        _, image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
+        (imageL_file, _, _), image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 
@@ -57,7 +57,8 @@ def validate_eth3d(model, iters=32, root="", mixed_prec=False):
         out = (epe_flattened > 1.0)
         image_out = out[val].float().mean().item()
         image_epe = epe_flattened[val].mean().item()
-        logging.info(f"ETH3D {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}")
+        logging.info(f"ETH3D {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}" +\
+                     f"\r\n{imageL_file}")
         epe_list.append(image_epe)
         out_list.append(image_out)
 
@@ -285,7 +286,8 @@ def validate_middlebury(model, iters=32, split='F', root="", mixed_prec=False):
         logging.info(f"Middlebury Iter {val_id+1} out of {len(val_dataset)}. " + \
                      f"EPE {round(image_epe,4)} D1 {round(image_out,4)} " + \
                      f"EPE_nocc {round(image_epe_nocc,4)} D1_nocc {round(image_out_nocc,4)} " + \
-                     f"EPE_mask {round(image_epe_mask,4)} D1_mask {round(image_out_mask,4)}")
+                     f"EPE_mask {round(image_epe_mask,4)} D1_mask {round(image_out_mask,4)} " + \
+                     f"\r\n{imageL_file}")
         epe_list.append(image_epe)
         out_list.append(image_out)
         epe_nocc_list.append(image_epe_nocc)
