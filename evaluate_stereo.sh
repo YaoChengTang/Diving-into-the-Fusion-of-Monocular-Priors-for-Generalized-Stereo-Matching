@@ -1,6 +1,6 @@
 # /usr/bin/bash
 
-# CUDA_VISIBLE_DEVICES=1 python3 evaluate_stereo.py --restore_ckpt pretrained/raftstereo-sceneflow.pth --dataset middlebury_H
+CUDA_VISIBLE_DEVICES=1 python3 evaluate_stereo.py --restore_ckpt pretrained/raftstereo-sceneflow.pth --dataset middlebury_H
 # CUDA_VISIBLE_DEVICES=1 python3 evaluate_stereo.py --restore_ckpt pretrained/raftstereo-sceneflow.pth --dataset kitti
 # CUDA_VISIBLE_DEVICES=1 python3 evaluate_stereo.py --restore_ckpt pretrained/raftstereo-sceneflow.pth --dataset eth3d
 

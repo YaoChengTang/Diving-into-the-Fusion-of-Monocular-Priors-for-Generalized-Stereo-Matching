@@ -65,7 +65,7 @@ def evalute(flow_pr_sequence, flow_pr_refine_sequence, confidence_list,
             if conf is not None:
                 confidence_list[idx] = F.sigmoid(conf)
             else:
-                confidence_list[idx] = torch.zeros_like(confidence_list[-1])
+                confidence_list[idx] = torch.zeros_like(flow_pr_sequence[-1])
             confidence_list[idx] = padder.unpad(confidence_list[idx]).cpu().squeeze(0)
     
     # fill None in flow_pr_refine_sequence with zero-matrix
@@ -312,7 +312,7 @@ if __name__ == '__main__':
     parser.add_argument('--offset_memory_last_iter', type=int, default=-1, help="only predict confidence using offset before xxx iters")
     parser.add_argument('--detach_in_confidence', action='store_true', help="detach for feature and offset in confidence learning")
     parser.add_argument('--refinement', type=str, default="", help="refinement for disparity map")
-    parser.add_argument('--refine_win_size', type=int, default=7, nargs='+', help="window size for refinement")
+    parser.add_argument('--refine_win_size', type=int, default=[7,7], nargs='+', help="window size for refinement")
     parser.add_argument('--split_win', action='store_true', help="given 3*10 win, using 3*10 and 10*3 for refinement")
     parser.add_argument('--num_heads', type=int, default=3, help="number of head in Transformer")
     parser.add_argument('--refine_start_itr', type=int, default=3, help="start to do refinement at which iteration")

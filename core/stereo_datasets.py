@@ -335,6 +335,10 @@ class Middlebury(StereoDataset):
         else:
             lines = list(map(osp.basename, glob(os.path.join(root, "MiddEval3/trainingF/*"))))
             # lines = list(filter(lambda p: any(s in p.split('/') for s in Path(os.path.join(root, "MiddEval3/official_train.txt")).read_text().splitlines()), lines))
+            # lines = [line for line in lines if line.find("Playtable")!=-1 or \
+            #                                    line.find("Playroom")!=-1 or \
+            #                                    line.find("Recycle")!=-1 or \
+            #                                    line.find("Vintage")!=-1 ]   # for fast visualization
             image1_list = sorted([os.path.join(root, "MiddEval3", f'training{split}', f'{name}/im0.png') for name in lines])
             image2_list = sorted([os.path.join(root, "MiddEval3", f'training{split}', f'{name}/im1.png') for name in lines])
             disp_list = sorted([os.path.join(root, "MiddEval3", f'training{split}', f'{name}/disp0GT.pfm') for name in lines])

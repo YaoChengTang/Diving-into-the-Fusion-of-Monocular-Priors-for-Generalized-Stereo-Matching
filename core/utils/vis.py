@@ -211,9 +211,15 @@ class Visualizer:
         for flow_pr in flow_pr_sequence:
             error_map = np.abs(flow_pr-flow_gt)
             error_map[np.isinf(flow_gt)|np.isnan(flow_gt)|(flow_gt==0)] = 0
+            print("-"*10, (np.isinf(flow_gt)|np.isnan(flow_gt)|(flow_gt==0)).sum())
             error_map_sequence.append(error_map)
-            colored_error_map = colorize_error_map(error_map)
+            # colored_error_map = colorize_error_map(error_map, ver_hor="hor")
+            colored_error_map = colorize_error_map(error_map, ver_hor="ver")
             colored_error_map_sequence.append(colored_error_map)
+        plt.figure()
+        plt.axis("off")
+        plt.imshow(colored_error_map)
+        plt.savefig("./tmp.png")
         
         # get the colored improvement map between adjacent iterations,
         # the improvement map of the first iteration is empty.
@@ -226,7 +232,8 @@ class Visualizer:
                 else :
                     improvement_map = error_map_sequence[idx] - error_map_sequence[idx-1]
                 improvement_map_sequence.append(improvement_map)
-                colored_improvement_map = colorize_improvement_map(improvement_map)
+                # colored_improvement_map = colorize_improvement_map(improvement_map, ver_hor="hor")
+                colored_improvement_map = colorize_improvement_map(improvement_map, ver_hor="ver")
                 colored_improvement_map_sequence.append(colored_improvement_map)
         
         # get the movement vector at each step
@@ -240,7 +247,8 @@ class Visualizer:
                 else :
                     movement_map = flow_pr_sequence[idx] - flow_pr_sequence[idx-1]
                 movement_map_sequence.append(movement_map)
-                colored_movement_map = colorize_improvement_map(movement_map)
+                # colored_movement_map = colorize_improvement_map(movement_map, ver_hor="hor")
+                colored_movement_map = colorize_improvement_map(movement_map, ver_hor="ver")
                 colored_movement_map_sequence.append(colored_movement_map)
         
         # get the difference between movement vector
@@ -251,7 +259,8 @@ class Visualizer:
                     acceleration_map = np.zeros_like(movement_map_sequence[idx])
                 else :
                     acceleration_map = movement_map_sequence[idx] - movement_map_sequence[idx-1]
-                colored_acceleration_map = colorize_improvement_map(acceleration_map)
+                # colored_acceleration_map = colorize_improvement_map(acceleration_map, ver_hor="hor")
+                colored_acceleration_map = colorize_improvement_map(acceleration_map, ver_hor="ver")
                 colored_acceleration_map_sequence.append(colored_acceleration_map)
 
         # get confidence
@@ -277,7 +286,8 @@ class Visualizer:
                         FN_conf = (improvement_map*confidence>1).sum() / ((improvement_map<-1)|(improvement_map>1)).sum()
                         static_improvement_list.append([TP,FN,TP_conf,FN_conf])
                 
-                colored_mask = colorize_confidence(confidence)
+                # colored_mask = colorize_confidence(confidence, ver_hor="hor")
+                colored_mask = colorize_confidence(confidence, ver_hor="ver")
                 mask_sequence_list.append(confidence)
                 colored_mask_sequence.append(colored_mask)
                 
@@ -287,6 +297,18 @@ class Visualizer:
                 # colored_movement_map_sequence[idx][:H] = ((1-ratio*(1-confidence))*colored_movement_map_sequence[idx][:H]).astype(np.uint8)
                 # colored_improvement_map_sequence[idx][:H] = ((1-ratio*(1-confidence))*colored_improvement_map_sequence[idx][:H]).astype(np.uint8) 
                 # colored_acceleration_map_sequence[idx][:H] = ((1-ratio*(1-confidence))*colored_acceleration_map_sequence[idx][:H]).astype(np.uint8)
+
+        # get confidence
+        if self.args.mask_binary:
+            mask_binary_sequence_list = []
+            for idx in range(0, len(flow_pr_sequence)):
+                if idx<=start_idx or len(confidence_list)==0 or confidence_list[idx] is None :
+                    confidence = np.ones_like(error_map_sequence[-1])
+                else:
+                    confidence = confidence_list[idx]
+                
+                mask_binary = confidence < self.args.U_thold
+                mask_binary_sequence_list.append(mask_binary)
 
         # vis
         ## visualize GT and the final prediction
@@ -307,13 +329,14 @@ class Visualizer:
                 self.args.movement_map +\
                 self.args.acceleration_map +\
                 self.args.mask +\
-                self.args.refine_map
+                self.args.refine_map +\
+                self.args.mask_binary
         group = max(group+2, 3)
         atom_dict_list = [{"img":flow_gt, "title":"GT Disparity", "cmap":'jet'},
                           {"img":image1, "title":"Left Image", },
                           {"img":image2, "title":"Right Image", },] +\
                          [{"img":np.zeros_like(image2), "title":"", }]*(group-3)
-        for idx in range(0, len(error_map_sequence)):
+        for idx in range(0, len(error_map_sequence)-20):
             if idx>20:
                 break
             info = "epe:{:.2f}".format(vis_epe_sequence[idx]) + ", " + \
@@ -346,6 +369,10 @@ class Visualizer:
                 tmp_list += [{"img":colored_mask_sequence[idx], 
                              "title":"Mask-{}".format(idx), 
                              "cmap":None, },]
+            if self.args.mask_binary:
+                tmp_list += [{"img":mask_binary_sequence_list[idx], 
+                             "title":"Binary Mask-{}".format(idx), 
+                             "cmap":"gray", },]
             atom_dict_list += tmp_list
         
         pre,lat = os.path.splitext(sv_path)
@@ -365,7 +392,7 @@ class Visualizer:
 #                                 "cmap":None, },
 
 
-def colorize_error_map(error_map):
+def colorize_error_map(error_map, ver_hor="hor"):
     # Define a custom colormap for errors within 10 (shades of red)
     num_colors = 10
     colors_map = [
@@ -391,24 +418,40 @@ def colorize_error_map(error_map):
     colored_map[error_map>=i] = colors_map[i - 1]
 
     # create corlor bar
-    color_bar = np.ones((15, error_map.shape[1], 3))*255
-    step = error_map.shape[1]//(num_colors+1)
-    for i in range(1+num_colors):
-        color_bar[5:, i*step:(i+1)*step] = colors_map[i]
     font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 0.45
     font_color = (0, 0, 0)  # Black
-    font_thickness = 1
-    for i in range(1+num_colors):
-        x = i * step + step // 8
-        y = 11
-        cv2.putText(color_bar, str(i), (x, y), font, font_scale, font_color, font_thickness)
-    
-    colored_map = np.vstack((colored_map, color_bar))
+    if ver_hor=="hor":
+        bar_size = 15
+        font_scale = 0.45
+        font_thickness = 1
+        color_bar = np.ones((bar_size, error_map.shape[1], 3))*255
+        step = error_map.shape[1]//(num_colors+1)
+        for i in range(1+num_colors):
+            color_bar[bar_size//3:, i*step:(i+1)*step] = colors_map[i]
+        for i in range(1+num_colors):
+            x = i * step + step // 8
+            y = bar_size//3*2
+            cv2.putText(color_bar, str(i), (x, y), font, font_scale, font_color, font_thickness)
+        colored_map = np.vstack((colored_map, color_bar))
+
+    elif ver_hor=="ver":
+        bar_size = error_map.shape[1] // 10
+        font_scale = 0.9
+        font_thickness = 2
+        color_bar = np.ones((error_map.shape[0], bar_size, 3))*255
+        step = error_map.shape[0]//(num_colors+1)
+        for i in range(1+num_colors):
+            color_bar[i*step:(i+1)*step, bar_size//3:] = colors_map[i]
+        for i in range(1+num_colors):
+            y = i * step + step // 4
+            x = bar_size//3*2
+            cv2.putText(color_bar, str(i), (x, y), font, font_scale, font_color, font_thickness)
+        colored_map = np.hstack((colored_map, color_bar))
+
     return colored_map.astype(np.uint8)
 
 
-def colorize_confidence(confidence):
+def colorize_confidence(confidence, ver_hor="hor"):
     # Define a custom colormap for errors within 10 (shades of red)
     colors_map = [
         (255, 219, 172),  # Navajo White
@@ -433,25 +476,44 @@ def colorize_confidence(confidence):
     colored_map[confidence>=i/num_colors] = colors_map[i-1]
 
     # create corlor bar
-    color_bar = np.ones((8, confidence.shape[1], 3))*255
-    step = confidence.shape[1]//num_colors
-    for i in range(1,1+num_colors):
-        color_bar[5:, (i-1)*step:i*step] = colors_map[i-1]
     font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 0.35
     font_color = (0, 0, 0)  # Black
-    font_thickness = 1
-    for i in range(1+num_colors):
-        x = i * step
-        x = x + step // 8 if i<num_colors else x - step // 8
-        y = 11
-        cv2.putText(color_bar, "{:.1f}".format(i/num_colors), (x, y), 
-                    font, font_scale, font_color, font_thickness)
-    colored_map = np.vstack((colored_map, color_bar))
+    if ver_hor=="hor":
+        bar_size = 8
+        font_scale = 0.35
+        font_thickness = 1
+        color_bar = np.ones((bar_size, confidence.shape[1], 3))*255
+        step = confidence.shape[1]//num_colors
+        for i in range(1,1+num_colors):
+            color_bar[bar_size//3:, (i-1)*step:i*step] = colors_map[i-1]
+        for i in range(1+num_colors):
+            x = i * step
+            x = x + step // 8 if i<num_colors else x - step // 8
+            y = bar_size//3*2
+            cv2.putText(color_bar, "{:.1f}".format(i/num_colors), (x, y), 
+                        font, font_scale, font_color, font_thickness)
+        colored_map = np.vstack((colored_map, color_bar))
+
+    elif ver_hor=="ver":
+        bar_size = confidence.shape[1] // 10
+        font_scale = 0.25
+        font_thickness = 1
+        color_bar = np.ones((confidence.shape[0], bar_size, 3))*255
+        step = confidence.shape[0]//num_colors
+        for i in range(1,1+num_colors):
+            color_bar[(i-1)*step:i*step, bar_size//3:] = colors_map[i-1]
+        for i in range(1+num_colors):
+            y = i * step
+            y = y + step // 4 if i<num_colors else y - step // 4
+            x = int(bar_size//3*1.5)
+            cv2.putText(color_bar, "{:.1f}".format(i/num_colors), (x, y), 
+                        font, font_scale, font_color, font_thickness)
+        colored_map = np.hstack((colored_map, color_bar))
+
     return colored_map.astype(np.uint8)
 
 
-def colorize_improvement_map(improvement_map):
+def colorize_improvement_map(improvement_map, ver_hor="hor"):
     # Define a custom colormap for errors within 10 (shades of red)
     num_colors = 10
     colors_map = [
@@ -497,19 +559,34 @@ def colorize_improvement_map(improvement_map):
                         (improvement_map<=bound_val[idx][1])] = colors_map[idx]
 
     # create corlor bar
-    color_bar = np.ones((15, improvement_map.shape[1], 3))*255
-    step = improvement_map.shape[1]//(num_colors+1)
-    for idx in range(1+num_colors):
-        color_bar[5:, idx*step:(idx+1)*step] = colors_map[idx]
     font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 0.45
     font_color = (0, 0, 0)  # Black
-    font_thickness = 1
-    for idx in range(1+num_colors):
-        x = idx * step + step // 8
-        y = 11
-        cv2.putText(color_bar, str(bound_val[idx][0]), (x, y), 
-                    font, font_scale, font_color, font_thickness)
-    
-    colored_map = np.vstack((colored_map, color_bar))
+    if ver_hor=="hor":
+        bar_size = 15
+        font_scale = 0.45
+        font_thickness = 1
+        color_bar = np.ones((bar_size, improvement_map.shape[1], 3))*255
+        step = improvement_map.shape[1]//(num_colors+1)
+        for i in range(1+num_colors):
+            color_bar[bar_size//3:, i*step:(i+1)*step] = colors_map[i]
+        for i in range(1+num_colors):
+            x = i * step + step // 8
+            y = bar_size//3*2
+            cv2.putText(color_bar, str(bound_val[i][0]), (x, y), font, font_scale, font_color, font_thickness)
+        colored_map = np.vstack((colored_map, color_bar))
+
+    elif ver_hor=="ver":
+        bar_size = improvement_map.shape[1] // 10
+        font_scale = 0.9
+        font_thickness = 2
+        color_bar = np.ones((improvement_map.shape[0], bar_size, 3))*255
+        step = improvement_map.shape[0]//(num_colors+1)
+        for i in range(1+num_colors):
+            color_bar[i*step:(i+1)*step, bar_size//3:] = colors_map[i]
+        for i in range(1+num_colors):
+            y = i * step + step // 4
+            x = bar_size//3*2
+            cv2.putText(color_bar, str(bound_val[i][0]), (x, y), font, font_scale, font_color, font_thickness)
+        colored_map = np.hstack((colored_map, color_bar))
+
     return colored_map.astype(np.uint8)

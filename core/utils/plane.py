@@ -173,10 +173,10 @@ def predict_disp(abc, uv_coord, patch_size, mul_last=False):
 
 
 if __name__ == '__main__':
-    slant = "slant"
-    # slant = "slant_local"
-    slant_norm = True
-    # slant_norm = False
+    # slant = "slant"
+    slant = "slant_local"
+    # slant_norm = True
+    slant_norm = False
     patch_size = 4
     disp_path = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/Sceneflow/flyingthings3d/disparity/TRAIN/A/0717/left/0006.pfm"
     left_path = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/Sceneflow/flyingthings3d/frames_cleanpass/TRAIN/A/0717/left/0006.png"
@@ -214,7 +214,7 @@ if __name__ == '__main__':
     # print(connect[0,:,test_v, test_u], mask[0,:,test_v, test_u], sep="\r\n")
 
     end_time = time.time()
-    print("cost time: {}".format(end_time-start_time))
+    print("cost time: {}".format(end_time-start_time), abc.shape)
 
     disp = disp.squeeze(0).squeeze(0).cpu().data.numpy()
     img0 = img0.squeeze(0).permute((1,2,0)).cpu().data.numpy()
@@ -225,12 +225,16 @@ if __name__ == '__main__':
     error_map = np.abs(rec_disp-disp)
     color_error_map = vis.colorize_error_map(error_map)
 
+    degree = torch.atan(abc[0,0] / abc[0,1])
+
     atom_dict = [{"img":img0, "title":"Left Image", },
                 {"img":disp, "title":"GT Disparity", "cmap":'jet', },
                 {"img":patch_disp, "title":"GT Patch Disparity", "cmap":'jet', },
                 {"img":rec_disp, "title":"GT recover Disparity", "cmap":'jet', },
                 {"img":rec_mask, "title":"rec_mask", "cmap": "gray"},
                 {"img":color_error_map, "title":"color_error_map", },
+                {"img":degree, "title":"GT ab", "cmap":'jet', },
+                {"img":abc[0,2], "title":"GT c", "cmap":'jet', },
                 ]
     
     if slant=="slant_local":
@@ -241,6 +245,6 @@ if __name__ == '__main__':
                     {"img":color_error_map, "title":"color_error_map of Plane", },]
         atom_dict += tmp_dict
 
-    # vis.show_imgs(atom_dict, 
-    #             sv_img=True, save2where=sv_path, if_inter=False, 
-    #             fontsize=20, szWidth=10, szHeight=5, group=2)
+    vis.show_imgs(atom_dict, 
+                sv_img=True, save2where=sv_path, if_inter=False, 
+                fontsize=20, szWidth=10, szHeight=5, group=2)
