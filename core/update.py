@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.init as init
 import torch.nn.functional as F
 from opt_einsum import contract
 
@@ -20,6 +21,8 @@ class ConvGRU(nn.Module):
         self.convr = nn.Conv2d(hidden_dim+input_dim, hidden_dim, kernel_size, padding=kernel_size//2)
         self.convq = nn.Conv2d(hidden_dim+input_dim, hidden_dim, kernel_size, padding=kernel_size//2)
 
+        self._initialize_weights()
+
     def forward(self, h, cz, cr, cq, *x_list):
         x = torch.cat(x_list, dim=1)
         hx = torch.cat([h, x], dim=1)
@@ -30,6 +33,13 @@ class ConvGRU(nn.Module):
 
         h = (1-z) * h + z * q
         return h
+    
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                init.kaiming_normal_(m.weight)
+                if m.bias is not None:
+                    m.bias.data.zero_()
 
 class SepConvGRU(nn.Module):
     def __init__(self, hidden_dim=128, input_dim=192+128):
