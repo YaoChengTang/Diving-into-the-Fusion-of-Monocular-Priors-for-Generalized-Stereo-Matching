@@ -53,27 +53,8 @@ class RAFTStereo(nn.Module):
         if args.confidence:
             self.confidence_computer = OffsetConfidence(args)
 
-        if args.slant_builder=="geometry":
+        if args.geo_estimator=="geometry":
             self.geometry_builder = Geometry(args)
-        
-        # # build offset for interpolation in slant plane
-        # # d_p = d_q + a_q\cdot\Delta u_{q\to p} + b_q\cdot\Delta v_{q\to p}
-        # if self.args.slant in ["slant_local"]:
-        #     factor = 2 ** self.args.n_downsample
-        #     delta_center = []
-        #     for sub_row_idx in range(0, factor):
-        #         for sub_col_idx in range(0, factor):
-        #             delta = [-factor/2 + 0.5 + sub_row_idx, -factor/2 + 0.5 + sub_col_idx]
-        #             delta_center.append(delta)
-        #     delta_center = np.array(delta_center)
-        #     delta_pq = []
-        #     for row_idx in [-1,0,1]:
-        #         for col_idx in [-1,0,1]:
-        #             delta = delta_center - np.array([row_idx,col_idx])*factor
-        #             delta_pq.append(delta)
-        #     delta_pq = np.array(delta_pq).reshape(9,factor,factor,2)
-        #     delta_pq = torch.Tensor(delta_pq)
-        #     self.delta_pq = nn.Parameter(delta_pq, requires_grad=False)   # (9,factor,factor,2)
         
         if args.refinement is not None and len(args.refinement)>0:
             if self.args.slant is None or len(self.args.slant)==0 :
@@ -94,7 +75,7 @@ class RAFTStereo(nn.Module):
                          f"Confidence: {args.confidence}, offset_memory_size: {args.offset_memory_size}, " +\
                          f"offset_memory_last_iter: {args.offset_memory_last_iter}, " +\
                          f"slant: {args.slant}, slant_norm: {args.slant_norm}, " +\
-                         f"slant builder: {args.slant_builder}, geo_fusion: {args.geo_fusion}, " +\
+                         f"geo estimator: {args.geo_estimator}, geo_fusion: {args.geo_fusion}, " +\
                          f"refine: {args.refinement}, refine_win_size: {args.refine_win_size}, num_heads:{args.num_heads}, " +\
                          f"split_win: {args.split_win}, refine_start_itr: {args.refine_start_itr}, " +\
                          f"update_his: {args.update_his} U_thold: {args.U_thold}" )
@@ -113,62 +94,59 @@ class RAFTStereo(nn.Module):
 
         return coords0, coords1
 
-    def upsample_flow(self, flow, mask, params=None):
+    def upsample_flow(self, flow, mask):
         """ Upsample flow field [H/8, W/8, 2] -> [H, W, 2] using convex combination """
         N, D, H, W = flow.shape
         factor = 2 ** self.args.n_downsample
         mask = mask.view(N, 1, 9, factor, factor, H, W)
         mask = torch.softmax(mask, dim=2)
 
-        if (self.args.slant_builder is None or len(self.args.slant_builder)==0) and\
-           self.args.slant in ["slant_local"] and params is not None:
-            # d_p = a_q\cdot\Delta u_{q\to p} + b_q\cdot\Delta v_{q\to p} + d_q
-            delta_pq = get_pos(H*factor, W*factor, disp=None,
-                              slant=self.args.slant,
-                              slant_norm=self.args.slant_norm,
-                              patch_size=factor,
-                              device=flow.device)                                                # (1,2,H*factor,W*factor)
-            patch_delta_pq = convert2patch(delta_pq, patch_size=factor, div_last=False).detach() # (1,2,factor*factor,H,W)
-            a_p, a_p_flow, \
-            b_p, b_p_flow, \
-            d_p, d_p_flow  = torch.split(params, 1, dim=1)              # (B,1,H,W)
-            abd      = torch.cat([a_p, b_p, d_p], dim=1)                # (B,3,H,W)
-            abd_flow = torch.cat([a_p_flow, b_p_flow, d_p_flow], dim=1) # (B,3,H,W)
-            d_coord      = predict_disp(abd, patch_delta_pq, patch_size=factor, mul_last=True)      # (B,factor*factor,H,W)
-            d_coord_flow = predict_disp(abd_flow, patch_delta_pq, patch_size=factor, mul_last=True) # (B,factor*factor,H,W)
-            up_flow      = torch.stack([d_coord, d_coord_flow], dim=1)                              # (B,2,factor*factor,H,W)
-            up_flow      = up_flow.view(N, 2*factor*factor, H, W)                                   # (B,2*factor*factor,H,W)
-            up_flow      = F.unfold(up_flow, [3,3], padding=1)                                      # (B,2*factor*factor*9,H,W)
-            up_flow      = up_flow.view(N, 2, factor, factor, 9, H, W)                              # (B,2,factor,factor,9,H,W)
-            up_flow      = up_flow.permute((0,1,4,2,3,5,6))                                         # (B,2,9,factor,factor,H,W)
+        up_flow = F.unfold(factor * flow, [3,3], padding=1)
+        up_flow = up_flow.view(N, D, 9, 1, 1, H, W)
+        up_flow = torch.sum(mask * up_flow, dim=2)
 
-            # up_flow = F.unfold(factor * flow, [3,3], padding=1)
-            # up_flow = up_flow.view(N, D, 9, 1, 1, H, W)
-            # a = F.unfold(params[:,:2], [3,3], padding=1)
-            # a = a.view(N, D, 9, 1, 1, H, W)
-            # b = F.unfold(params[:,2:4], [3,3], padding=1)
-            # b = b.view(N, D, 9, 1, 1, H, W)
-            # delta_pq = self.delta_pq.view(1,1,9,factor,factor,1,1,2)
-            # up_flow = up_flow + a*delta_pq[...,1] + b*delta_pq[...,0]
-        else:
-            up_flow = F.unfold(factor * flow, [3,3], padding=1)
-            up_flow = up_flow.view(N, D, 9, 1, 1, H, W)
+        img_coord = None
+        if self.args.geo_estimator is not None and len(self.args.geo_estimator)>0:
+            img_coord = get_pos(H*factor, W*factor, disp=None,
+                                slant=self.args.slant,
+                                slant_norm=self.args.slant_norm,
+                                patch_size=factor,
+                                device=flow.device)                                                # (1,2,H*factor,W*factor)
+            img_coord = img_coord.repeat(N,1,1,1)
+        
+        up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
+        return up_flow.reshape(N, D, factor*H, factor*W), img_coord
+    
+    def upsample_geo(self, flow, mask, params=None):
+        """ Upsample flow field [H/8, W/8, 2] -> [H, W, 2] using convex combination """
+        N, D, H, W = flow.shape
+        factor = 2 ** self.args.n_downsample
+        mask = mask.view(N, 1, 9, factor, factor, H, W)
+        mask = torch.softmax(mask, dim=2)
+
+        # d_p = a_q\cdot\Delta u_{q\to p} + b_q\cdot\Delta v_{q\to p} + d_q
+        delta_pq = get_pos(H*factor, W*factor, disp=None,
+                            slant=self.args.slant,
+                            slant_norm=self.args.slant_norm,
+                            patch_size=factor,
+                            device=flow.device)                                                # (1,2,H*factor,W*factor)
+        patch_delta_pq = convert2patch(delta_pq, patch_size=factor, div_last=False).detach() # (1,2,factor*factor,H,W)
+        a_p, a_p_flow, \
+        b_p, b_p_flow, \
+        d_p, d_p_flow  = torch.split(params, 1, dim=1)              # (B,1,H,W)
+        abd      = torch.cat([a_p, b_p, d_p], dim=1)                # (B,3,H,W)
+        abd_flow = torch.cat([a_p_flow, b_p_flow, d_p_flow], dim=1) # (B,3,H,W)
+        d_coord      = predict_disp(abd, patch_delta_pq, patch_size=factor, mul_last=True)      # (B,factor*factor,H,W)
+        d_coord_flow = predict_disp(abd_flow, patch_delta_pq, patch_size=factor, mul_last=True) # (B,factor*factor,H,W)
+        up_flow      = torch.stack([d_coord, d_coord_flow], dim=1)                              # (B,2,factor*factor,H,W)
+        up_flow      = up_flow.view(N, 2*factor*factor, H, W)                                   # (B,2*factor*factor,H,W)
+        up_flow      = F.unfold(up_flow, [3,3], padding=1)                                      # (B,2*factor*factor*9,H,W)
+        up_flow      = up_flow.view(N, 2, factor, factor, 9, H, W)                              # (B,2,factor,factor,9,H,W)
+        up_flow      = up_flow.permute((0,1,4,2,3,5,6))                                         # (B,2,9,factor,factor,H,W)
 
         up_flow = torch.sum(mask * up_flow, dim=2)
-        if self.args.slant_builder is not None and len(self.args.slant_builder)>0:
-            delta_pq = get_pos(H*factor, W*factor, disp=None,
-                              slant=self.args.slant,
-                              slant_norm=self.args.slant_norm,
-                              patch_size=factor,
-                              device=flow.device)                                                # (1,2,H*factor,W*factor)
-            patch_delta_pq = convert2patch(delta_pq, patch_size=factor, div_last=False).detach() # (1,2,factor*factor,H,W)
-            patch_delta_pq = patch_delta_pq.repeat(N,1,1,1,1)
-            fit_points = up_flow.reshape(N,D,factor*factor,H,W)                                  # (1,2,factor*factor,H,W)
-            fit_points = torch.cat([patch_delta_pq,fit_points], dim=1)                           # (1,4,factor*factor,H,W)
-        else:
-            fit_points = None
         up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
-        return up_flow.reshape(N, D, factor*H, factor*W), fit_points
+        return up_flow.reshape(N, D, factor*H, factor*W)
 
 
     def forward(self, image1, image2, iters=12, flow_init=None, 
@@ -211,7 +189,6 @@ class RAFTStereo(nn.Module):
 
         flow_predictions = []
         flow_predictions_refine = []
-        raw_params_list = []
         params_list = []
         confidence_list = []
         offset_memory = []
@@ -221,7 +198,7 @@ class RAFTStereo(nn.Module):
             flow = coords1 - coords0
 
             with autocast(enabled=self.args.mixed_precision):
-                ## GRU-like exploration
+                ## first-stage geometry estimation
                 if self.args.n_gru_layers == 3 and self.args.slow_fast_gru: # Update low-res GRU
                     net_list = self.update_block(net_list, inp_list, iter32=True, iter16=False, iter08=False, update=False)
                 if self.args.n_gru_layers >= 2 and self.args.slow_fast_gru:# Update low-res GRU and mid-res GRU
@@ -246,68 +223,31 @@ class RAFTStereo(nn.Module):
                 confidence_list.append(confidence)
 
             # in stereo mode, project flow onto epipolar
-            if self.args.slant_builder is None and \
-               self.args.slant in ["slant", "slant_local"]:
-                delta_flow[:,1] = 0.0
-                delta_flow[:,3] = 0.0
-                delta_flow[:,5] = 0.0
-            else:
-                delta_flow[:,1] = 0.0
+            delta_flow[:,1] = 0.0
 
-            ## compute current position for following exploration
-            if self.args.slant_builder is not None or \
-               self.args.slant is None or len(self.args.slant)==0 :
-                offset = delta_flow
-            elif self.args.slant in ["slant", "slant_local"] :
-                # d = a*u + b*v + c
-                B,_,H,W = coords0.shape
-                if self.args.slant=="slant" :
-                    if self.args.slant_norm:
-                        norm_range = torch.Tensor([W,H])[None,:,None,None].float().to(coords0.device)
-                        offset = delta_flow[:,0:1] * coords0 / norm_range + \
-                                 delta_flow[:,2:3] * coords0[:,[1,0]] / norm_range[:,[1,0]] + \
-                                 delta_flow[:,4:5]
-                    else:
-                        offset = delta_flow[:,0:1] * coords0 + \
-                                 delta_flow[:,2:3] * coords0[:,[1,0]] + \
-                                 delta_flow[:,4:5]
-                elif self.args.slant=="slant_local" :
-                    offset = delta_flow[:,4:6]
-                
-                if len(raw_params_list)==0:
-                    raw_params_list.append(delta_flow)
-                else:
-                    raw_params_list.append(raw_params_list[-1].detach() + delta_flow)
-            else:
-                raise Exception(f"No such slant type {self.args.slant}")
             # F(t+1) = F(t) + \Delta(t)
-            coords1 = coords1 + offset
-            disparity = coords1 - coords0
+            coords1 = coords1 + delta_flow
+            flow = coords1 - coords0
 
             # We do not need to upsample or output intermediate results in test_mode
-            if test_mode and itr < iters-1 and \
-               self.args.slant_builder is None and \
-               (self.args.slant is None or len(self.args.slant)==0) and \
-               (self.args.refinement is None or len(self.args.refinement)==0 or not enable_refinement):
+            if test_mode:
                 continue
             
-            # upsample predictions
+            # upsample disparity map
             if up_mask is None:
-                flow_up = upflow8(disparity)
+                flow_up = upflow8(flow)
             else:
-                params = raw_params_list[-1] if self.args.slant_builder is None and \
-                                                self.args.slant in ["slant", "slant_local"] else None
-                flow_up, fit_points = self.upsample_flow(disparity, up_mask, params=params)
+                flow_up, img_coord = self.upsample_flow(flow, up_mask)
             flow_up = flow_up[:,:1]
             flow_predictions.append(flow_up)
 
-            # compute geometry
-            if self.args.slant_builder is not None and len(self.args.slant_builder)>0:
-                ab = self.geometry_builder(fit_points)
-                geo = torch.cat([disparity[:,:1],ab], dim=1)
-                raw_params_list.append(geo)
+            # second-stage geometry estimation
+            disparity = flow[:,:1]
+            if self.args.geo_estimator is not None and len(self.args.geo_estimator)>0:
+                geo_params = self.geometry_builder(img_coord, flow_up, disparity)
+                params_list.append(geo_params)
 
-            ## manifold geometry refinement
+            ## curvature-aware propagation
             disparity_refine = None
             if self.args.refinement is not None and len(self.args.refinement)>0 and enable_refinement:
                 if itr>=self.args.refine_start_itr:
@@ -320,27 +260,11 @@ class RAFTStereo(nn.Module):
             
             # upsample refinement
             if disparity_refine is not None:
-                if up_mask is None:
-                    flow_up_refine = upflow8(disparity_refine)
-                else:
-                    params = raw_params_list[-1] if self.args.slant in ["slant", "slant_local"] else None
-                    flow_up_refine, fit_points = self.upsample_flow(disparity_refine, up_mask, params=params)
+                flow_up_refine = self.upsample_geo(disparity_refine, up_mask, params=geo_params)
                 flow_up_refine = flow_up_refine[:,:1]
             else:
                 flow_up_refine = None
             flow_predictions_refine.append(flow_up_refine)
-
-            # upsample paramaters
-            if self.args.slant_builder is not None:
-                params_list = raw_params_list
-            elif self.args.slant is not None and len(self.args.slant)>0 and not test_mode:
-                # if up_mask is None:
-                #     params = upflow8(raw_params_list[-1])
-                # else:
-                #     params = self.upsample_flow(raw_params_list[-1], up_mask)
-                # params = torch.concat([params[:,0:1], params[:,2:3], params[:,4:5]], dim=1)
-                # params_list.append(params)
-                params_list = [torch.concat([params[:,0:1], params[:,2:3], params[:,4:5]], dim=1) for params in raw_params_list]
 
         if test_mode:
             if disparity_refine is not None:
