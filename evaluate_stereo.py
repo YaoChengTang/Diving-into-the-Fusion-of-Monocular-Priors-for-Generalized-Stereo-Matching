@@ -384,30 +384,30 @@ if __name__ == '__main__':
 
     if args.dataset == 'eth3d':
         if args.root is None:
-            args.root = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/ETH3D"
+            args.root = "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/ETH3D"
         validate_eth3d(model, iters=args.valid_iters, root=args.root, 
                        mixed_prec=use_mixed_precision)
 
     elif args.dataset == 'kitti':
         if args.root is None:
-            args.root = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/KITTI2015"
+            args.root = "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/KITTI2015"
         validate_kitti(model, iters=args.valid_iters, root=args.root, 
                        mixed_prec=use_mixed_precision)
     
     elif args.dataset == 'kitti2012':
         if args.root is None:
-            args.root = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/KITTI2012"
+            args.root = "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/KITTI2012"
         validate_kitti2012(model, iters=args.valid_iters, root=args.root, 
                            mixed_prec=use_mixed_precision)
 
     elif args.dataset in [f"middlebury_{s}" for s in 'FHQ']:
         if args.root is None:
-            args.root = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/Middlebury"
+            args.root = "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/Middlebury"
         validate_middlebury(model, iters=args.valid_iters, root=args.root, split=args.dataset[-1], 
                             mixed_prec=use_mixed_precision)
 
     elif args.dataset == 'things':
         if args.root is None:
-            args.root = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/Sceneflow"
+            args.root = "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/Sceneflow"
         validate_things(model, iters=args.valid_iters, root=args.root, 
                         mixed_prec=use_mixed_precision)

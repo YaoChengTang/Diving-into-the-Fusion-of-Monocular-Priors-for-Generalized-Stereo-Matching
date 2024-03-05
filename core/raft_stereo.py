@@ -15,7 +15,8 @@ from core.extractor import BasicEncoder, MultiBasicEncoder, ResidualBlock
 from core.corr import CorrBlock1D, PytorchAlternateCorrBlock1D, CorrBlockFast1D, AlternateCorrBlock
 from core.utils.utils import coords_grid, upflow8
 from core.confidence import OffsetConfidence
-from core.refinement import Geometry, Refinement, UpdateHistory
+from core.refinement import Refinement, UpdateHistory
+from core import geometry as GEO
 from core.utils.plane import get_pos, convert2patch, predict_disp
 
 
@@ -53,8 +54,10 @@ class RAFTStereo(nn.Module):
         if args.confidence:
             self.confidence_computer = OffsetConfidence(args)
 
-        if args.geo_estimator=="geometry":
-            self.geometry_builder = Geometry(args)
+        if args.geo_estimator=="geometry_mlp":
+            self.geometry_builder = GEO.Geometry_MLP(args)
+        elif args.geo_estimator=="geometry_conv":
+            self.geometry_builder = GEO.Geometry_Conv(args)
         
         if args.refinement is not None and len(args.refinement)>0:
             if self.args.slant is None or len(self.args.slant)==0 :
@@ -229,8 +232,9 @@ class RAFTStereo(nn.Module):
             coords1 = coords1 + delta_flow
             flow = coords1 - coords0
 
-            # We do not need to upsample or output intermediate results in test_mode
-            if test_mode:
+            # We do not need to upsample or output intermediate results in test_mode for raftStereo
+            if test_mode and \
+               (self.args.refinement is None or len(self.args.refinement)==0):
                 continue
             
             # upsample disparity map

@@ -305,7 +305,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_gru_layers', type=int, default=3, help="number of hidden GRU levels")
     parser.add_argument('--slant', type=str, default=None, help="use slanted stereo matching")
     parser.add_argument('--slant_norm', action='store_true', help="use normalization in slanted stereo matching")
-    parser.add_argument('--slant_builder', type=str, default=None, help="the builder used to compute geometry, None is default GRU")
+    parser.add_argument('--geo_estimator', type=str, default=None, help="the builder used to compute geometry, None is default GRU")
     parser.add_argument('--geo_fusion', type=str, default=None, help="the fusion used in geometry builder proposals")
     parser.add_argument('--confidence', action='store_true', help="use confidence learning")
     parser.add_argument('--offset_memory_size', type=int, default=2, help="size of offset memory in confidence learning")

@@ -96,20 +96,21 @@ def get_plane_lstsq(chs_coord, slant, patch_coord=None):
     chs_coord: B,C,patch_size*patch_size,H,W;
     mask: B,patch_size*patch_size,H,W;
     return:
-        abc: B,H*W,patch_size*patch_size;
+        cab: B,6,H,W; (disparity, a, b, g_uu, g_vv, g_uv)
     """
     # "slant": get a*u + b*v - d + c = 0 through least squares
     # "slant_local": a*(u-u_p) + b*(b-b_p) - (d-d_p) = 0
     B,C,L,H,W = chs_coord.shape
-    chs_coord = chs_coord.flatten(-2,-1).transpose(-2,-1)
+    chs_coord = chs_coord.flatten(-2,-1).transpose(-2,-1)                                       # (B,C,H*W,patch_size*patch_size)
     u_coord = chs_coord[:,0]
     v_coord = chs_coord[:,1]
     d_coord = chs_coord[:,2]
-    A = torch.stack((u_coord, v_coord, torch.ones_like(u_coord)), dim=3)
+    A = torch.stack((torch.ones_like(u_coord), u_coord, v_coord, 
+                    u_coord*u_coord/2, v_coord*v_coord/2, u_coord*v_coord), dim=3)              # (B,H*W,patch_size*patch_size,6)
 
     # print(chs_coord.shape, A.shape, d_coord.shape)
-    abc = torch.linalg.lstsq(A, d_coord).solution   # B,H*W,C
-    abc = abc.transpose(1,2).view((-1,3,H,W))
+    cab = torch.linalg.lstsq(A, d_coord).solution   # B,H*W,C
+    cab = cab.transpose(1,2).view((-1,6,H,W))
 
     # # A(B,N,P,C) X(B,N,C) Y(B,N,P)
     # # print("-"*10, A.shape, d_coord.shape, abc.shape)
@@ -123,11 +124,13 @@ def get_plane_lstsq(chs_coord, slant, patch_coord=None):
     # L, V = torch.linalg.eig(B)
     # print(L, V.shape)
 
-    return abc
+    return cab
 
 def extract_plane(disp,slant="slant", slant_norm=False, patch_size=4,thold=3,vis=False):
     """
     disp: B,1,H,W;
+    return:
+        cab: B,6,H,W; (disparity, a, b, g_uu, g_vv, g_uv)
     """
     # cluster through nearest search
     patch_pos = convert2patch(disp, patch_size=patch_size)
@@ -151,25 +154,50 @@ def extract_plane(disp,slant="slant", slant_norm=False, patch_size=4,thold=3,vis
 
     # "slant": get a*u + b*v - d + c = 0 through least squares
     # "slant_local": a*(u-u_p) + b*(b-b_p) - (d-d_p) = 0
-    abc = get_plane_lstsq(chs_coord, slant, patch_coord)
+    cab = get_plane_lstsq(chs_coord, slant, patch_coord)
     
     if vis:
-        return abc, mask
-    return abc
+        return cab, mask
+    return cab
 
-def predict_disp(abc, uv_coord, patch_size, mul_last=False):
+def predict_disp(cab, uv_coord, patch_size, mul_last=False):
     """
-    abc: B,3,H,W;
+    cab: B,6,H,W; (disparity, a, b, g_uu, g_vv, g_uv)
     uv_coord: B,2,patch_size*patch_size,H,W;
     """
     u_coord = uv_coord[:,0]
     v_coord = uv_coord[:,1]
-    A = torch.stack((u_coord, v_coord, torch.ones_like(u_coord)), dim=1)
-    d_coord = (A * abc.unsqueeze(dim=2)).sum(dim=1)
+    A = torch.stack((torch.ones_like(u_coord), u_coord, v_coord, 
+                    u_coord*u_coord/2, v_coord*v_coord/2, u_coord*v_coord), dim=1)      # (B,6,patch_size*patch_size,H,W)
+    d_coord = (A * cab.unsqueeze(dim=2)).sum(dim=1)
     if mul_last:
         d_coord *= patch_size
     # print(d_coord.shape)
     return d_coord
+
+def compute_curvature(cab):
+    """
+    cab: B,6,H,W; (disparity, a, b, g_uu, g_vv, g_uv)
+
+    """
+    B,C,H,W = cab.shape
+    hessian = torch.stack([cab[0,-3], cab[0,-1], cab[0,-1], cab[0,-2]],dim=-1).reshape(H,W,2,2)
+    eigen_val, eigen_vec = torch.linalg.eigh(hessian)
+    Gaussian_cur = eigen_val[...,0] * eigen_val[...,1]
+    mean_cur     = (eigen_val[...,0] + eigen_val[...,1]) / 2
+
+    Gaussian_cur = Gaussian_cur.abs()
+    mean_cur = mean_cur.abs()
+
+    Gaussian_cur[Gaussian_cur>0.03] = 0
+    mean_cur[mean_cur>0.01] = 0
+
+    Gaussian_cur = (Gaussian_cur - Gaussian_cur.min()) / (Gaussian_cur.max()-Gaussian_cur.min())
+    mean_cur = (mean_cur - mean_cur.min()) / (mean_cur.max()-mean_cur.min())
+
+    # print(Gaussian_cur[120, 170:180], mean_cur[120, 170:180], cab[0,-3:, 120, 170:180], sep="\r\n")
+
+    return Gaussian_cur, mean_cur
 
 
 if __name__ == '__main__':
@@ -178,8 +206,9 @@ if __name__ == '__main__':
     # slant_norm = True
     slant_norm = False
     patch_size = 4
-    disp_path = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/Sceneflow/flyingthings3d/disparity/TRAIN/A/0717/left/0006.pfm"
-    left_path = "/horizon-bucket/BasicAlgorithm/Users/chengtang.yao/Sceneflow/flyingthings3d/frames_cleanpass/TRAIN/A/0717/left/0006.png"
+    root = "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/Sceneflow"
+    disp_path = root+"/flyingthings3d/disparity/TRAIN/A/0717/left/0006.pfm"
+    left_path = root+"/flyingthings3d/frames_cleanpass/TRAIN/A/0717/left/0006.png"
     sv_path   = "./tmp.png"
 
     img0 = np.array(Image.open(left_path))
@@ -193,14 +222,15 @@ if __name__ == '__main__':
     img0 = torch.from_numpy(img0).permute((2,0,1)).unsqueeze(0)
 
     # extract planes a*u + b*v - d + c = 0
-    abc, mask = extract_plane(disp, 
+    # (B,6,H,W) ~ [disparity, u_coord, v_coord, g_uu, g_vv, g_uv]
+    cab, mask = extract_plane(disp, 
                         slant=slant, slant_norm=slant_norm,
                         patch_size=patch_size, thold=3, vis=True)
-    # print(abc.shape)
+    # print(cab.shape)
 
     uv_coord = get_pos(H,W, slant=slant, slant_norm=slant_norm, patch_size=patch_size)
     patch_uv_coord = convert2patch(uv_coord, patch_size=patch_size)
-    d_coord = predict_disp(abc, patch_uv_coord, patch_size=patch_size, mul_last=True)
+    d_coord = predict_disp(cab, patch_uv_coord, patch_size=patch_size, mul_last=True)
 
     patch_disp = convert2patch(disp, patch_size=patch_size, div_last=True)
     rec_disp = F.fold(d_coord.flatten(-2,-1), disp.shape[-2:], kernel_size=patch_size, stride=patch_size).view(1,1,H,W)
@@ -214,7 +244,7 @@ if __name__ == '__main__':
     # print(connect[0,:,test_v, test_u], mask[0,:,test_v, test_u], sep="\r\n")
 
     end_time = time.time()
-    print("cost time: {}".format(end_time-start_time), abc.shape)
+    print("cost time: {}".format(end_time-start_time), cab.shape)
 
     disp = disp.squeeze(0).squeeze(0).cpu().data.numpy()
     img0 = img0.squeeze(0).permute((1,2,0)).cpu().data.numpy()
@@ -225,7 +255,13 @@ if __name__ == '__main__':
     error_map = np.abs(rec_disp-disp)
     color_error_map = vis.colorize_error_map(error_map)
 
-    degree = torch.atan(abc[0,0] / abc[0,1])
+    # normals
+    degree = torch.atan(cab[0,1] / cab[0,2])
+
+    # curvatures
+    Gaussian_cur, mean_cur = compute_curvature(cab)
+    print("-"*10, Gaussian_cur.min(), Gaussian_cur.max(), Gaussian_cur.mean(), Gaussian_cur.median())
+    print("-"*10, mean_cur.min(), mean_cur.max(), mean_cur.mean(), mean_cur.median())
 
     atom_dict = [{"img":img0, "title":"Left Image", },
                 {"img":disp, "title":"GT Disparity", "cmap":'jet', },
@@ -234,11 +270,14 @@ if __name__ == '__main__':
                 {"img":rec_mask, "title":"rec_mask", "cmap": "gray"},
                 {"img":color_error_map, "title":"color_error_map", },
                 {"img":degree, "title":"GT ab", "cmap":'jet', },
-                {"img":abc[0,2], "title":"GT c", "cmap":'jet', },
+                {"img":cab[0,0], "title":"GT c", "cmap":'jet', },
+
+                {"img":Gaussian_cur.abs(), "title":"Gaussian curvature", "cmap":'jet', },
+                {"img":mean_cur.abs(), "title":"mean curvature", "cmap":'jet', },
                 ]
     
     if slant=="slant_local":
-        d_p = abc[0,-1]
+        d_p = cab[0,0]
         error_map = np.abs(d_p-patch_disp)
         color_error_map = vis.colorize_error_map(error_map)
         tmp_dict = [{"img":d_p, "title":"GT Disparity of Plane", "cmap":'jet', },
