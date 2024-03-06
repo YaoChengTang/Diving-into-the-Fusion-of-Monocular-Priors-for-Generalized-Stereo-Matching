@@ -271,7 +271,7 @@ class RAFTStereo(nn.Module):
             flow_predictions_refine.append(flow_up_refine)
 
         if test_mode:
-            if disparity_refine is not None:
+            if self.args.refinement is not None and len(self.args.refinement)>0 and enable_refinement:
                 return coords1 - coords0, flow_up_refine
             return coords1 - coords0, flow_up
 
