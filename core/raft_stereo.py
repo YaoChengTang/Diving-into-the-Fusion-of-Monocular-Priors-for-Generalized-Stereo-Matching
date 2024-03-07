@@ -233,7 +233,7 @@ class RAFTStereo(nn.Module):
             flow = coords1 - coords0
 
             # We do not need to upsample or output intermediate results in test_mode for raftStereo
-            if test_mode and \
+            if test_mode and itr < iters-1 and \
                (self.args.refinement is None or len(self.args.refinement)==0):
                 continue
             

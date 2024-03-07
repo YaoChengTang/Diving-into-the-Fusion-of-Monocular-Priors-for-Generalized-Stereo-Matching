@@ -16,5 +16,15 @@ python3 cluster_submit_mul_machine/url2IP.py
 cat /job_data/mpi_hosts
 dis_url=$(head -n +1 /job_data/mpi_hosts)
 
-python3 cluster_submit_mul_machine/ssh_launcher.py -num_machines 2 -num_gpus 4 \
+nnodes=$(wc -l /job_data/mpi_hosts | awk '{print $1}')
+echo "there are $nnodes machines"
+
+gpu_per_node=$(nvidia-smi --list-gpus | wc -l)
+echo "there are $gpu_per_node gpus in current machine"
+
+
+# python3 cluster_submit_mul_machine/ssh_launcher.py -num_machines 4 -num_gpus 4 \
+#     -host /job_data/mpi_hosts -ports 8000 bash cluster_submit_mul_machine/train_stereo_cloud_MulIP.sh
+
+python3 cluster_submit_mul_machine/ssh_launcher.py -num_machines "$nnodes" -num_gpus "$gpu_per_node" \
     -host /job_data/mpi_hosts -ports 8000 bash cluster_submit_mul_machine/train_stereo_cloud_MulIP.sh
