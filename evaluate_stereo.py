@@ -17,8 +17,9 @@ import stereo_datasets as datasets
 from utils.utils import InputPadder
 
 
-LOG_ROOT = os.getenv('LOG_ROOT', default="")
-LOG_PATH = os.path.join("logs" if LOG_ROOT is None or len(LOG_ROOT)==0 else LOG_ROOT, 
+NODE_RANK = os.getenv('NODE_RANK', default=0)
+LOG_ROOT  = os.getenv('LOG_ROOT', default="")
+LOG_PATH  = os.path.join("logs" if LOG_ROOT is None or len(LOG_ROOT)==0 else LOG_ROOT, 
                         '{}-{}.log'.format(os.path.basename(__file__), datetime.now().strftime("%y%m%d_%H%M%S")))
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -184,7 +185,7 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=
 
     out_list_1, epe_list = [], []
     out_list_2, out_list_3 = [], []
-    tqdm_disable = args is not None and args.local_rank>0
+    tqdm_disable = args is not None and args.local_rank>0 and NODE_RANK>0
     for val_id in tqdm(range(len(val_dataset)), disable=tqdm_disable):
         paths, image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
         image1 = image1[None].cuda()

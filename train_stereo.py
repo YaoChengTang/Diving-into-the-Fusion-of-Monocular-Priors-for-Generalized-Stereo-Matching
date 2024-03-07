@@ -17,6 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 sys.path.insert(0,'core')
 sys.path.insert(0,'core/utils')
 
+NODE_RANK    = os.getenv('NODE_RANK', default=0)
 LOG_ROOT     = os.getenv('LOG_ROOT', default="")
 TB_ROOT      = os.getenv('TB_ROOT', default="")
 CKPOINT_ROOT = os.getenv('CKPOINT_ROOT', default="")
@@ -112,12 +113,12 @@ class Logger:
 def train(args):
 
     model = get_model_ddp(args)
-    if args.local_rank==0 :
+    if args.local_rank==0 and NODE_RANK==0:
         logging.info("Parameter Count: %d" % count_parameters(model))
 
     train_loader = fetch_dataloader(args)
     optimizer, scheduler = fetch_optimizer(args, model)
-    if args.local_rank==0:
+    if args.local_rank==0 and NODE_RANK==0:
         logger = Logger(model, scheduler)
 
     model.cuda()
@@ -144,7 +145,7 @@ def train(args):
     global_batch_num = 0
     while should_keep_training:
         
-        for i_batch, (_, *data_blob) in enumerate(tqdm(train_loader, disable=args.local_rank>0)):
+        for i_batch, (_, *data_blob) in enumerate(tqdm(train_loader, disable=(args.local_rank>0 and NODE_RANK>0))):
             optimizer.zero_grad()
             image1, image2, flow, valid, plane_abc = [x.cuda() for x in data_blob]
 
@@ -163,7 +164,7 @@ def train(args):
                                     params_list=params_list, 
                                     imgL=image1, imgR=None, plane_abc=plane_abc)
             except Exception as err:
-                if args.local_rank==0:
+                if args.local_rank==0 and NODE_RANK==0:
                     debug_info = ""
                     n_predictions = len(flow_predictions)
                     for i in range(n_predictions):
@@ -179,7 +180,7 @@ def train(args):
                     logging.info(debug_info)
                 raise Exception(err)
 
-            if args.local_rank==0:
+            if args.local_rank==0 and NODE_RANK==0:
                 logger.push(metrics)
                 logger.writer.add_scalar("live_loss", loss.item(), global_batch_num)
                 logger.writer.add_scalar("live_flow_loss", flow_loss.item(), global_batch_num)
@@ -201,14 +202,14 @@ def train(args):
             scaler.update()
 
             if total_steps % validation_frequency == validation_frequency - 1:
-                if args.local_rank==0:
+                if args.local_rank==0 and NODE_RANK==0:
                     save_path = os.path.join(CKPOINT_ROOT, 
                                     'checkpoints/%d_%s.pth' % (total_steps + 1, args.name))
                     logging.info(f"Saving file {save_path}")
                     torch.save(model.state_dict(), save_path)
                 results = validate_things(model.module, iters=args.valid_iters, args=args)
 
-                if args.local_rank==0:
+                if args.local_rank==0 and NODE_RANK==0:
                     logger.write_dict(results)
 
                 model.train()
@@ -219,13 +220,13 @@ def train(args):
                 should_keep_training = False
                 break
 
-        if args.local_rank==0 and len(train_loader) >= 10000:
+        if args.local_rank==0 and NODE_RANK==0 and len(train_loader) >= 10000:
             save_path = os.path.join(CKPOINT_ROOT, 
                             'checkpoints/%d_epoch_%s.pth.gz' % (total_steps + 1, args.name))
             logging.info(f"Saving file {save_path}")
             torch.save(model.state_dict(), save_path)
 
-    if args.local_rank==0:
+    if args.local_rank==0 and NODE_RANK==0:
         logger.close()
         PATH = os.path.join(CKPOINT_ROOT, 'checkpoints/%s.pth' % args.name)
         torch.save(model.state_dict(), PATH)
@@ -235,7 +236,7 @@ def train(args):
 
 
 def init_directory(args):
-    if args.local_rank==0 :
+    if args.local_rank==0 and NODE_RANK==0 :
         if not os.path.exists( os.path.join(CKPOINT_ROOT, 'checkpoints') ):
             os.makedirs( os.path.join(CKPOINT_ROOT, 'checkpoints') )
 
