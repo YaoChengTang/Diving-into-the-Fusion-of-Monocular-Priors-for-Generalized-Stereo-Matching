@@ -191,7 +191,7 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=
 
     out_list_1, epe_list = [], []
     out_list_2, out_list_3 = [], []
-    tqdm_disable = args is not None and args.local_rank>0 and NODE_RANK>0
+    tqdm_disable = args is not None and args.local_rank>0 and int(NODE_RANK)>0
     for val_id in tqdm(range(len(val_dataset)), disable=tqdm_disable):
         paths, image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
         image1 = image1[None].cuda()

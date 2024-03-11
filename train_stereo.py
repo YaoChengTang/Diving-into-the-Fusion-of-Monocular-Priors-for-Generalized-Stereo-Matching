@@ -17,7 +17,8 @@ from torch.utils.tensorboard import SummaryWriter
 sys.path.insert(0,'core')
 sys.path.insert(0,'core/utils')
 
-NODE_RANK    = os.getenv('NODE_RANK', default=0)
+NODE_RANK    = int(os.getenv('NODE_RANK', default=0))
+node_rank    = int(NODE_RANK)
 LOG_ROOT     = os.getenv('LOG_ROOT', default="")
 TB_ROOT      = os.getenv('TB_ROOT', default="")
 CKPOINT_ROOT = os.getenv('CKPOINT_ROOT', default="")
@@ -111,19 +112,22 @@ class Logger:
 
 
 def train(args):
-
+    
     model = get_model_ddp(args)
-    if args.local_rank==0 and NODE_RANK==0:
+    if args.local_rank==0 and node_rank==0:
         logging.info("Parameter Count: %d" % count_parameters(model))
 
     train_loader = fetch_dataloader(args)
     optimizer, scheduler = fetch_optimizer(args, model)
-    if args.local_rank==0 and NODE_RANK==0:
+    if args.local_rank==0 and node_rank==0:
         logger = Logger(model, scheduler)
 
     model.cuda()
     model.train()
-    model.module.freeze_bn() # We keep BatchNorm frozen
+    if not args.stop_freeze_bn:
+        model.module.freeze_bn() # We keep BatchNorm frozen
+    else:
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
     myLoss = Loss(loss_gamma=0.9, max_flow=700, loss_zeta=0.5,
                     smoothness=args.loss_smooth, 
@@ -143,9 +147,11 @@ def train(args):
     total_steps = 0
     should_keep_training = True
     global_batch_num = 0
+
+    print("-"*10, type(args.local_rank), args.local_rank, type(node_rank), node_rank)
     while should_keep_training:
         
-        for i_batch, (_, *data_blob) in enumerate(tqdm(train_loader, disable=(args.local_rank>0 and NODE_RANK>0))):
+        for i_batch, (_, *data_blob) in enumerate(tqdm(train_loader, disable=(args.local_rank>0 and node_rank>0))):
             optimizer.zero_grad()
             image1, image2, flow, valid, plane_abc = [x.cuda() for x in data_blob]
 
@@ -164,7 +170,7 @@ def train(args):
                                     params_list=params_list, 
                                     imgL=image1, imgR=None, plane_abc=plane_abc)
             except Exception as err:
-                if args.local_rank==0 and NODE_RANK==0:
+                if args.local_rank==0 and node_rank==0:
                     debug_info = ""
                     n_predictions = len(flow_predictions)
                     for i in range(n_predictions):
@@ -180,7 +186,7 @@ def train(args):
                     logging.info(debug_info)
                 raise Exception(err)
 
-            if args.local_rank==0 and NODE_RANK==0:
+            if args.local_rank==0 and node_rank==0:
                 logger.push(metrics)
                 logger.writer.add_scalar("live_loss", loss.item(), global_batch_num)
                 logger.writer.add_scalar("live_flow_loss", flow_loss.item(), global_batch_num)
@@ -202,14 +208,14 @@ def train(args):
             scaler.update()
 
             if total_steps % validation_frequency == validation_frequency - 1:
-                if args.local_rank==0 and NODE_RANK==0:
+                if args.local_rank==0 and node_rank==0:
                     save_path = os.path.join(CKPOINT_ROOT, 
                                     'checkpoints/%d_%s.pth' % (total_steps + 1, args.name))
                     logging.info(f"Saving file {save_path}")
                     torch.save(model.state_dict(), save_path)
                 results = validate_things(model.module, iters=args.valid_iters, args=args)
 
-                if args.local_rank==0 and NODE_RANK==0:
+                if args.local_rank==0 and node_rank==0:
                     logger.write_dict(results)
 
                 model.train()
@@ -220,13 +226,13 @@ def train(args):
                 should_keep_training = False
                 break
 
-        if args.local_rank==0 and NODE_RANK==0 and len(train_loader) >= 10000:
+        if args.local_rank==0 and node_rank==0 and len(train_loader) >= 10000:
             save_path = os.path.join(CKPOINT_ROOT, 
                             'checkpoints/%d_epoch_%s.pth.gz' % (total_steps + 1, args.name))
             logging.info(f"Saving file {save_path}")
             torch.save(model.state_dict(), save_path)
 
-    if args.local_rank==0 and NODE_RANK==0:
+    if args.local_rank==0 and node_rank==0:
         logger.close()
         PATH = os.path.join(CKPOINT_ROOT, 'checkpoints/%s.pth' % args.name)
         torch.save(model.state_dict(), PATH)
@@ -236,7 +242,7 @@ def train(args):
 
 
 def init_directory(args):
-    if args.local_rank==0 and NODE_RANK==0 :
+    if args.local_rank==0 and node_rank==0 :
         if not os.path.exists( os.path.join(CKPOINT_ROOT, 'checkpoints') ):
             os.makedirs( os.path.join(CKPOINT_ROOT, 'checkpoints') )
 
@@ -287,6 +293,7 @@ if __name__ == '__main__':
     parser.add_argument('--refine_start_itr', type=int, default=3, help="start to do refinement at which iteration")
     parser.add_argument('--update_his', action='store_true', help="update history using refined disparity")
     parser.add_argument('--U_thold', type=float, default=0.98, help="thold used to filter out noise diaprity with uncertainty/confidence")
+    parser.add_argument('--stop_freeze_bn', action='store_true', help="stop freeze BN")
     
     # Loss parameters
     parser.add_argument('--loss_smooth', type=str, default=None, choices=["", "gradient", "curvature"], help="use smoothness loss")

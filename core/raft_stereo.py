@@ -81,7 +81,8 @@ class RAFTStereo(nn.Module):
                          f"geo estimator: {args.geo_estimator}, geo_fusion: {args.geo_fusion}, " +\
                          f"refine: {args.refinement}, refine_win_size: {args.refine_win_size}, num_heads:{args.num_heads}, " +\
                          f"split_win: {args.split_win}, refine_start_itr: {args.refine_start_itr}, " +\
-                         f"update_his: {args.update_his} U_thold: {args.U_thold}" )
+                         f"update_his: {args.update_his}, U_thold: {args.U_thold}, " +\
+                         f"stop_freeze_bn: {args.stop_freeze_bn}" )
 
     def freeze_bn(self):
         for m in self.modules():
