@@ -124,7 +124,7 @@ def validate_kitti(model, iters=32, root="", mixed_prec=False):
 
     avg_runtime = np.mean(elapsed_list)
 
-    logger.info(f"Validation KITTI: EPE {epe}, D1 {d1}, {format(1/avg_runtime, '.2f')}-FPS ({format(avg_runtime, '.3f')}s)")
+    logger.info(f"Validation KITTI: EPE {round(epe,4)}, D1 {round(d1,4)}, {format(1/avg_runtime, '.2f')}-FPS ({format(avg_runtime, '.3f')}s)")
     logger.info("\r\n"*3)
     return {'kitti-epe': epe, 'kitti-d1': d1}
 
@@ -177,7 +177,7 @@ def validate_kitti2012(model, iters=32, root="", mixed_prec=False):
 
     avg_runtime = np.mean(elapsed_list)
 
-    logger.info(f"Validation KITTI: EPE {epe}, D1 {d1}, {format(1/avg_runtime, '.2f')}-FPS ({format(avg_runtime, '.3f')}s)")
+    logger.info(f"Validation KITTI: EPE {round(epe,4)}, D1 {round(d1,4)}, {format(1/avg_runtime, '.2f')}-FPS ({format(avg_runtime, '.3f')}s)")
     logger.info("\r\n"*3)
     return {'kitti-epe': epe, 'kitti-d1': d1}
 
@@ -316,9 +316,9 @@ def validate_middlebury(model, iters=32, split='F', root="", mixed_prec=False):
     epe_mask = np.mean(epe_mask_list)
     d1_mask  = 100 * np.mean(out_mask_list)
 
-    logger.info(f"Validation Middlebury{split}: EPE {epe}, D1 {d1}, " + \
-                 f"EPE_nocc {epe_nocc}, D1_nocc {d1_nocc}, " + \
-                 f"EPE_mask {epe_mask} D1_mask {d1_mask}")
+    logger.info(f"Validation Middlebury{split}: EPE {round(epe,4)}, D1 {round(d1,4)}, " + \
+                 f"EPE_nocc {round(epe_nocc,4)}, D1_nocc {round(d1_nocc,4)}, " + \
+                 f"EPE_mask {round(epe_mask,4)} D1_mask {round(d1_mask,4)}")
     return {f'middlebury{split}-epe': epe, f'middlebury{split}-d1': d1}
 
 
@@ -371,7 +371,7 @@ if __name__ == '__main__':
 
     if args.restore_ckpt is not None:
         assert args.restore_ckpt.endswith(".pth") or args.restore_ckpt.endswith(".tar")
-        logger.info("Loading checkpoint...")
+        logger.info("Loading checkpoint from {args.restore_ckpt}")
         checkpoint = torch.load(args.restore_ckpt)
         model.load_state_dict(checkpoint, strict=True)
         logger.info(f"Done loading checkpoint")
