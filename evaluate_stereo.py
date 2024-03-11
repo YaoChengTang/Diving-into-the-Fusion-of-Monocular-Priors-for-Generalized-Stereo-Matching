@@ -71,7 +71,7 @@ def validate_eth3d(model, iters=32, root="", mixed_prec=False):
     epe = np.mean(epe_list)
     d1 = 100 * np.mean(out_list)
 
-    logger.info("Validation ETH3D: EPE %f, D1 %f" % (epe, d1))
+    logger.info("Validation ETH3D: EPE %f, D1 %f" % (round(epe,4), round(d1,4)))
     logger.info("\r\n"*3)
     return {'eth3d-epe': epe, 'eth3d-d1': d1}
 
