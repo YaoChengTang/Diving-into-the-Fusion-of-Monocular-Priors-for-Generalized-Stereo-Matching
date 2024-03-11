@@ -3,5 +3,6 @@ commits.bundle
 runs/
 checkpoints/
 logs/
+logs-raw/
 
 *.pyc

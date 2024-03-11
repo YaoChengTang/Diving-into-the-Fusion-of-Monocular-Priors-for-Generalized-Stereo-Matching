@@ -26,7 +26,9 @@ logging.basicConfig(level=logging.INFO,
                     handlers = [logging.FileHandler(LOG_PATH), 
                                 logging.StreamHandler()]
                    )
-
+logger = logging.getLogger("EVAL")
+logger.addHandler(logging.FileHandler(LOG_PATH))
+# logger.info("Hello~")
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -58,7 +60,7 @@ def validate_eth3d(model, iters=32, root="", mixed_prec=False):
         out = (epe_flattened > 1.0)
         image_out = out[val].float().mean().item()
         image_epe = epe_flattened[val].mean().item()
-        logging.info(f"ETH3D {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}" +\
+        logger.info(f"ETH3D {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}" +\
                      f"\r\n{imageL_file}")
         epe_list.append(image_epe)
         out_list.append(image_out)
@@ -69,7 +71,8 @@ def validate_eth3d(model, iters=32, root="", mixed_prec=False):
     epe = np.mean(epe_list)
     d1 = 100 * np.mean(out_list)
 
-    logging.info("Validation ETH3D: EPE %f, D1 %f" % (epe, d1))
+    logger.info("Validation ETH3D: EPE %f, D1 %f" % (epe, d1))
+    logger.info("\r\n"*3)
     return {'eth3d-epe': epe, 'eth3d-d1': d1}
 
 
@@ -121,7 +124,8 @@ def validate_kitti(model, iters=32, root="", mixed_prec=False):
 
     avg_runtime = np.mean(elapsed_list)
 
-    logging.info(f"Validation KITTI: EPE {epe}, D1 {d1}, {format(1/avg_runtime, '.2f')}-FPS ({format(avg_runtime, '.3f')}s)")
+    logger.info(f"Validation KITTI: EPE {epe}, D1 {d1}, {format(1/avg_runtime, '.2f')}-FPS ({format(avg_runtime, '.3f')}s)")
+    logger.info("\r\n"*3)
     return {'kitti-epe': epe, 'kitti-d1': d1}
 
 
@@ -173,7 +177,8 @@ def validate_kitti2012(model, iters=32, root="", mixed_prec=False):
 
     avg_runtime = np.mean(elapsed_list)
 
-    logging.info(f"Validation KITTI: EPE {epe}, D1 {d1}, {format(1/avg_runtime, '.2f')}-FPS ({format(avg_runtime, '.3f')}s)")
+    logger.info(f"Validation KITTI: EPE {epe}, D1 {d1}, {format(1/avg_runtime, '.2f')}-FPS ({format(avg_runtime, '.3f')}s)")
+    logger.info("\r\n"*3)
     return {'kitti-epe': epe, 'kitti-d1': d1}
 
 @torch.no_grad()
@@ -240,7 +245,8 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=
     bad2 = 100 * np.mean(out_list_2)
     bad3 = 100 * np.mean(out_list_3)
 
-    logging.info("Validation FlyingThings: %f, %f, %f, %f" % (epe, bad1, bad2, bad3))
+    logger.info("Validation FlyingThings: %f, %f, %f, %f" % (epe, bad1, bad2, bad3))
+    logger.info("\r\n"*3)
     return {'things-epe': epe, 'things-bad1': bad1, 'things-bad2': bad2, 'things-bad3': bad3}
 
 
@@ -284,7 +290,7 @@ def validate_middlebury(model, iters=32, split='F', root="", mixed_prec=False):
         image_epe_nocc = epe_flattened[val_nocc].mean().item()
         image_out_mask = (out[mask_analysis].float().sum() / val.sum()).item()
         image_epe_mask = (epe_flattened[mask_analysis].sum() / val.sum()).item()
-        logging.info(f"Middlebury Iter {val_id+1} out of {len(val_dataset)}. " + \
+        logger.info(f"Middlebury Iter {val_id+1} out of {len(val_dataset)}. " + \
                      f"EPE {round(image_epe,4)} D1 {round(image_out,4)} " + \
                      f"EPE_nocc {round(image_epe_nocc,4)} D1_nocc {round(image_out_nocc,4)} " + \
                      f"EPE_mask {round(image_epe_mask,4)} D1_mask {round(image_out_mask,4)} " + \
@@ -310,7 +316,7 @@ def validate_middlebury(model, iters=32, split='F', root="", mixed_prec=False):
     epe_mask = np.mean(epe_mask_list)
     d1_mask  = 100 * np.mean(out_mask_list)
 
-    logging.info(f"Validation Middlebury{split}: EPE {epe}, D1 {d1}, " + \
+    logger.info(f"Validation Middlebury{split}: EPE {epe}, D1 {d1}, " + \
                  f"EPE_nocc {epe_nocc}, D1_nocc {d1_nocc}, " + \
                  f"EPE_mask {epe_mask} D1_mask {d1_mask}")
     return {f'middlebury{split}-epe': epe, f'middlebury{split}-d1': d1}
@@ -363,20 +369,17 @@ if __name__ == '__main__':
 
     model = torch.nn.DataParallel(RAFTStereo(args), device_ids=[0])
 
-    logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
-
     if args.restore_ckpt is not None:
         assert args.restore_ckpt.endswith(".pth") or args.restore_ckpt.endswith(".tar")
-        logging.info("Loading checkpoint...")
+        logger.info("Loading checkpoint...")
         checkpoint = torch.load(args.restore_ckpt)
         model.load_state_dict(checkpoint, strict=True)
-        logging.info(f"Done loading checkpoint")
+        logger.info(f"Done loading checkpoint")
 
     model.cuda()
     model.eval()
 
-    logging.info(f"The model has {format(count_parameters(model)/1e6, '.2f')}M learnable parameters.")
+    logger.info(f"The model has {format(count_parameters(model)/1e6, '.2f')}M learnable parameters.")
 
     # The CUDA implementations of the correlation volume prevent half-precision
     # rounding errors in the correlation lookup. This allows us to use mixed precision
