@@ -8,6 +8,7 @@ import argparse
 import time
 import logging
 import numpy as np
+import pandas as pd
 import torch
 from tqdm import tqdm
 from datetime import datetime
@@ -18,8 +19,8 @@ from utils.utils import InputPadder
 
 
 NODE_RANK = os.getenv('NODE_RANK', default=0)
-LOG_ROOT  = os.getenv('LOG_ROOT', default="")
-LOG_PATH  = os.path.join("logs" if LOG_ROOT is None or len(LOG_ROOT)==0 else LOG_ROOT, 
+LOG_ROOT  = os.getenv('LOG_ROOT', default="logs")
+LOG_PATH  = os.path.join(LOG_ROOT, 
                         '{}-{}.log'.format(os.path.basename(__file__), datetime.now().strftime("%y%m%d_%H%M%S")))
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -73,7 +74,7 @@ def validate_eth3d(model, iters=32, root="", mixed_prec=False):
 
     logger.info("Validation ETH3D: EPE %f, D1 %f" % (round(epe,4), round(d1,4)))
     logger.info("\r\n"*3)
-    return {'eth3d-epe': epe, 'eth3d-d1': d1}
+    return {'eth3d-epe': round(epe,4), 'eth3d-d1': round(d1,4)}
 
 
 @torch.no_grad()
@@ -124,9 +125,9 @@ def validate_kitti(model, iters=32, root="", mixed_prec=False):
 
     avg_runtime = np.mean(elapsed_list)
 
-    logger.info(f"Validation KITTI: EPE {round(epe,4)}, D1 {round(d1,4)}, {format(1/avg_runtime, '.2f')}-FPS ({format(avg_runtime, '.3f')}s)")
+    logger.info(f"Validation KITTI: EPE {round(epe,4)}, D1 {round(d1,4)}, FPS {format(1/avg_runtime, '.2f')}, Time ({format(avg_runtime, '.3f')}s)")
     logger.info("\r\n"*3)
-    return {'kitti-epe': epe, 'kitti-d1': d1}
+    return {'kitti-epe': round(epe,4), 'kitti-d1': round(d1,4)}
 
 
 @torch.no_grad()
@@ -179,7 +180,7 @@ def validate_kitti2012(model, iters=32, root="", mixed_prec=False):
 
     logger.info(f"Validation KITTI: EPE {round(epe,4)}, D1 {round(d1,4)}, {format(1/avg_runtime, '.2f')}-FPS ({format(avg_runtime, '.3f')}s)")
     logger.info("\r\n"*3)
-    return {'kitti-epe': epe, 'kitti-d1': d1}
+    return {'kitti-epe': round(epe,4), 'kitti-d1': round(d1,4)}
 
 @torch.no_grad()
 def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=False):
@@ -245,9 +246,9 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=
     bad2 = 100 * np.mean(out_list_2)
     bad3 = 100 * np.mean(out_list_3)
 
-    logger.info("Validation FlyingThings: %f, %f, %f, %f" % (epe, bad1, bad2, bad3))
+    logger.info("Validation FlyingThings: %f, %f, %f, %f" % (round(epe,4), round(bad1), round(bad2), round(bad3)))
     logger.info("\r\n"*3)
-    return {'things-epe': epe, 'things-bad1': bad1, 'things-bad2': bad2, 'things-bad3': bad3}
+    return {'things-epe': round(epe), 'things-bad1': round(bad1), 'things-bad2': round(bad2), 'things-bad3': round(bad3)}
 
 
 @torch.no_grad()
@@ -318,8 +319,8 @@ def validate_middlebury(model, iters=32, split='F', root="", mixed_prec=False):
 
     logger.info(f"Validation Middlebury{split}: EPE {round(epe,4)}, D1 {round(d1,4)}, " + \
                  f"EPE_nocc {round(epe_nocc,4)}, D1_nocc {round(d1_nocc,4)}, " + \
-                 f"EPE_mask {round(epe_mask,4)} D1_mask {round(d1_mask,4)}")
-    return {f'middlebury{split}-epe': epe, f'middlebury{split}-d1': d1}
+                 f"EPE_mask {round(epe_mask,4)}, D1_mask {round(d1_mask,4)}")
+    return {f'middlebury{split}-epe': round(epe,4), f'middlebury{split}-d1': round(d1,4)}
 
 
 if __name__ == '__main__':
@@ -389,29 +390,50 @@ if __name__ == '__main__':
     if args.dataset == 'eth3d':
         if args.root is None:
             args.root = "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/ETH3D"
-        validate_eth3d(model, iters=args.valid_iters, root=args.root, 
-                       mixed_prec=use_mixed_precision)
+        res = validate_eth3d(model, iters=args.valid_iters, root=args.root, 
+                             mixed_prec=use_mixed_precision)
 
     elif args.dataset == 'kitti':
         if args.root is None:
             args.root = "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/KITTI2015"
-        validate_kitti(model, iters=args.valid_iters, root=args.root, 
-                       mixed_prec=use_mixed_precision)
+        res = validate_kitti(model, iters=args.valid_iters, root=args.root, 
+                             mixed_prec=use_mixed_precision)
     
     elif args.dataset == 'kitti2012':
         if args.root is None:
             args.root = "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/KITTI2012"
-        validate_kitti2012(model, iters=args.valid_iters, root=args.root, 
-                           mixed_prec=use_mixed_precision)
+        res = validate_kitti2012(model, iters=args.valid_iters, root=args.root, 
+                                 mixed_prec=use_mixed_precision)
 
     elif args.dataset in [f"middlebury_{s}" for s in 'FHQ']:
         if args.root is None:
             args.root = "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/Middlebury"
-        validate_middlebury(model, iters=args.valid_iters, root=args.root, split=args.dataset[-1], 
-                            mixed_prec=use_mixed_precision)
+        res = validate_middlebury(model, iters=args.valid_iters, root=args.root, split=args.dataset[-1], 
+                                  mixed_prec=use_mixed_precision)
 
     elif args.dataset == 'things':
         if args.root is None:
             args.root = "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/Sceneflow"
-        validate_things(model, iters=args.valid_iters, root=args.root, 
-                        mixed_prec=use_mixed_precision)
+        res = validate_things(model, iters=args.valid_iters, root=args.root, 
+                              mixed_prec=use_mixed_precision)
+    
+    
+    # write results into excel
+    res["Model"] = os.path.basename(args.restore_ckpt)
+    row = pd.DataFrame([res])
+    df = None
+    file_path = os.path.join(LOG_ROOT,"eval.xlsx")
+    if os.path.exists(file_path):
+        sheet_to_df_map = pd.read_excel(file_path, sheet_name=None)
+        if args.dataset in sheet_to_df_map:
+            df = sheet_to_df_map[args.dataset]
+    df_update = pd.concat([df,row])
+    
+    if not os.path.exists(file_path):
+        writer = pd.ExcelWriter(file_path, mode='w', engine="openpyxl")
+    else:
+        writer = pd.ExcelWriter(file_path, mode="a", engine="openpyxl", if_sheet_exists="replace")
+    df_update.to_excel(writer, sheet_name=args.dataset, index=False)
+    writer.close()
+
+
