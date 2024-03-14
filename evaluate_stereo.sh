@@ -24,5 +24,8 @@
 # CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft-stereo-4090-20240313-111146.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset eth3d
 
 
+CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft-stereo-a10_8_FreezeBN-20240313-110514.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset middlebury_H
+CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft-stereo-a10_8_FreezeBN-20240313-110514.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset kitti
+CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft-stereo-a10_8_FreezeBN-20240313-110514.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset eth3d
 
 python3 merge_sheet.py

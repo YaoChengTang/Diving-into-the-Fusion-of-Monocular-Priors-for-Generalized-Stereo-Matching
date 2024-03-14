@@ -373,7 +373,7 @@ if __name__ == '__main__':
 
     if args.restore_ckpt is not None:
         assert args.restore_ckpt.endswith(".pth") or args.restore_ckpt.endswith(".tar")
-        logger.info("Loading checkpoint from {args.restore_ckpt}")
+        logger.info(f"Loading checkpoint from {args.restore_ckpt}")
         checkpoint = torch.load(args.restore_ckpt)
         model.load_state_dict(checkpoint, strict=True)
         logger.info(f"Done loading checkpoint")
