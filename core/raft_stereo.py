@@ -58,6 +58,8 @@ class RAFTStereo(nn.Module):
             self.geometry_builder = GEO.Geometry_MLP(args)
         elif args.geo_estimator=="geometry_conv":
             self.geometry_builder = GEO.Geometry_Conv(args)
+        elif args.geo_estimator=="geometry_conv_split":
+            self.geometry_builder = GEO.Geometry_Conv_Split(args)
         
         if args.refinement is not None and len(args.refinement)>0:
             if self.args.slant is None or len(self.args.slant)==0 :

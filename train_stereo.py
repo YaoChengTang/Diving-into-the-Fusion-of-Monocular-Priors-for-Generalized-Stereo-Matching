@@ -148,7 +148,7 @@ def train(args):
     should_keep_training = True
     global_batch_num = 0
 
-    print("-"*10, type(args.local_rank), args.local_rank, type(node_rank), node_rank)
+    # print("-"*10, type(args.local_rank), args.local_rank, type(node_rank), node_rank)
     while should_keep_training:
         
         for i_batch, (_, *data_blob) in enumerate(tqdm(train_loader, disable=(args.local_rank>0 and node_rank>0))):

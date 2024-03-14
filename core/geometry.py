@@ -66,9 +66,44 @@ class Geometry_Conv(nn.Module):
         # img_coord: (1,2,H*factor,W*factor)
         # disparity_up: (1,1,H*factor,W*factor)
         # disparity: (1,1,H,W)
-        factor = 2 ** self.args.n_downsample
+        # factor = 2 ** self.args.n_downsample
         points = torch.cat([img_coord, disparity_up], dim=1)          # (1,3,factor*H,factor*W)
 
         rest_params = self.reg(points)                                   # (1,5,H,W)
         params = torch.cat([disparity,rest_params], dim=1)             # (1,6,H,W)
+        return params
+
+
+class Geometry_Conv_Split(nn.Module):
+    def __init__(self, args):
+        super(Geometry_Conv_Split, self).__init__()
+        self.args = args
+        self.encode = nn.Sequential(
+            nn.Conv2d(3, 4, kernel_size=3, padding=1, stride=1),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(4, 8, kernel_size=3, padding=1, stride=2),
+            nn.LeakyReLU(inplace=True),
+        )
+        self.decode_plane = nn.Sequential(
+            nn.Conv2d(8, 4, kernel_size=3, padding=1, stride=2),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(4, 2, kernel_size=1, padding=0, stride=1),
+        )
+        self.decode_curvature = nn.Sequential(
+            nn.Conv2d(8, 4, kernel_size=3, padding=1, stride=2),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(4, 3, kernel_size=1, padding=0, stride=1),
+        )
+        
+    def forward(self, img_coord, disparity_up, disparity):
+        # img_coord: (1,2,H*factor,W*factor)
+        # disparity_up: (1,1,H*factor,W*factor)
+        # disparity: (1,1,H,W)
+        # factor = 2 ** self.args.n_downsample
+        points = torch.cat([img_coord, disparity_up], dim=1)          # (1,3,factor*H,factor*W)
+
+        latten = self.encode(points)                                  # (1,8,factor*H/2,factor*W/2)
+        plane_ab = self.decode_plane(latten)                          # (1,2,H,W)
+        hessian_g = self.decode_curvature(latten)                     # (1,3,H,W)
+        params = torch.cat([disparity,plane_ab,hessian_g], dim=1)     # (1,6,H,W)
         return params
