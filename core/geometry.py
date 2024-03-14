@@ -17,7 +17,7 @@ from core.utils.plane import convert2patch
 
 class Geometry_MLP(nn.Module):
     def __init__(self, args):
-        super(Geometry, self).__init__()
+        super(Geometry_MLP, self).__init__()
         self.args = args
         self.reg = nn.Sequential(
             nn.Linear(3,3),
