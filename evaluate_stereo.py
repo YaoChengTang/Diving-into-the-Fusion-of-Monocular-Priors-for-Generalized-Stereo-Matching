@@ -13,23 +13,17 @@ import torch
 from tqdm import tqdm
 from datetime import datetime
 
-from raft_stereo import RAFTStereo, autocast
+from core.raft_stereo import RAFTStereo, autocast
 import stereo_datasets as datasets
-from utils.utils import InputPadder
+from core.utils.utils import InputPadder, LoggerCommon
 
 
-NODE_RANK = os.getenv('NODE_RANK', default=0)
-LOG_ROOT  = os.getenv('LOG_ROOT', default="logs")
-LOG_PATH  = os.path.join(LOG_ROOT, 
-                        '{}-{}.log'.format(os.path.basename(__file__), datetime.now().strftime("%y%m%d_%H%M%S")))
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
-                    handlers = [logging.FileHandler(LOG_PATH), 
-                                logging.StreamHandler()]
-                   )
-logger = logging.getLogger("EVAL")
-logger.addHandler(logging.FileHandler(LOG_PATH))
-# logger.info("Hello~")
+NODE_RANK    = os.getenv('NODE_RANK', default=0)
+LOCAL_RANK   = os.getenv("LOCAL_RANK", default=0)
+LOG_ROOT     = os.getenv('LOG_ROOT', default="logs")
+
+logger = LoggerCommon("EVAL")
+
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -113,7 +107,7 @@ def validate_kitti(model, iters=32, root="", mixed_prec=False):
         image_out = out[val].float().mean().item()
         image_epe = epe_flattened[val].mean().item()
         if val_id < 9 or (val_id+1)%10 == 0:
-            logging.info(f"KITTI Iter {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}. Runtime: {format(end-start, '.3f')}s ({format(1/(end-start), '.2f')}-FPS)")
+            logger.info(f"KITTI Iter {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}. Runtime: {format(end-start, '.3f')}s ({format(1/(end-start), '.2f')}-FPS)")
         epe_list.append(epe_flattened[val].mean().item())
         out_list.append(out[val].cpu().numpy())
 
@@ -166,7 +160,7 @@ def validate_kitti2012(model, iters=32, root="", mixed_prec=False):
         image_out = out[val].float().mean().item()
         image_epe = epe_flattened[val].mean().item()
         if val_id < 9 or (val_id+1)%10 == 0:
-            logging.info(f"KITTI Iter {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}. Runtime: {format(end-start, '.3f')}s ({format(1/(end-start), '.2f')}-FPS)")
+            logger.info(f"KITTI Iter {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}. Runtime: {format(end-start, '.3f')}s ({format(1/(end-start), '.2f')}-FPS)")
         epe_list.append(epe_flattened[val].mean().item())
         out_list.append(out[val].cpu().numpy())
 
@@ -191,7 +185,7 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=
 
     out_list_1, epe_list = [], []
     out_list_2, out_list_3 = [], []
-    tqdm_disable = args is not None and args.local_rank>0 and int(NODE_RANK)>0
+    tqdm_disable = args is not None and (args.silence or args.local_rank>0 or int(NODE_RANK)>0)
     for val_id in tqdm(range(len(val_dataset)), disable=tqdm_disable):
         paths, image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
         image1 = image1[None].cuda()
@@ -231,7 +225,7 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=
         if not eval and val_id>10:
             break
         
-        logging.info(f"FlyingThings Iter {val_id+1} out of {len(val_dataset)}. " + \
+        logger.info(f"FlyingThings Iter {val_id+1} out of {len(val_dataset)}. " + \
                      f"EPE {round(image_epe,4)}, BAD1 {round(image_out_1,4)}, " +\
                      f"BAD2 {round(image_out_2,4)}, BAD3 {round(image_out_3,4)} ")
         
@@ -331,6 +325,7 @@ if __name__ == '__main__':
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--valid_iters', type=int, default=32, help='number of flow-field updates during forward pass')
     parser.add_argument('--eval', action='store_true', help='evaluation mode')
+    parser.add_argument('--silence', action='store_true', help='no output of training/eval process')
 
     # Architecure choices
     parser.add_argument('--hidden_dims', nargs='+', type=int, default=[128]*3, help="hidden state and context dimensions")

@@ -1,7 +1,12 @@
-import torch
-import torch.nn.functional as F
+import os
+import sys
+import logging
 import numpy as np
 from scipy import interpolate
+from datetime import datetime
+
+import torch
+import torch.nn.functional as F
 
 
 class InputPadder:
@@ -118,3 +123,98 @@ def disparity_computation(params, slant=None, slant_norm=False, coords0=None):
     else:
         raise Exception(f"{slant} is not supported")
     return offset
+
+
+
+NODE_RANK    = os.getenv('NODE_RANK', default=0)
+LOCAL_RANK   = os.getenv("LOCAL_RANK", default=0)
+LOG_ROOT     = os.getenv('LOG_ROOT', default="logs")
+TB_ROOT      = os.getenv('TB_ROOT', default="runs")
+
+class LoggerCommon:
+    def __init__(self, name):
+        LOG_PATH = os.path.join(LOG_ROOT, 
+                                '{}-{}.log'.format(name, datetime.now().strftime("%y%m%d_%H%M%S")))
+        if int(LOCAL_RANK)==0 and int(NODE_RANK)==0:
+            logging.basicConfig(level=logging.INFO,
+                                format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
+                                handlers = [logging.FileHandler(LOG_PATH), 
+                                            logging.StreamHandler()]
+                            )
+            self.logger = logging.getLogger(name)
+            self.logger.addHandler(logging.FileHandler(LOG_PATH))
+    
+    def info(self, message):
+        if int(LOCAL_RANK)==0 and int(NODE_RANK)==0:
+            self.logger.info(message)
+    
+    def warning(self, message):
+        if int(LOCAL_RANK)==0 and int(NODE_RANK)==0:
+            self.logger.warning(message)
+    
+    def error(self, message):
+        if int(LOCAL_RANK)==0 and int(NODE_RANK)==0:
+            self.logger.error(message)
+    
+    def exception(self, message):
+        if int(LOCAL_RANK)==0 and int(NODE_RANK)==0:
+            self.logger.exception(message)
+
+
+from torch.utils.tensorboard import SummaryWriter
+
+class LoggerTraining(LoggerCommon):
+
+    SUM_FREQ = 100
+
+    def __init__(self, name, model=None, scheduler=None):
+        super(LoggerTraining, self).__init__(name)
+
+        self.model = model
+        self.scheduler = scheduler
+        self.silence = False
+        self.total_steps = 0
+        self.running_loss = {}
+        self.writer = SummaryWriter(log_dir=TB_ROOT)
+    
+    def set_training(self, model, scheduler):
+        self.model = model
+        self.scheduler = scheduler
+    
+    def _print_training_status(self):
+        metrics_data = [self.running_loss[k]/LoggerTraining.SUM_FREQ for k in sorted(self.running_loss.keys())]
+        training_str = "[{:6d}, {:10.7f}] ".format(self.total_steps+1, self.scheduler.get_last_lr()[0])
+        metrics_str = ("{:10.4f}, "*len(metrics_data)).format(*metrics_data)
+        
+        # print the training status
+        self.info(f"Training Metrics ({self.total_steps}): {training_str + metrics_str}")
+
+        if self.writer is None:
+            self.writer = SummaryWriter(log_dir=TB_ROOT)
+
+        for k in self.running_loss:
+            self.writer.add_scalar(k, self.running_loss[k]/LoggerTraining.SUM_FREQ, self.total_steps)
+            self.running_loss[k] = 0.0
+
+    def push(self, metrics):
+        self.total_steps += 1
+
+        for key in metrics:
+            if key not in self.running_loss:
+                self.running_loss[key] = 0.0
+
+            self.running_loss[key] += metrics[key]
+
+        if self.total_steps % LoggerTraining.SUM_FREQ == LoggerTraining.SUM_FREQ-1:
+            self._print_training_status()
+            self.running_loss = {}
+
+    def write_dict(self, results):
+        if self.writer is None:
+            self.writer = SummaryWriter(log_dir=TB_ROOT)
+
+        for key in results:
+            self.writer.add_scalar(key, results[key], self.total_steps)
+
+    def close(self):
+        self.writer.close()

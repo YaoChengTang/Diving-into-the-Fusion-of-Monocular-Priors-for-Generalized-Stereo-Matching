@@ -2,9 +2,7 @@ import os
 import sys
 import logging
 import numpy as np
-
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',)
+from datetime import datetime
 
 import torch
 import torch.nn as nn
@@ -13,12 +11,13 @@ import torch.nn.functional as F
 from core.update import BasicMultiUpdateBlock
 from core.extractor import BasicEncoder, MultiBasicEncoder, ResidualBlock
 from core.corr import CorrBlock1D, PytorchAlternateCorrBlock1D, CorrBlockFast1D, AlternateCorrBlock
-from core.utils.utils import coords_grid, upflow8
+from core.utils.utils import coords_grid, upflow8, LoggerCommon
 from core.confidence import OffsetConfidence
 from core.refinement import Refinement, UpdateHistory
 from core import geometry as GEO
 from core.utils.plane import get_pos, convert2patch, predict_disp
 
+logger = LoggerCommon("ARCHI")
 
 try:
     autocast = torch.cuda.amp.autocast
@@ -75,16 +74,15 @@ class RAFTStereo(nn.Module):
         if self.args.update_his:
             self.update_hist = UpdateHistory(args, 128, dim_disp)
 
-        if "local_rank" not in args or args.local_rank==0 :
-            logging.info(f"RAFTStereo ~ " +\
-                         f"Confidence: {args.confidence}, offset_memory_size: {args.offset_memory_size}, " +\
-                         f"offset_memory_last_iter: {args.offset_memory_last_iter}, " +\
-                         f"slant: {args.slant}, slant_norm: {args.slant_norm}, " +\
-                         f"geo estimator: {args.geo_estimator}, geo_fusion: {args.geo_fusion}, " +\
-                         f"refine: {args.refinement}, refine_win_size: {args.refine_win_size}, num_heads:{args.num_heads}, " +\
-                         f"split_win: {args.split_win}, refine_start_itr: {args.refine_start_itr}, " +\
-                         f"update_his: {args.update_his}, U_thold: {args.U_thold}, " +\
-                         f"stop_freeze_bn: {args.stop_freeze_bn}" )
+        logger.info(f"RAFTStereo ~ " +\
+                    f"Confidence: {args.confidence}, offset_memory_size: {args.offset_memory_size}, " +\
+                    f"offset_memory_last_iter: {args.offset_memory_last_iter}, " +\
+                    f"slant: {args.slant}, slant_norm: {args.slant_norm}, " +\
+                    f"geo estimator: {args.geo_estimator}, geo_fusion: {args.geo_fusion}, " +\
+                    f"refine: {args.refinement}, refine_win_size: {args.refine_win_size}, num_heads:{args.num_heads}, " +\
+                    f"split_win: {args.split_win}, refine_start_itr: {args.refine_start_itr}, " +\
+                    f"update_his: {args.update_his}, U_thold: {args.U_thold}, " +\
+                    f"stop_freeze_bn: {args.stop_freeze_bn}" )
 
     def freeze_bn(self):
         for m in self.modules():

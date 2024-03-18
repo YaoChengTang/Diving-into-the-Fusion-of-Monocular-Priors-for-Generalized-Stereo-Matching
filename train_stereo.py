@@ -12,26 +12,24 @@ from datetime import datetime
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.tensorboard import SummaryWriter
 
 sys.path.insert(0,'core')
 sys.path.insert(0,'core/utils')
 
-NODE_RANK    = int(os.getenv('NODE_RANK', default=0))
-node_rank    = int(NODE_RANK)
-LOG_ROOT     = os.getenv('LOG_ROOT', default="")
+NODE_RANK    = os.getenv('NODE_RANK', default=0)
+LOCAL_RANK   = os.getenv("LOCAL_RANK", default=0)
+LOG_ROOT     = os.getenv('LOG_ROOT', default="logs")
 TB_ROOT      = os.getenv('TB_ROOT', default="")
 CKPOINT_ROOT = os.getenv('CKPOINT_ROOT', default="")
-logging.basicConfig(filename=os.path.join("logs" if LOG_ROOT is None or len(LOG_ROOT)==0 else LOG_ROOT, 
-                                          'log-{}.log'.format(datetime.now().strftime("%y%m%d_%H%M%S"))), 
-                    level=logging.INFO,
-                    format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
 
 from evaluate_stereo import *
 from core.loss import Loss
 from core.raft_stereo import RAFTStereo
 from core.stereo_datasets import fetch_dataloader
 from core.utils.ddp import ddp_init, ddp_close, get_model_ddp
+from core.utils.utils import LoggerTraining
+
+logger = LoggerTraining("TRAIN", None, None)
 
 try:
     from torch.cuda.amp import GradScaler
@@ -61,73 +59,20 @@ def fetch_optimizer(args, model):
     return optimizer, scheduler
 
 
-class Logger:
-
-    SUM_FREQ = 100
-
-    def __init__(self, model, scheduler):
-        self.model = model
-        self.scheduler = scheduler
-        self.total_steps = 0
-        self.running_loss = {}
-        self.writer = SummaryWriter(log_dir='runs' if TB_ROOT is None or len(TB_ROOT)==0 else TB_ROOT)
-
-    def _print_training_status(self):
-        metrics_data = [self.running_loss[k]/Logger.SUM_FREQ for k in sorted(self.running_loss.keys())]
-        training_str = "[{:6d}, {:10.7f}] ".format(self.total_steps+1, self.scheduler.get_last_lr()[0])
-        metrics_str = ("{:10.4f}, "*len(metrics_data)).format(*metrics_data)
-        
-        # print the training status
-        logging.info(f"Training Metrics ({self.total_steps}): {training_str + metrics_str}")
-
-        if self.writer is None:
-            self.writer = SummaryWriter(log_dir='runs' if TB_ROOT is None or len(TB_ROOT)==0 else TB_ROOT)
-
-        for k in self.running_loss:
-            self.writer.add_scalar(k, self.running_loss[k]/Logger.SUM_FREQ, self.total_steps)
-            self.running_loss[k] = 0.0
-
-    def push(self, metrics):
-        self.total_steps += 1
-
-        for key in metrics:
-            if key not in self.running_loss:
-                self.running_loss[key] = 0.0
-
-            self.running_loss[key] += metrics[key]
-
-        if self.total_steps % Logger.SUM_FREQ == Logger.SUM_FREQ-1:
-            self._print_training_status()
-            self.running_loss = {}
-
-    def write_dict(self, results):
-        if self.writer is None:
-            self.writer = SummaryWriter(log_dir='runs' if TB_ROOT is None or len(TB_ROOT)==0 else TB_ROOT)
-
-        for key in results:
-            self.writer.add_scalar(key, results[key], self.total_steps)
-
-    def close(self):
-        self.writer.close()
-
-
 def train(args):
     
     model = get_model_ddp(args)
-    if args.local_rank==0 and node_rank==0:
-        logging.info("Parameter Count: %d" % count_parameters(model))
 
     train_loader = fetch_dataloader(args)
     optimizer, scheduler = fetch_optimizer(args, model)
-    if args.local_rank==0 and node_rank==0:
-        logger = Logger(model, scheduler)
+    
+    logger.set_training(model, scheduler)
+    logger.info("Parameter Count: %d" % count_parameters(model))
 
     model.cuda()
     model.train()
     if not args.stop_freeze_bn:
         model.module.freeze_bn() # We keep BatchNorm frozen
-    else:
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
     myLoss = Loss(loss_gamma=0.9, max_flow=700, loss_zeta=0.5,
                     smoothness=args.loss_smooth, 
@@ -139,7 +84,7 @@ def train(args):
                     args=args)
     device  = torch.device("cuda", args.local_rank)
     myLoss  = myLoss.to(device)
-                    
+
     validation_frequency = 10000
 
     scaler = GradScaler(enabled=args.mixed_precision)
@@ -147,11 +92,11 @@ def train(args):
     total_steps = 0
     should_keep_training = True
     global_batch_num = 0
+    tqdm_disable = args is not None and (args.silence or args.local_rank>0 or int(NODE_RANK)>0)
 
-    # print("-"*10, type(args.local_rank), args.local_rank, type(node_rank), node_rank)
     while should_keep_training:
         
-        for i_batch, (_, *data_blob) in enumerate(tqdm(train_loader, disable=(args.local_rank>0 and node_rank>0))):
+        for i_batch, (_, *data_blob) in enumerate(tqdm(train_loader, disable=tqdm_disable)):
             optimizer.zero_grad()
             image1, image2, flow, valid, plane_abc = [x.cuda() for x in data_blob]
 
@@ -170,7 +115,7 @@ def train(args):
                                     params_list=params_list, 
                                     imgL=image1, imgR=None, plane_abc=plane_abc)
             except Exception as err:
-                if args.local_rank==0 and node_rank==0:
+                if args.local_rank==0 and int(NODE_RANK)==0:
                     debug_info = ""
                     n_predictions = len(flow_predictions)
                     for i in range(n_predictions):
@@ -183,10 +128,10 @@ def train(args):
                             debug_info += f" NAN found in parameter: {name}"
                         if param.requires_grad and torch.isinf(param).any():
                             debug_info += f" INF found in parameter: {name}"
-                    logging.info(debug_info)
+                    logging.exception(debug_info)
                 raise Exception(err)
 
-            if args.local_rank==0 and node_rank==0:
+            if args.local_rank==0 and int(NODE_RANK)==0:
                 logger.push(metrics)
                 logger.writer.add_scalar("live_loss", loss.item(), global_batch_num)
                 logger.writer.add_scalar("live_flow_loss", flow_loss.item(), global_batch_num)
@@ -208,14 +153,14 @@ def train(args):
             scaler.update()
 
             if total_steps % validation_frequency == validation_frequency - 1:
-                if args.local_rank==0 and node_rank==0:
+                if args.local_rank==0 and int(NODE_RANK)==0:
                     save_path = os.path.join(CKPOINT_ROOT, 
                                     'checkpoints/%d_%s.pth' % (total_steps + 1, args.name))
-                    logging.info(f"Saving file {save_path}")
+                    logger.info(f"Saving file {save_path}")
                     torch.save(model.state_dict(), save_path)
                 results = validate_things(model.module, iters=args.valid_iters, args=args)
 
-                if args.local_rank==0 and node_rank==0:
+                if args.local_rank==0 and int(NODE_RANK)==0:
                     logger.write_dict(results)
 
                 model.train()
@@ -226,13 +171,13 @@ def train(args):
                 should_keep_training = False
                 break
 
-        if args.local_rank==0 and node_rank==0 and len(train_loader) >= 10000:
+        if args.local_rank==0 and int(NODE_RANK)==0 and len(train_loader) >= 10000:
             save_path = os.path.join(CKPOINT_ROOT, 
                             'checkpoints/%d_epoch_%s.pth.gz' % (total_steps + 1, args.name))
-            logging.info(f"Saving file {save_path}")
+            logger.info(f"Saving file {save_path}")
             torch.save(model.state_dict(), save_path)
 
-    if args.local_rank==0 and node_rank==0:
+    if args.local_rank==0 and int(NODE_RANK)==0:
         logger.close()
         PATH = os.path.join(CKPOINT_ROOT, 'checkpoints/%s.pth' % args.name)
         torch.save(model.state_dict(), PATH)
@@ -242,7 +187,7 @@ def train(args):
 
 
 def init_directory(args):
-    if args.local_rank==0 and node_rank==0 :
+    if args.local_rank==0 and int(NODE_RANK)==0 :
         if not os.path.exists( os.path.join(CKPOINT_ROOT, 'checkpoints') ):
             os.makedirs( os.path.join(CKPOINT_ROOT, 'checkpoints') )
 
@@ -253,6 +198,7 @@ if __name__ == '__main__':
     parser.add_argument('--restore_ckpt', help="restore checkpoint")
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--eval', action='store_true', help='evaluation mode')
+    parser.add_argument('--silence', action='store_true', help='no output of training/eval process')
 
     # Training parameters
     parser.add_argument('--batch_size', type=int, default=6, help="batch size used during training.")

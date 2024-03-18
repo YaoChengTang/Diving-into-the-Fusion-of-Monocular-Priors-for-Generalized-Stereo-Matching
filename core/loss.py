@@ -8,7 +8,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from core.utils.utils import coords_grid, disparity_computation
+from core.utils.utils import LoggerCommon
 
+logger = LoggerCommon("LOSS")
 
 try:
     autocast = torch.cuda.amp.autocast
@@ -45,12 +47,11 @@ class Loss(nn.Module):
                                                    kernel_size=ner_kernel_size,
                                                    ner_weight_reduce=ner_weight_reduce)
         
-        if local_rank==0 :
-            logging.info(f"smoothness: {smoothness}, " +\
-                         f"slant: {slant}, slant_norm: {slant_norm}, " +\
-                         f"ner_kernel_size: {ner_kernel_size}, " +\
-                         f"ner_weight_reduce: {ner_weight_reduce}, " +\
-                         f"conf_disp: {self.conf_disp}. " )
+        logger.info(f"smoothness: {smoothness}, " +\
+                    f"slant: {slant}, slant_norm: {slant_norm}, " +\
+                    f"ner_kernel_size: {ner_kernel_size}, " +\
+                    f"ner_weight_reduce: {ner_weight_reduce}, " +\
+                    f"conf_disp: {self.conf_disp}. " )
     
     def forward(self, flow_preds, flow_preds_refine, flow_gt, valid, global_batch_num,
                 confidence_list=None, params_list=None, imgL=None, imgR=None, plane_abc=None):
