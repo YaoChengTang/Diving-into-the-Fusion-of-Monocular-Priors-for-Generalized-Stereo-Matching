@@ -373,25 +373,28 @@ class Refinement(nn.Module):
             self.propagation_2_2 = SwinTransformerBlock(args, dim_fea, dim_disp, self.args.num_heads, 
                                         window_size=rev_win_size, shift_size=rev_shift_size,)
         
-    def forward(self, disparity, fea, confidence=None, if_shift=False):
+    def forward(self, geo_params, fea, confidence=None, if_shift=False):
         if type(fea) is list:
             fea = torch.cat(fea, dim=1)
         guidance = self.patch_embed(fea.detach() if self.detach else fea)
+
         if confidence is not None :
             uncertainty = F.sigmoid(confidence.detach())
             uncertainty = uncertainty.masked_fill(uncertainty>self.args.U_thold, float(-100.0)).masked_fill(uncertainty<=self.args.U_thold, float(0.0))
             reliability = uncertainty.detach()
         else:
             reliability = None
+
         if not if_shift:
-            disparity_refine = self.propagation_1(disparity.detach(), guidance, reliability)
+            geo_params_refine = self.propagation_1(geo_params.detach(), guidance, reliability)
             if self.args.split_win:
-                disparity_refine = self.propagation_1_2(disparity_refine, guidance, reliability)
+                geo_params_refine = self.propagation_1_2(geo_params_refine, guidance, reliability)
         else:
-            disparity_refine = self.propagation_2(disparity.detach(), guidance, reliability)
+            geo_params_refine = self.propagation_2(geo_params.detach(), guidance, reliability)
             if self.args.split_win:
-                disparity_refine = self.propagation_2_2(disparity_refine, guidance, reliability)
-        return disparity_refine
+                geo_params_refine = self.propagation_2_2(geo_params_refine, guidance, reliability)
+        
+        return geo_params_refine
     
     
 class UpdateHistory(nn.Module):

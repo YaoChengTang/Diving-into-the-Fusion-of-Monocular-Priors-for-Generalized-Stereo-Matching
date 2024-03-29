@@ -62,9 +62,9 @@ class RAFTStereo(nn.Module):
         
         if args.refinement is not None and len(args.refinement)>0:
             if self.args.slant is None or len(self.args.slant)==0 :
-                dim_disp = 2
+                dim_disp = 1
             elif self.args.slant in ["slant", "slant_local"] :
-                dim_disp = 2*3
+                dim_disp = 6
 
             if args.refinement.lower()=="refinement":
                 self.refine = Refinement(args, in_chans=256, dim_fea=96, dim_disp=dim_disp)
@@ -252,6 +252,8 @@ class RAFTStereo(nn.Module):
             if self.args.geo_estimator is not None and len(self.args.geo_estimator)>0:
                 geo_params = self.geometry_builder(img_coord, flow_up, disparity)
                 params_list.append(geo_params)
+            else:
+                geo_params = disparity
 
             ## curvature-aware propagation
             disparity_refine = None
