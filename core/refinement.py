@@ -357,6 +357,7 @@ class Refinement(nn.Module):
     def __init__(self, args, in_chans, dim_fea, dim_disp):
         super(Refinement, self).__init__()
         self.args = args
+        self.detach = args.detach_in_refinement
         self.window_size = to_2tuple(args.refine_win_size)
         self.shift_size  = (self.window_size[0]//2, self.window_size[1]//2)
         self.patch_embed = nn.Conv2d(in_chans, dim_fea, kernel_size=3, stride=1, padding=1)
@@ -372,12 +373,10 @@ class Refinement(nn.Module):
             self.propagation_2_2 = SwinTransformerBlock(args, dim_fea, dim_disp, self.args.num_heads, 
                                         window_size=rev_win_size, shift_size=rev_shift_size,)
         
-        # if "local_rank" not in args or args.local_rank==0 :
-        #     logging.info(f"OffsetConfidence: " + \
-        #                  f"detach: {args.detach_in_confidence}")
-
     def forward(self, disparity, fea, confidence=None, if_shift=False):
-        guidance = self.patch_embed(fea)
+        if type(fea) is list:
+            fea = torch.cat(fea, dim=1)
+        guidance = self.patch_embed(fea.detach() if self.detach else fea)
         if confidence is not None :
             uncertainty = F.sigmoid(confidence.detach())
             uncertainty = uncertainty.masked_fill(uncertainty>self.args.U_thold, float(-100.0)).masked_fill(uncertainty<=self.args.U_thold, float(0.0))
@@ -401,10 +400,6 @@ class UpdateHistory(nn.Module):
         self.conv = nn.Conv2d(in_chans2, in_chans2, kernel_size=1, stride=1, padding=0)
         self.update = nn.Sequential(nn.Conv2d(in_chans1+in_chans2, in_chans1, kernel_size=3, stride=1, padding=1),)
         
-        # if "local_rank" not in args or args.local_rank==0 :
-        #     logging.info(f"OffsetConfidence: " + \
-        #                  f"detach: {args.detach_in_confidence}")
-
     def forward(self, his, disp):
         hist_update = self.update( torch.cat([his,self.conv(disp)], dim=1) )
         return hist_update

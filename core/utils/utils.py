@@ -159,6 +159,16 @@ class LoggerCommon:
     def exception(self, message):
         if int(LOCAL_RANK)==0 and int(NODE_RANK)==0:
             self.logger.exception(message)
+    
+    def print_args(self, args):
+        msg = ""
+        args_dict = vars(args)
+        max_arg_length = max(len(arg_name) for arg_name in args_dict.keys())
+        for arg_name, arg_value in args_dict.items():
+            arg_name_padded = arg_name.ljust(max_arg_length)
+            msg += f"{arg_name_padded}: {arg_value}\r\n"
+        self.info(msg)
+        
 
 
 from torch.utils.tensorboard import SummaryWriter

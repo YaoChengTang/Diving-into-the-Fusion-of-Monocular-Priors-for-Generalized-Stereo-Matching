@@ -13,3 +13,4 @@ dependencies:
   - imageio
   - scikit-image
   - p7zip
+  - pandas

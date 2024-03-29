@@ -33,6 +33,8 @@ class OffsetConfidence(nn.Module):
                          f"detach: {args.detach_in_confidence}")
 
     def forward(self, fea, offset_memory):
+        if type(fea) is list:
+            fea = torch.cat(fea, dim=1)
         context = self.conv_fea(fea.detach() if self.detach else fea)
         offset_memory = torch.cat([offset.detach() if self.detach else offset for offset in offset_memory], dim=1)
         confidence = self.conv_offset( -offset_memory )

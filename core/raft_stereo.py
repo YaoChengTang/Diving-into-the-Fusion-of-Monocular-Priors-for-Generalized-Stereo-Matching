@@ -194,6 +194,7 @@ class RAFTStereo(nn.Module):
         flow_predictions = []
         flow_predictions_refine = []
         params_list = []
+        params_list_refine = []
         confidence_list = []
         offset_memory = []
         for itr in range(iters):
@@ -221,7 +222,7 @@ class RAFTStereo(nn.Module):
                             start_itr = self.args.offset_memory_last_iter - self.args.offset_memory_size
                             end_itr   = self.args.offset_memory_last_iter
                             input_offset_mem = offset_memory[start_itr:end_itr]
-                        confidence = self.confidence_computer(fmap1, input_offset_mem)
+                        confidence = self.confidence_computer(inp_list[0], input_offset_mem)
                 else:
                     confidence = None
                 confidence_list.append(confidence)
@@ -256,12 +257,15 @@ class RAFTStereo(nn.Module):
             disparity_refine = None
             if self.args.refinement is not None and len(self.args.refinement)>0 and enable_refinement:
                 if itr>=self.args.refine_start_itr:
-                    disparity_refine = self.refine(disparity, fmap1, confidence, 
+                    geo_params_refine = self.refine(geo_params, inp_list[0], confidence, 
                                             if_shift=(itr-self.args.refine_start_itr)%2>0)
-                    coords1 = coords0 + disparity_refine
+                    coords1 = coords0 + geo_params_refine[:,:1]
+                    params_list_refine.append(geo_params_refine)
 
                     if self.args.update_his:
                         net_list[0] = self.update_hist(net_list[0], disparity_refine)
+                else:
+                    params_list_refine.append(None)
             
             # upsample refinement
             if disparity_refine is not None:
