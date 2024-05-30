@@ -111,6 +111,9 @@ def get_loader(dataset, args):
                                   drop_last=True)
     return data_loader
 
+NODE_RANK    = os.getenv('NODE_RANK', default=0)
+LOCAL_RANK   = os.getenv("LOCAL_RANK", default=0)
+
 def get_model_ddp(args):
     model  = nn.SyncBatchNorm.convert_sync_batchnorm(RAFTStereo(args))
     device = torch.device("cuda", args.local_rank)

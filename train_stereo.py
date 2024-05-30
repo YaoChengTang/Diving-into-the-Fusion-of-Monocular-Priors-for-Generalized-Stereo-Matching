@@ -101,19 +101,24 @@ def train(args):
             image1, image2, flow, valid, plane_abc = [x.cuda() for x in data_blob]
 
             assert model.training
-            flow_predictions, flow_predictions_refine, \
-            confidence_list, params_list = model(image1, image2, iters=args.train_iters,
-                                                 enable_refinement=total_steps>args.enable_refine_step)
+            flow_predictions, disp_predictions, disp_predictions_refine, \
+            confidence_list, params_list, params_list_refine = model(image1, image2, iters=args.train_iters,
+                                                                     enable_refinement=total_steps>args.enable_refine_step)
             assert model.training
 
             try:
                 loss, metrics, \
-                flow_loss, confidence_loss, \
+                flow_loss, disp_loss, disp_refine_loss, confidence_loss, \
                 smooth_loss, \
-                params_loss = myLoss(flow_predictions, flow_predictions_refine, flow, valid, global_batch_num,
-                                    confidence_list=confidence_list,
-                                    params_list=params_list, 
-                                    imgL=image1, imgR=None, plane_abc=plane_abc)
+                params_loss, params_refine_loss = myLoss(flow_predictions, flow, valid, 
+                                                        disp_predictions=disp_predictions, 
+                                                        disp_predictions_refine=disp_predictions_refine, 
+                                                        confidence_list=confidence_list,
+                                                        params_list=params_list, 
+                                                        params_list_refine=params_list_refine,
+                                                        imgL=image1, imgR=None, 
+                                                        plane_abc=plane_abc, 
+                                                        global_batch_num=global_batch_num)
             except Exception as err:
                 if args.local_rank==0 and int(NODE_RANK)==0:
                     debug_info = ""
@@ -141,6 +146,12 @@ def train(args):
                     logger.writer.add_scalar("live_smooth_loss", smooth_loss.item(), global_batch_num)
                 if params_loss>0:
                     logger.writer.add_scalar("params_loss", params_loss.item(), global_batch_num)
+                if params_refine_loss>0:
+                    logger.writer.add_scalar("params_refine_loss", params_refine_loss.item(), global_batch_num)
+                if disp_loss>0:
+                    logger.writer.add_scalar("disp_loss", disp_loss.item(), global_batch_num)
+                if disp_refine_loss>0:
+                    logger.writer.add_scalar("disp_refine_loss", disp_refine_loss.item(), global_batch_num)
                 logger.writer.add_scalar(f'learning_rate', optimizer.param_groups[0]['lr'], global_batch_num)
             
             global_batch_num += 1

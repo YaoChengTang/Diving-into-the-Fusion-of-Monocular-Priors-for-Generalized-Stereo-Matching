@@ -192,7 +192,8 @@ class RAFTStereo(nn.Module):
             coords1 = coords1 + flow_init
 
         flow_predictions = []
-        flow_predictions_refine = []
+        disp_predictions = []
+        disp_predictions_refine = []
         params_list = []
         params_list_refine = []
         confidence_list = []
@@ -203,7 +204,7 @@ class RAFTStereo(nn.Module):
             flow = coords1 - coords0
 
             with autocast(enabled=self.args.mixed_precision):
-                ## first-stage geometry estimation
+                ## first-stage in geometry estimation
                 if self.args.n_gru_layers == 3 and self.args.slow_fast_gru: # Update low-res GRU
                     net_list = self.update_block(net_list, inp_list, iter32=True, iter16=False, iter08=False, update=False)
                 if self.args.n_gru_layers >= 2 and self.args.slow_fast_gru:# Update low-res GRU and mid-res GRU
@@ -247,35 +248,37 @@ class RAFTStereo(nn.Module):
             flow_up = flow_up[:,:1]
             flow_predictions.append(flow_up)
 
-            # second-stage geometry estimation
+            # second-stage in geometry estimation
+            geo_params = None
             disparity = flow[:,:1]
             if self.args.geo_estimator is not None and len(self.args.geo_estimator)>0:
                 geo_params = self.geometry_builder(img_coord, flow_up, disparity)
-                params_list.append(geo_params)
-            else:
-                geo_params = disparity
+                
+                disp_up = self.upsample_geo(disparity, up_mask, params=geo_params)
+                disp_up = disp_up[:,:1]
+            params_list.append(geo_params)
+            disp_predictions.append(disp_up)
 
             ## curvature-aware propagation
             disparity_refine = None
+            geo_params_refine = None
             if self.args.refinement is not None and len(self.args.refinement)>0 and enable_refinement:
                 if itr>=self.args.refine_start_itr:
                     geo_params_refine = self.refine(geo_params, inp_list[0], confidence, 
                                             if_shift=(itr-self.args.refine_start_itr)%2>0)
                     coords1 = coords0 + geo_params_refine[:,:1]
-                    params_list_refine.append(geo_params_refine)
-
+                    disparity_refine = geo_params_refine[:,:1]
+                    ### update hidden state
                     if self.args.update_his:
                         net_list[0] = self.update_hist(net_list[0], disparity_refine)
-                else:
-                    params_list_refine.append(None)
+            params_list_refine.append(geo_params_refine)
             
             # upsample refinement
+            disp_up_refine = None
             if disparity_refine is not None:
-                flow_up_refine = self.upsample_geo(disparity_refine, up_mask, params=geo_params)
-                flow_up_refine = flow_up_refine[:,:1]
-            else:
-                flow_up_refine = None
-            flow_predictions_refine.append(flow_up_refine)
+                disp_up_refine = self.upsample_geo(disparity_refine, up_mask, params=geo_params_refine)
+                disp_up_refine = disp_up_refine[:,:1]
+            disp_predictions_refine.append(disp_up_refine)
 
         if test_mode:
             if self.args.refinement is not None and len(self.args.refinement)>0 and enable_refinement:
@@ -283,6 +286,6 @@ class RAFTStereo(nn.Module):
             return coords1 - coords0, flow_up
 
         if vis_mode:
-            return flow_predictions, flow_predictions_refine, confidence_list
+            return flow_predictions, disp_predictions, disp_predictions_refine, confidence_list
 
-        return flow_predictions, flow_predictions_refine, confidence_list, params_list
+        return flow_predictions, disp_predictions, disp_predictions_refine, confidence_list, params_list, params_list_refine

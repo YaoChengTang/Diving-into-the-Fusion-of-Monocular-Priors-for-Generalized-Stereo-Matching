@@ -53,16 +53,23 @@ class Loss(nn.Module):
                     f"ner_weight_reduce: {ner_weight_reduce}, " +\
                     f"conf_disp: {self.conf_disp}. " )
     
-    def forward(self, flow_preds, flow_preds_refine, flow_gt, valid, global_batch_num,
-                confidence_list=None, params_list=None, imgL=None, imgR=None, plane_abc=None):
+    def forward(self, flow_preds, flow_gt, valid, 
+                disp_preds=None, disp_preds_refine=None, 
+                confidence_list=None, 
+                params_list=None, params_list_refine=None,  
+                plane_abc=None, 
+                imgL=None, imgR=None, 
+                global_batch_num=None,):
         """ Loss function defined over sequence of flow predictions """
         n_predictions = len(flow_preds)
         assert n_predictions >= 1
         flow_loss = 0.0
-        refine_loss = 0.0
+        disp_loss = 0.0
+        disp_refine_loss = 0.0
         smooth_loss = 0.0
         confidence_loss = 0.0
         params_loss = 0.0
+        params_refine_loss = 0.0
 
         # exlude invalid pixels and extremely large diplacements
         mag = torch.sum(flow_gt**2, dim=1).sqrt()
@@ -95,23 +102,33 @@ class Loss(nn.Module):
                                                                             gt_conf, reduction='none')
                     confidence_loss += i_weight * tmp_confidence_loss.mean()
 
-            # disprity loss
+            # flow loss
             i_loss = (flow_preds[i] - flow_gt).abs()
             if self.conf_disp and global_batch_num>3 and confidence_list[i] is not None:
                 weight = F.interpolate(confidence_list[i],scale_factor=4,mode='bilinear')
                 i_loss = i_loss * (F.sigmoid(weight.detach()/3)*1.5 + 1)
             assert i_loss.shape == valid.shape, [i_loss.shape, valid.shape, flow_gt.shape, flow_preds[i].shape]
             flow_loss += i_weight * i_loss[valid.bool()].mean()
+
+            # disparity loss
+            if disp_preds is not None and len(disp_preds)>0 and disp_preds[i] is not None:
+                disp_loss = (disp_preds[i] - flow_gt).abs()
+                disp_loss += i_weight * disp_loss[valid.bool()].mean()
             
             # plane loss
-            if len(params_list)>0 and plane_abc is not None and plane_abc.shape[1]==3:
+            if params_list is not None and len(params_list)>0 and plane_abc is not None and plane_abc.shape[1]==3:
                 # print("~"*30, params_list[-1].shape, plane_abc.shape)
                 params_loss += i_weight * 0.5 * (params_list[i] - plane_abc).abs().mean()
 
             # refinement loss
-            if len(flow_preds_refine)>0 and flow_preds_refine[i] is not None:
-                disp_refine_loss = (flow_preds_refine[i] - flow_gt).abs()
-                refine_loss += i_weight * disp_refine_loss[valid.bool()].mean()
+            if disp_preds_refine is not None and len(disp_preds_refine)>0 and disp_preds_refine[i] is not None:
+                disp_refine_loss = (disp_preds_refine[i] - flow_gt).abs()
+                disp_refine_loss += i_weight * disp_refine_loss[valid.bool()].mean()
+            
+            # plane loss
+            if params_list_refine is not None and len(params_list_refine)>0 and plane_abc is not None and plane_abc.shape[1]==3:
+                # print("~"*30, params_list_refine[-1].shape, plane_abc.shape)
+                params_refine_loss += i_weight * 0.5 * (params_list_refine[i] - plane_abc).abs().mean()
 
             if i>n_predictions//2:
                 with autocast(enabled=self.mixed_precision):
@@ -130,18 +147,25 @@ class Loss(nn.Module):
             '5px': (epe < 5).float().mean().item(),
         }
 
-        if len(flow_preds_refine)>0 and flow_preds_refine[-1] is not None:
-            epe_refine = torch.sum((flow_preds_refine[-1] - flow_gt)**2, dim=1).sqrt()
-            epe_refine = epe_refine.view(-1)[valid.view(-1)]
-            metrics.update({'epe_refine': epe_refine.mean().item(),
-                            '3px_refine': (epe_refine < 3).float().mean().item(),})
+        if disp_preds is not None and len(disp_preds)>0 and disp_preds[-1] is not None:
+            epe = torch.sum((disp_preds[-1] - flow_gt)**2, dim=1).sqrt()
+            epe = epe.view(-1)[valid.view(-1)]
+            metrics.update({'epe_disp': epe.mean().item(),
+                            '3px_disp': (epe < 3).float().mean().item(),})
+        
+        if disp_preds_refine is not None and len(disp_preds_refine)>0 and disp_preds_refine[-1] is not None:
+            epe = torch.sum((disp_preds_refine[-1] - flow_gt)**2, dim=1).sqrt()
+            epe = epe.view(-1)[valid.view(-1)]
+            metrics.update({'epe_disp_refine': epe.mean().item(),
+                            '3px_disp_refine': (epe < 3).float().mean().item(),})
 
         if self.smoothness is not None and len(self.smoothness)>0:
-            loss = flow_loss + params_loss + refine_loss + confidence_loss + self.loss_zeta * smooth_loss
+            loss = flow_loss + disp_loss + params_loss + disp_refine_loss + params_refine_loss + confidence_loss + self.loss_zeta * smooth_loss
         else:
-            loss = flow_loss + params_loss + refine_loss + confidence_loss
+            loss = flow_loss + disp_loss + params_loss + disp_refine_loss + params_refine_loss + confidence_loss
             smooth_loss = torch.Tensor([0.0]).to(flow_loss.device)
-        return loss, metrics, flow_loss, confidence_loss, smooth_loss, params_loss
+        
+        return loss, metrics, flow_loss, disp_loss, disp_refine_loss, confidence_loss, smooth_loss, params_loss, params_refine_loss
 
 
 class SmoothLoss(nn.Module):
