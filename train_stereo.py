@@ -111,8 +111,8 @@ def train(args):
                 flow_loss, disp_loss, disp_refine_loss, confidence_loss, \
                 smooth_loss, \
                 params_loss, params_refine_loss = myLoss(flow_predictions, flow, valid, 
-                                                        disp_predictions=disp_predictions, 
-                                                        disp_predictions_refine=disp_predictions_refine, 
+                                                        disp_preds=disp_predictions, 
+                                                        disp_preds_refine=disp_predictions_refine, 
                                                         confidence_list=confidence_list,
                                                         params_list=params_list, 
                                                         params_list_refine=params_list_refine,

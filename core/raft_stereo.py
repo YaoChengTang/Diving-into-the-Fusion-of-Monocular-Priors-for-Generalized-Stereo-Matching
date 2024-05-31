@@ -121,36 +121,30 @@ class RAFTStereo(nn.Module):
         up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
         return up_flow.reshape(N, D, factor*H, factor*W), img_coord
     
-    def upsample_geo(self, flow, mask, params=None):
+    def upsample_geo(self, mask, params):
         """ Upsample flow field [H/8, W/8, 2] -> [H, W, 2] using convex combination """
-        N, D, H, W = flow.shape
+        N, D, H, W = params.shape
         factor = 2 ** self.args.n_downsample
         mask = mask.view(N, 1, 9, factor, factor, H, W)
-        mask = torch.softmax(mask, dim=2)
+        mask = torch.softmax(mask, dim=2)                                                        # (B,1,9,factor,factor,H,W)
 
         # d_p = a_q\cdot\Delta u_{q\to p} + b_q\cdot\Delta v_{q\to p} + d_q
         delta_pq = get_pos(H*factor, W*factor, disp=None,
                             slant=self.args.slant,
                             slant_norm=self.args.slant_norm,
                             patch_size=factor,
-                            device=flow.device)                                                # (1,2,H*factor,W*factor)
-        patch_delta_pq = convert2patch(delta_pq, patch_size=factor, div_last=False).detach() # (1,2,factor*factor,H,W)
-        a_p, a_p_flow, \
-        b_p, b_p_flow, \
-        d_p, d_p_flow  = torch.split(params, 1, dim=1)              # (B,1,H,W)
-        abd      = torch.cat([a_p, b_p, d_p], dim=1)                # (B,3,H,W)
-        abd_flow = torch.cat([a_p_flow, b_p_flow, d_p_flow], dim=1) # (B,3,H,W)
-        d_coord      = predict_disp(abd, patch_delta_pq, patch_size=factor, mul_last=True)      # (B,factor*factor,H,W)
-        d_coord_flow = predict_disp(abd_flow, patch_delta_pq, patch_size=factor, mul_last=True) # (B,factor*factor,H,W)
-        up_flow      = torch.stack([d_coord, d_coord_flow], dim=1)                              # (B,2,factor*factor,H,W)
-        up_flow      = up_flow.view(N, 2*factor*factor, H, W)                                   # (B,2*factor*factor,H,W)
-        up_flow      = F.unfold(up_flow, [3,3], padding=1)                                      # (B,2*factor*factor*9,H,W)
-        up_flow      = up_flow.view(N, 2, factor, factor, 9, H, W)                              # (B,2,factor,factor,9,H,W)
-        up_flow      = up_flow.permute((0,1,4,2,3,5,6))                                         # (B,2,9,factor,factor,H,W)
+                            device=params.device)                                                # (1,2,H*factor,W*factor)
+        patch_delta_pq = convert2patch(delta_pq, patch_size=factor, div_last=False).detach()     # (1,2,factor*factor,H,W)
 
-        up_flow = torch.sum(mask * up_flow, dim=2)
-        up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
-        return up_flow.reshape(N, D, factor*H, factor*W)
+        disp = predict_disp(params, patch_delta_pq, patch_size=factor, mul_last=True)            # (B,factor*factor,H,W)
+        
+        disp = F.unfold(disp, [3,3], padding=1)                                                  # (B,factor*factor*9,H,W)
+        disp = disp.view(N, 1, factor, factor, 9, H, W)                                          # (B,1,factor,factor,9,H,W)
+        disp = disp.permute((0,1,4,2,3,5,6))                                                     # (B,1,9,factor,factor,H,W)
+
+        disp = torch.sum(mask * disp, dim=2)                                                     # (B,1,factor,factor,H,W)
+        disp = disp.permute(0, 1, 4, 2, 5, 3)                                                    # (B,1,H,factor,W,factor)
+        return disp.reshape(N, 1, factor*H, factor*W)
 
 
     def forward(self, image1, image2, iters=12, flow_init=None, 
@@ -254,7 +248,7 @@ class RAFTStereo(nn.Module):
             if self.args.geo_estimator is not None and len(self.args.geo_estimator)>0:
                 geo_params = self.geometry_builder(img_coord, flow_up, disparity)
                 
-                disp_up = self.upsample_geo(disparity, up_mask, params=geo_params)
+                disp_up = self.upsample_geo(up_mask, params=geo_params)
                 disp_up = disp_up[:,:1]
             params_list.append(geo_params)
             disp_predictions.append(disp_up)
@@ -275,8 +269,8 @@ class RAFTStereo(nn.Module):
             
             # upsample refinement
             disp_up_refine = None
-            if disparity_refine is not None:
-                disp_up_refine = self.upsample_geo(disparity_refine, up_mask, params=geo_params_refine)
+            if geo_params_refine is not None:
+                disp_up_refine = self.upsample_geo(up_mask, params=geo_params_refine)
                 disp_up_refine = disp_up_refine[:,:1]
             disp_predictions_refine.append(disp_up_refine)
 

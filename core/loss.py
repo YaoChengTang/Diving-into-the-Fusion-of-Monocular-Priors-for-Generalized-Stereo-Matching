@@ -112,23 +112,25 @@ class Loss(nn.Module):
 
             # disparity loss
             if disp_preds is not None and len(disp_preds)>0 and disp_preds[i] is not None:
-                disp_loss = (disp_preds[i] - flow_gt).abs()
-                disp_loss += i_weight * disp_loss[valid.bool()].mean()
+                i_loss = (disp_preds[i] - flow_gt).abs()
+                disp_loss += i_weight * i_loss[valid.bool()].mean()
             
             # plane loss
             if params_list is not None and len(params_list)>0 and plane_abc is not None and plane_abc.shape[1]==3:
                 # print("~"*30, params_list[-1].shape, plane_abc.shape)
-                params_loss += i_weight * 0.5 * (params_list[i] - plane_abc).abs().mean()
+                i_loss = (params_list[i] - plane_abc).abs()
+                params_loss += i_weight * 0.5 * i_loss.mean()
 
             # refinement loss
             if disp_preds_refine is not None and len(disp_preds_refine)>0 and disp_preds_refine[i] is not None:
-                disp_refine_loss = (disp_preds_refine[i] - flow_gt).abs()
-                disp_refine_loss += i_weight * disp_refine_loss[valid.bool()].mean()
+                i_loss = (disp_preds_refine[i] - flow_gt).abs()
+                disp_refine_loss += i_weight * i_loss[valid.bool()].mean()
             
             # plane loss
             if params_list_refine is not None and len(params_list_refine)>0 and plane_abc is not None and plane_abc.shape[1]==3:
                 # print("~"*30, params_list_refine[-1].shape, plane_abc.shape)
-                params_refine_loss += i_weight * 0.5 * (params_list_refine[i] - plane_abc).abs().mean()
+                i_loss = (params_list_refine[i] - plane_abc).abs()
+                params_refine_loss += i_weight * 0.5 * i_loss.mean()
 
             if i>n_predictions//2:
                 with autocast(enabled=self.mixed_precision):
