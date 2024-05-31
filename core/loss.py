@@ -112,7 +112,7 @@ class Loss(nn.Module):
 
             # disparity loss
             if disp_preds is not None and len(disp_preds)>0 and disp_preds[i] is not None:
-                i_loss = (disp_preds[i] - flow_gt).abs()
+                i_loss = (-disp_preds[i] - flow_gt).abs()
                 disp_loss += i_weight * i_loss[valid.bool()].mean()
             
             # plane loss
@@ -123,7 +123,7 @@ class Loss(nn.Module):
 
             # refinement loss
             if disp_preds_refine is not None and len(disp_preds_refine)>0 and disp_preds_refine[i] is not None:
-                i_loss = (disp_preds_refine[i] - flow_gt).abs()
+                i_loss = (-disp_preds_refine[i] - flow_gt).abs()
                 disp_refine_loss += i_weight * i_loss[valid.bool()].mean()
             
             # plane loss
@@ -150,13 +150,13 @@ class Loss(nn.Module):
         }
 
         if disp_preds is not None and len(disp_preds)>0 and disp_preds[-1] is not None:
-            epe = torch.sum((disp_preds[-1] - flow_gt)**2, dim=1).sqrt()
+            epe = torch.sum((-disp_preds[-1] - flow_gt)**2, dim=1).sqrt()
             epe = epe.view(-1)[valid.view(-1)]
             metrics.update({'epe_disp': epe.mean().item(),
                             '3px_disp': (epe < 3).float().mean().item(),})
         
         if disp_preds_refine is not None and len(disp_preds_refine)>0 and disp_preds_refine[-1] is not None:
-            epe = torch.sum((disp_preds_refine[-1] - flow_gt)**2, dim=1).sqrt()
+            epe = torch.sum((-disp_preds_refine[-1] - flow_gt)**2, dim=1).sqrt()
             epe = epe.view(-1)[valid.view(-1)]
             metrics.update({'epe_disp_refine': epe.mean().item(),
                             '3px_disp_refine': (epe < 3).float().mean().item(),})

@@ -244,12 +244,11 @@ class RAFTStereo(nn.Module):
 
             # second-stage in geometry estimation
             geo_params = None
-            disparity = flow[:,:1]
+            disparity = -flow[:,:1]
             if self.args.geo_estimator is not None and len(self.args.geo_estimator)>0:
-                geo_params = self.geometry_builder(img_coord, flow_up, disparity)
+                geo_params = self.geometry_builder(img_coord, -flow_up, disparity)
                 
                 disp_up = self.upsample_geo(up_mask, params=geo_params)
-                disp_up = disp_up[:,:1]
             params_list.append(geo_params)
             disp_predictions.append(disp_up)
 
@@ -260,18 +259,18 @@ class RAFTStereo(nn.Module):
                 if itr>=self.args.refine_start_itr:
                     geo_params_refine = self.refine(geo_params, inp_list[0], confidence, 
                                             if_shift=(itr-self.args.refine_start_itr)%2>0)
-                    coords1 = coords0 + geo_params_refine[:,:1]
+                    coords1 = coords0 - geo_params_refine[:,:1]
                     disparity_refine = geo_params_refine[:,:1]
                     ### update hidden state
                     if self.args.update_his:
-                        net_list[0] = self.update_hist(net_list[0], disparity_refine)
+                        net_list[0] = self.update_hist(net_list[0], -disparity_refine)
             params_list_refine.append(geo_params_refine)
             
             # upsample refinement
             disp_up_refine = None
             if geo_params_refine is not None:
                 disp_up_refine = self.upsample_geo(up_mask, params=geo_params_refine)
-                disp_up_refine = disp_up_refine[:,:1]
+                # disp_up_refine = disp_up_refine[:,:1]
             disp_predictions_refine.append(disp_up_refine)
 
         if test_mode:
