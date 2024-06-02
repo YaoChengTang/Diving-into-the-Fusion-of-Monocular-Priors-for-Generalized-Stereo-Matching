@@ -67,10 +67,12 @@ class Geometry_Conv(nn.Module):
         # disparity_up: (1,1,H*factor,W*factor)
         # disparity: (1,1,H,W)
         # factor = 2 ** self.args.n_downsample
-        points = torch.cat([img_coord, disparity_up], dim=1)          # (1,3,factor*H,factor*W)
 
-        rest_params = self.reg(points)                                   # (1,5,H,W)
-        params = torch.cat([disparity,rest_params], dim=1)             # (1,6,H,W)
+        points = torch.cat([img_coord, disparity_up], dim=1)          # (1,3,factor*H,factor*W)
+        # points = torch.cat([img_coord, disparity_up.detach()], dim=1)   # (1,3,factor*H,factor*W)
+
+        rest_params = self.reg(points)                                  # (1,5,H,W)
+        params = torch.cat([disparity,rest_params], dim=1)              # (1,6,H,W)
         return params
 
 

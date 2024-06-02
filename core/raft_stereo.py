@@ -146,6 +146,9 @@ class RAFTStereo(nn.Module):
         disp = disp.permute(0, 1, 4, 2, 5, 3)                                                    # (B,1,H,factor,W,factor)
         return disp.reshape(N, 1, factor*H, factor*W)
 
+        # disp = F.fold(disp.flatten(-2,-1), (H*factor,W*factor), kernel_size=factor, stride=factor).view(N,1,H*factor,W*factor)
+        # return disp
+
 
     def forward(self, image1, image2, iters=12, flow_init=None, 
                 test_mode=False, vis_mode=False, enable_refinement=True):
@@ -277,6 +280,7 @@ class RAFTStereo(nn.Module):
             if self.args.refinement is not None and len(self.args.refinement)>0 and enable_refinement:
                 return coords1 - coords0, flow_up_refine
             return coords1 - coords0, flow_up
+            # return coords1 - coords0, -disp_up
 
         if vis_mode:
             return flow_predictions, disp_predictions, disp_predictions_refine, confidence_list
