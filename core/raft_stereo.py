@@ -121,12 +121,16 @@ class RAFTStereo(nn.Module):
         up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
         return up_flow.reshape(N, D, factor*H, factor*W), img_coord
     
-    def upsample_geo(self, mask, params):
+    def upsample_geo(self, mask=None, mask_disp=None, params=None):
         """ Upsample flow field [H/8, W/8, 2] -> [H, W, 2] using convex combination """
         N, D, H, W = params.shape
         factor = 2 ** self.args.n_downsample
-        # mask = mask.view(N, 1, 9, factor, factor, H, W)
-        # mask = torch.softmax(mask, dim=2)                                                        # (B,1,9,factor,factor,H,W)
+        if mask is not None:
+            mask = mask.view(N, 1, 9, factor, factor, H, W)
+            mask = torch.softmax(mask, dim=2)                                                    # (B,1,9,factor,factor,H,W)
+        if mask_disp is not None:
+            mask_disp = mask_disp.view(N, 1, 9, factor, factor, H, W)
+            mask_disp = torch.softmax(mask_disp, dim=2)                                          # (B,1,9,factor,factor,H,W)
 
         # d_p = a_q\cdot\Delta u_{q\to p} + b_q\cdot\Delta v_{q\to p} + d_q
         delta_pq = get_pos(H*factor, W*factor, disp=None,
@@ -138,12 +142,21 @@ class RAFTStereo(nn.Module):
 
         disp = predict_disp(params, patch_delta_pq, patch_size=factor, mul_last=True)            # (B,factor*factor,H,W)
         
-        # disp = F.unfold(disp, [3,3], padding=1)                                                  # (B,factor*factor*9,H,W)
-        # disp = disp.view(N, 1, factor, factor, 9, H, W)                                          # (B,1,factor,factor,9,H,W)
-        # disp = disp.permute((0,1,4,2,3,5,6))                                                     # (B,1,9,factor,factor,H,W)
-        # disp = torch.sum(mask * disp, dim=2)                                                     # (B,1,factor,factor,H,W)
-        # disp = disp.permute(0, 1, 4, 2, 5, 3)                                                    # (B,1,H,factor,W,factor)
-        # return disp.reshape(N, 1, factor*H, factor*W)
+        if mask_disp is not None:
+            disp = F.unfold(disp, [3,3], padding=1)                                                  # (B,factor*factor*9,H,W)
+            disp = disp.view(N, 1, factor, factor, 9, H, W)                                          # (B,1,factor,factor,9,H,W)
+            disp = disp.permute((0,1,4,2,3,5,6))                                                     # (B,1,9,factor,factor,H,W)
+            disp = torch.sum(mask_disp * disp, dim=2)                                                     # (B,1,factor,factor,H,W)
+            disp = disp.permute(0, 1, 4, 2, 5, 3)                                                    # (B,1,H,factor,W,factor)
+            return disp.reshape(N, 1, factor*H, factor*W)
+        
+        elif mask is not None:
+            disp = F.unfold(disp, [3,3], padding=1)                                                  # (B,factor*factor*9,H,W)
+            disp = disp.view(N, 1, factor, factor, 9, H, W)                                          # (B,1,factor,factor,9,H,W)
+            disp = disp.permute((0,1,4,2,3,5,6))                                                     # (B,1,9,factor,factor,H,W)
+            disp = torch.sum(mask * disp, dim=2)                                                     # (B,1,factor,factor,H,W)
+            disp = disp.permute(0, 1, 4, 2, 5, 3)                                                    # (B,1,H,factor,W,factor)
+            return disp.reshape(N, 1, factor*H, factor*W)
 
         disp = F.fold(disp.flatten(-2,-1), (H*factor,W*factor), kernel_size=factor, stride=factor).view(N,1,H*factor,W*factor)
         return disp
@@ -205,7 +218,7 @@ class RAFTStereo(nn.Module):
                     net_list = self.update_block(net_list, inp_list, iter32=True, iter16=False, iter08=False, update=False)
                 if self.args.n_gru_layers >= 2 and self.args.slow_fast_gru:# Update low-res GRU and mid-res GRU
                     net_list = self.update_block(net_list, inp_list, iter32=self.args.n_gru_layers==3, iter16=True, iter08=False, update=False)
-                net_list, up_mask, delta_flow = self.update_block(net_list, inp_list, corr, flow, iter32=self.args.n_gru_layers==3, iter16=self.args.n_gru_layers>=2)
+                net_list, up_mask, delta_flow, up_mask_disp = self.update_block(net_list, inp_list, corr, flow, iter32=self.args.n_gru_layers==3, iter16=self.args.n_gru_layers>=2)
 
                 ## region detection: acquire confidence
                 if self.args.confidence:
@@ -250,7 +263,8 @@ class RAFTStereo(nn.Module):
             if self.args.geo_estimator is not None and len(self.args.geo_estimator)>0:
                 geo_params = self.geometry_builder(img_coord, -flow_up, disparity)
                 
-                disp_up = self.upsample_geo(up_mask, params=geo_params)
+                # disp_up = self.upsample_geo(up_mask, params=geo_params)
+                disp_up = self.upsample_geo(mask=None, mask_disp=up_mask_disp, params=geo_params)
             params_list.append(geo_params)
             disp_predictions.append(disp_up)
 
@@ -271,7 +285,8 @@ class RAFTStereo(nn.Module):
             # upsample refinement
             disp_up_refine = None
             if geo_params_refine is not None:
-                disp_up_refine = self.upsample_geo(up_mask, params=geo_params_refine)
+                # disp_up_refine = self.upsample_geo(up_mask, params=geo_params_refine)
+                disp_up_refine = self.upsample_geo(mask=None, mask_disp=up_mask_disp, params=geo_params_refine)
                 # disp_up_refine = disp_up_refine[:,:1]
             disp_predictions_refine.append(disp_up_refine)
 

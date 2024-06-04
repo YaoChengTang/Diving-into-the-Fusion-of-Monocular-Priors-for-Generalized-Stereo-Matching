@@ -123,6 +123,11 @@ class BasicMultiUpdateBlock(nn.Module):
             nn.Conv2d(hidden_dims[2], 256, 3, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(256, (factor**2)*9, 1, padding=0))
+        
+        self.mask2 = nn.Sequential(
+            nn.Conv2d(hidden_dims[2], 256, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, (factor**2)*9, 1, padding=0))
 
     def forward(self, net, inp, corr=None, flow=None, iter08=True, iter16=True, iter32=True, update=True):
 
@@ -147,4 +152,8 @@ class BasicMultiUpdateBlock(nn.Module):
 
         # scale mask to balence gradients
         mask = .25 * self.mask(net[0])
-        return net, mask, delta_flow
+        # return net, mask, delta_flow
+
+        mask_disp = None
+        mask_disp = .25 * self.mask2(net[0])
+        return net, mask, delta_flow, mask_disp

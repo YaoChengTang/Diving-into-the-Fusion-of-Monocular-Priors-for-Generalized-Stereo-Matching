@@ -16,6 +16,7 @@ import torch.optim as optim
 sys.path.insert(0,'core')
 sys.path.insert(0,'core/utils')
 
+DATASET_ROOT = os.getenv('DATASET_ROOT', default="")
 NODE_RANK    = os.getenv('NODE_RANK', default=0)
 LOCAL_RANK   = os.getenv("LOCAL_RANK", default=0)
 LOG_ROOT     = os.getenv('LOG_ROOT', default="logs")
@@ -174,10 +175,8 @@ def train(args):
                 # if args.local_rank==0 and int(NODE_RANK)==0:
                 #     logger.write_dict(results)
 
-                # results = validate_middlebury(model.module, iters=args.valid_iters, split="H", 
-                #                           root="/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/Middlebury", )
-                results = validate_middlebury(model.module, iters=args.valid_iters, split="H", 
-                                          root="/bucket/output/saturn_v_dev/01_users/chengtang.yao/Middlebury", )
+                middlebury_root = "/".join(DATASET_ROOT.split("/")[:-1]) + "/Middlebury"
+                results = validate_middlebury(model.module, iters=args.valid_iters, split="H", root=middlebury_root, )
                 if args.local_rank==0 and int(NODE_RANK)==0:
                     logger.write_dict(results)
 
