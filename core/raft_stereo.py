@@ -125,8 +125,8 @@ class RAFTStereo(nn.Module):
         """ Upsample flow field [H/8, W/8, 2] -> [H, W, 2] using convex combination """
         N, D, H, W = params.shape
         factor = 2 ** self.args.n_downsample
-        mask = mask.view(N, 1, 9, factor, factor, H, W)
-        mask = torch.softmax(mask, dim=2)                                                        # (B,1,9,factor,factor,H,W)
+        # mask = mask.view(N, 1, 9, factor, factor, H, W)
+        # mask = torch.softmax(mask, dim=2)                                                        # (B,1,9,factor,factor,H,W)
 
         # d_p = a_q\cdot\Delta u_{q\to p} + b_q\cdot\Delta v_{q\to p} + d_q
         delta_pq = get_pos(H*factor, W*factor, disp=None,
@@ -138,16 +138,15 @@ class RAFTStereo(nn.Module):
 
         disp = predict_disp(params, patch_delta_pq, patch_size=factor, mul_last=True)            # (B,factor*factor,H,W)
         
-        disp = F.unfold(disp, [3,3], padding=1)                                                  # (B,factor*factor*9,H,W)
-        disp = disp.view(N, 1, factor, factor, 9, H, W)                                          # (B,1,factor,factor,9,H,W)
-        disp = disp.permute((0,1,4,2,3,5,6))                                                     # (B,1,9,factor,factor,H,W)
+        # disp = F.unfold(disp, [3,3], padding=1)                                                  # (B,factor*factor*9,H,W)
+        # disp = disp.view(N, 1, factor, factor, 9, H, W)                                          # (B,1,factor,factor,9,H,W)
+        # disp = disp.permute((0,1,4,2,3,5,6))                                                     # (B,1,9,factor,factor,H,W)
+        # disp = torch.sum(mask * disp, dim=2)                                                     # (B,1,factor,factor,H,W)
+        # disp = disp.permute(0, 1, 4, 2, 5, 3)                                                    # (B,1,H,factor,W,factor)
+        # return disp.reshape(N, 1, factor*H, factor*W)
 
-        disp = torch.sum(mask * disp, dim=2)                                                     # (B,1,factor,factor,H,W)
-        disp = disp.permute(0, 1, 4, 2, 5, 3)                                                    # (B,1,H,factor,W,factor)
-        return disp.reshape(N, 1, factor*H, factor*W)
-
-        # disp = F.fold(disp.flatten(-2,-1), (H*factor,W*factor), kernel_size=factor, stride=factor).view(N,1,H*factor,W*factor)
-        # return disp
+        disp = F.fold(disp.flatten(-2,-1), (H*factor,W*factor), kernel_size=factor, stride=factor).view(N,1,H*factor,W*factor)
+        return disp
 
 
     def forward(self, image1, image2, iters=12, flow_init=None, 

@@ -4,5 +4,5 @@ runs/
 checkpoints/
 logs/
 logs-raw/
-
+logs*
 *.pyc

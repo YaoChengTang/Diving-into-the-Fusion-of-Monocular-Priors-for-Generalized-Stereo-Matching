@@ -169,8 +169,15 @@ def train(args):
                                     'checkpoints/%d_%s.pth' % (total_steps + 1, args.name))
                     logger.info(f"Saving file {save_path}")
                     torch.save(model.state_dict(), save_path)
-                results = validate_things(model.module, iters=args.valid_iters, args=args)
 
+                # results = validate_things(model.module, iters=args.valid_iters, args=args, info="SceneFlow")
+                # if args.local_rank==0 and int(NODE_RANK)==0:
+                #     logger.write_dict(results)
+
+                # results = validate_middlebury(model.module, iters=args.valid_iters, split="H", 
+                #                           root="/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/Middlebury", )
+                results = validate_middlebury(model.module, iters=args.valid_iters, split="H", 
+                                          root="/bucket/output/saturn_v_dev/01_users/chengtang.yao/Middlebury", )
                 if args.local_rank==0 and int(NODE_RANK)==0:
                     logger.write_dict(results)
 

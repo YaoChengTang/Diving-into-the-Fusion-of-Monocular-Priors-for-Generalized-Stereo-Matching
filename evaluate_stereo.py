@@ -177,7 +177,7 @@ def validate_kitti2012(model, iters=32, root="", mixed_prec=False):
     return {'kitti-epe': round(epe,4), 'kitti-d1': round(d1,4)}
 
 @torch.no_grad()
-def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=False):
+def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=False, info=""):
     """ Peform validation using the FlyingThings3D (TEST) split """
     eval = args.eval if args is not None else eval
     model.eval()
@@ -242,7 +242,11 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=
 
     logger.info("Validation FlyingThings: %f, %f, %f, %f" % (round(epe,4), round(bad1), round(bad2), round(bad3)))
     logger.info("\r\n"*3)
-    return {'things-epe': round(epe), 'things-bad1': round(bad1), 'things-bad2': round(bad2), 'things-bad3': round(bad3)}
+    
+    return {info+'things-epe': round(epe), 
+            info+'things-bad1': round(bad1), 
+            info+'things-bad2': round(bad2), 
+            info+'things-bad3': round(bad3)}
 
 
 @torch.no_grad()

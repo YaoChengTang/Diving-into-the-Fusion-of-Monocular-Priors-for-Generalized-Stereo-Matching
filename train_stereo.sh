@@ -16,7 +16,7 @@ export DATASET_ROOT="/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/Scenefl
 # CUDA_VISIBLE_DEVICES=2,3 python3 -m torch.distributed.launch --master_port=20000 --nproc_per_node 2 train_stereo.py --batch_size 1 --train_iters 22 --valid_iters 22 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 70000 --mixed_precision --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --stop_freeze_bn --silence
 
 
-CUDA_VISIBLE_DEVICES=2,3 python3 -m torch.distributed.launch --master_port=20000 --nproc_per_node 2 train_stereo.py --batch_size 1 --train_iters 22 --valid_iters 22 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 70000 --mixed_precision --slant "slant_local" --slant_norm --geo_estimator "geometry_conv"
+CUDA_VISIBLE_DEVICES=1,2 python3 -m torch.distributed.launch --master_port=20000 --nproc_per_node 2 train_stereo.py --batch_size 1 --train_iters 22 --valid_iters 22 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 70000 --mixed_precision --slant "slant_local" --slant_norm --geo_estimator "geometry_conv"
 
 
 

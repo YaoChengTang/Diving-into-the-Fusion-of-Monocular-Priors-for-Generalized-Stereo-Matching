@@ -43,8 +43,35 @@
 
 
 
-CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset middlebury_H
-CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset kitti
-CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset eth3d
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset middlebury_H
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset kitti
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset eth3d
+
+
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2-noSF.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset middlebury_H
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2-noSF.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset kitti
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2-noSF.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset eth3d
+
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2-noSF-x2-70000.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset middlebury_H
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2-noSF-x2-70000.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset kitti
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2-noSF-x2-70000.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset eth3d
+
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2-noSF-x2-140000.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset middlebury_H
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2-noSF-x2-140000.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset kitti
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2-noSF-x2-140000.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset eth3d
+
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2-noSF-detach2ndStage-70000.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset middlebury_H
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2-noSF-detach2ndStage-70000.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset kitti
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2-noSF-detach2ndStage-70000.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset eth3d
+
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2-noSF-detach2ndStage-140000.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset middlebury_H
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2-noSF-detach2ndStage-140000.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset kitti
+# CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2-noSF-detach2ndStage-140000.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset eth3d
+
+CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2-noSF-singleMask.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset middlebury_H
+CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2-noSF-singleMask.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset kitti
+CUDA_VISIBLE_DEVICES=2 python3 evaluate_stereo.py --restore_ckpt pretrained/rebuild-raft2-noSF-singleMask.pth --slant "slant_local" --slant_norm --geo_estimator "geometry_conv" --dataset eth3d
+
+
 
 python3 merge_sheet.py
