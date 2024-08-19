@@ -3,7 +3,7 @@ dependencies:
   - python=3.8
   # - pytorch=1.11.0
   # - cudatoolkit=11.3
-  - torchvision
+  # - torchvision
   - matplotlib
   # - tensorboard
   - scipy
