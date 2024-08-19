@@ -136,6 +136,8 @@ class LoggerCommon:
         LOG_PATH = os.path.join(LOG_ROOT, 
                                 '{}-{}.log'.format(name, datetime.now().strftime("%y%m%d_%H%M%S")))
         if int(LOCAL_RANK)==0 and int(NODE_RANK)==0:
+            if not os.path.exists(LOG_ROOT):
+                os.makedirs(LOG_ROOT)
             logging.basicConfig(level=logging.INFO,
                                 format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
                                 handlers = [logging.FileHandler(LOG_PATH), 
@@ -179,6 +181,10 @@ class LoggerTraining(LoggerCommon):
 
     def __init__(self, name, model=None, scheduler=None):
         super(LoggerTraining, self).__init__(name)
+
+        if int(LOCAL_RANK)==0 and int(NODE_RANK)==0:
+            if not os.path.exists(TB_ROOT):
+                os.makedirs(TB_ROOT)
 
         self.model = model
         self.scheduler = scheduler

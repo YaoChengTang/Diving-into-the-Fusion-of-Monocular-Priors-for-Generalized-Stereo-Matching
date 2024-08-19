@@ -104,7 +104,52 @@ def interp(x, dest):
     interp_args = {'mode': 'bilinear', 'align_corners': True}
     return F.interpolate(x, dest.shape[2:], **interp_args)
 
+
 class BasicMultiUpdateBlock(nn.Module):
+    def __init__(self, args, hidden_dims=[]):
+        super().__init__()
+        self.args = args
+        self.encoder = BasicMotionEncoder(args)
+        encoder_output_dim = 128
+
+        self.gru08 = ConvGRU(hidden_dims[2], encoder_output_dim + hidden_dims[1] * (args.n_gru_layers > 1))
+        self.gru16 = ConvGRU(hidden_dims[1], hidden_dims[0] * (args.n_gru_layers == 3) + hidden_dims[2])
+        self.gru32 = ConvGRU(hidden_dims[0], hidden_dims[1])
+        self.flow_head = FlowHead(hidden_dims[2], hidden_dim=256, output_dim=2)
+        factor = 2**self.args.n_downsample
+
+        self.mask = nn.Sequential(
+            nn.Conv2d(hidden_dims[2], 256, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, (factor**2)*9, 1, padding=0))
+
+    def forward(self, net, inp, corr=None, flow=None, iter08=True, iter16=True, iter32=True, update=True):
+
+        if iter32:
+            net[2] = self.gru32(net[2], *(inp[2]), pool2x(net[1]))
+        if iter16:
+            if self.args.n_gru_layers > 2:
+                net[1] = self.gru16(net[1], *(inp[1]), pool2x(net[0]), interp(net[2], net[1]))
+            else:
+                net[1] = self.gru16(net[1], *(inp[1]), pool2x(net[0]))
+        if iter08:
+            motion_features = self.encoder(flow, corr)
+            if self.args.n_gru_layers > 1:
+                net[0] = self.gru08(net[0], *(inp[0]), motion_features, interp(net[1], net[0]))
+            else:
+                net[0] = self.gru08(net[0], *(inp[0]), motion_features)
+
+        if not update:
+            return net
+
+        delta_flow = self.flow_head(net[0])
+
+        # scale mask to balence gradients
+        mask = .25 * self.mask(net[0])
+        return net, mask, delta_flow
+
+
+class ManifoldBasicMultiUpdateBlock(nn.Module):
     def __init__(self, args, hidden_dims=[]):
         super().__init__()
         self.args = args

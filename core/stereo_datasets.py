@@ -118,15 +118,19 @@ class StereoDataset(data.Dataset):
 
         flow = flow[:1]
 
-        if self.slant is None:
-            plane_abc = torch.zeros_like(flow)
-        else:
-            plane_abc = plane.extract_plane(-flow.unsqueeze(0),
-                                            slant=self.slant, 
-                                            slant_norm=self.slant_norm, 
-                                            patch_size=4, thold=3)
-            plane_abc = plane_abc.squeeze(0)
-        return self.image_list[index] + [self.disparity_list[index]], img1, img2, flow, valid.float(), plane_abc
+        return self.image_list[index] + [self.disparity_list[index]], \
+               img1, img2, flow, valid.float()
+
+        # if self.slant is None:
+        #     plane_abc = torch.zeros_like(flow)
+        # else:
+        #     plane_abc = plane.extract_plane(-flow.unsqueeze(0),
+        #                                     slant=self.slant, 
+        #                                     slant_norm=self.slant_norm, 
+        #                                     patch_size=4, thold=3)
+        #     plane_abc = plane_abc.squeeze(0)
+        # return self.image_list[index] + [self.disparity_list[index]], \
+        #        img1, img2, flow, valid.float(), plane_abc
 
 
     def __mul__(self, v):
@@ -162,7 +166,7 @@ class SceneFlowDatasets(StereoDataset):
         """ Add FlyingThings3D data """
 
         original_length = len(self.disparity_list)
-        cache_file = osp.join(self.root, 'flyingthings3d'+"-"+self.dstype+"-"+split+".npz")
+        cache_file = osp.join(self.root, 'flying3d'+"-"+self.dstype+"-"+split+".npz")
         if self.caching and os.path.exists(cache_file):
             cache = np.load(cache_file)
             root = cache["root"]
@@ -170,7 +174,7 @@ class SceneFlowDatasets(StereoDataset):
             right_images = cache["right_images"]
             disparity_images = cache["disparity_images"]
         else :
-            root = osp.join(self.root, 'flyingthings3d')
+            root = osp.join(self.root, 'flying3d')
             left_images = sorted( glob(osp.join(root, self.dstype, split, '*/*/left/*.png')) )
             right_images = [ im.replace('left', 'right') for im in left_images ]
             disparity_images = [ im.replace(self.dstype, 'disparity').replace('.png', '.pfm') for im in left_images ]
