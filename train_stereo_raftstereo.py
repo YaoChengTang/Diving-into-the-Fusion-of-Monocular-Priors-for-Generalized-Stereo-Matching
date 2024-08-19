@@ -61,7 +61,6 @@ def fetch_optimizer(args, model):
 
 
 def train(args):
-    
     model = get_model_ddp(args)
 
     train_loader = fetch_dataloader(args)
@@ -74,17 +73,6 @@ def train(args):
     model.train()
     if not args.stop_freeze_bn:
         model.module.freeze_bn() # We keep BatchNorm frozen
-
-    myLoss = Loss(loss_gamma=0.9, max_flow=700, loss_zeta=0.5,
-                    smoothness=args.loss_smooth, 
-                    slant=args.slant, slant_norm=args.slant_norm,
-                    ner_kernel_size=args.ner_kernel_size,
-                    ner_weight_reduce=args.ner_weight_reduce,
-                    local_rank=args.local_rank,
-                    mixed_precision=args.mixed_precision,
-                    args=args)
-    device  = torch.device("cuda", args.local_rank)
-    myLoss  = myLoss.to(device)
 
     validation_frequency = 10000
 
@@ -213,13 +201,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     logger.print_args(args)
-
-    if len(args.refine_win_size)==0:
-        args.refine_win_size = None
-    elif len(args.refine_win_size)==1:
-        args.refine_win_size = [args.refine_win_size[0], args.refine_win_size[0]]
-    elif len(args.refine_win_size)>2:
-        raise Exception("only support one-tuple or two-tuple.")
     
     torch.manual_seed(1234)
     np.random.seed(1234)

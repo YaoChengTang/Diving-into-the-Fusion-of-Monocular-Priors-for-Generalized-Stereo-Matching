@@ -36,11 +36,12 @@ from core.raft_stereo import RAFTStereo
 
 
 def setup_distributed(args):
-    dist.init_process_group(backend='nccl')
+    args.rank = int(os.getenv("RANK"))
     args.local_rank = int(os.getenv("LOCAL_RANK"))
     args.world_size = int(os.getenv("WORLD_SIZE"))
     # print("-"*10, "local_rank: {}, world_size:{}".format(args.local_rank, args.world_size),
     #      " - {}, {}".format(dist.get_rank(), dist.get_world_size()))  # they result in the same value
+    dist.init_process_group(backend='nccl')
     torch.cuda.set_device(args.local_rank)
     torch.set_printoptions(precision=10)
 
@@ -127,8 +128,9 @@ def get_model_ddp(args):
         model.load_state_dict(checkpoint, strict=True)
         if args.local_rank==0 :
             logging.info(f"Done loading checkpoint")
-
+            
     dist.barrier()
+
     # DDP setting
     if args.distributed:
         model = DDP(model, device_ids=[args.local_rank], output_device=args.local_rank, 

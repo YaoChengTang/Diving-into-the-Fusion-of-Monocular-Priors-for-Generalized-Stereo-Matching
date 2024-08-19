@@ -37,14 +37,14 @@ class StereoDataset(data.Dataset):
         else:
             self.disparity_reader = reader        
 
-        if args is not None:
-            # self.plane = args.plane_datset
-            self.slant = args.slant 
-            self.slant_norm = args.slant_norm
-        else:
-            # self.plane = False
-            self.slant = None 
-            self.slant_norm = False
+        # if args is not None:
+        #     # self.plane = args.plane_datset
+        #     self.slant = args.slant 
+        #     self.slant_norm = args.slant_norm
+        # else:
+        #     # self.plane = False
+        #     self.slant = None 
+        #     self.slant_norm = False
 
         self.is_test = False
         self.init_seed = False
