@@ -1,12 +1,16 @@
 import os
 import sys
+import time
+import shutil
 import logging
 import numpy as np
+
 from scipy import interpolate
 from datetime import datetime
 
 import torch
 import torch.nn.functional as F
+
 
 
 class InputPadder:
@@ -84,6 +88,11 @@ def coords_grid(batch, ht, wd):
     coords = torch.stack(coords[::-1], dim=0).float()
     return coords[None].repeat(batch, 1, 1, 1)
 
+def hor_coords_grid(batch, ht, wd):
+    # (batch,1,H,W)
+    hor_coords = torch.arange(wd).float().repeat(batch, 1, ht, 1)
+    return hor_coords
+
 
 def upflow8(flow, mode='bilinear'):
     new_size = (8 * flow.shape[2], 8 * flow.shape[3])
@@ -136,8 +145,7 @@ class LoggerCommon:
         LOG_PATH = os.path.join(LOG_ROOT, 
                                 '{}-{}.log'.format(name, datetime.now().strftime("%y%m%d_%H%M%S")))
         if int(LOCAL_RANK)==0 and int(NODE_RANK)==0:
-            if not os.path.exists(LOG_ROOT):
-                os.makedirs(LOG_ROOT)
+            os.makedirs(LOG_ROOT, exist_ok=True)
             logging.basicConfig(level=logging.INFO,
                                 format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
                                 handlers = [logging.FileHandler(LOG_PATH), 
@@ -183,8 +191,7 @@ class LoggerTraining(LoggerCommon):
         super(LoggerTraining, self).__init__(name)
 
         if int(LOCAL_RANK)==0 and int(NODE_RANK)==0:
-            if not os.path.exists(TB_ROOT):
-                os.makedirs(TB_ROOT)
+            os.makedirs(TB_ROOT, exist_ok=True)
 
         self.model = model
         self.scheduler = scheduler
@@ -234,3 +241,45 @@ class LoggerTraining(LoggerCommon):
 
     def close(self):
         self.writer.close()
+
+
+
+def init_directories(directories):
+    if int(LOCAL_RANK)==0 and int(NODE_RANK)==0 :
+        for directory in directories:
+            os.makedirs(directory, exist_ok=True)
+    
+def delete_directories_if_static(directories):
+    if int(LOCAL_RANK)==0 and int(NODE_RANK)==0 :
+        # 如果检测到文件大小有变化，终止删除操作
+        if not is_any_folder_static(directories):
+            print("File sizes are changing in one of the directories {}.".format(directories) + \
+                  "No directories will be deleted.")
+            return
+        
+        # 如果所有文件都静止，删除目录
+        for directory in directories:
+            if os.path.exists(directory):
+                shutil.rmtree(directory)
+                print(f"Directory {directory} deleted")
+
+def get_file_sizes(directories):
+    """返回多个目录中所有文件的大小字典"""
+    file_sizes = {}
+    for directory in directories:
+        if os.path.exists(directory):
+            for root, dirs, files in os.walk(directory):
+                for file in files:
+                    filepath = os.path.join(root, file)
+                    file_sizes[filepath] = os.path.getsize(filepath)
+    return file_sizes
+
+def is_any_folder_static(directories, check_interval=2):
+    """检测所有文件是否静止（没有变化）"""
+    # 获取所有文件初始大小
+    initial_sizes = get_file_sizes(directories)
+    time.sleep(check_interval)  # 等待一段时间，观察文件变化
+    final_sizes = {filepath: os.path.getsize(filepath) for filepath in initial_sizes if os.path.exists(filepath)}
+    
+    # 如果文件大小一致，则所有文件静止
+    return initial_sizes == final_sizes

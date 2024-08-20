@@ -9,9 +9,11 @@ CURRENT_TIME=$(date +"%Y%m%d_%H%M%S")
 
 # 如果有参数，使用参数作为文件夹名，否则使用脚本名加时间
 if [ -n "$1" ]; then
-    FOLDER_NAME="$1"
+    FOLDER_NAME="${1}_${CURRENT_TIME}"
+    EXP_NAME="${1}"
 else
     FOLDER_NAME="${SCRIPT_NAME}_${CURRENT_TIME}"
+    EXP_NAME="${SCRIPT_NAME}"
 fi
 
 
@@ -19,8 +21,9 @@ fi
 export NCCL_P2P_DISABLE=1
 # export NCCL_SOCKET_IFNAME=eth0  # 设置正确的网络接口
 # export MASTER_ADDR=127.0.0.1
-# export MASTER_PORT=29500
-export CUDA_VISIBLE_DEVICES=4,5,6,7  # 使用两张GPU
+export MASTER_PORT=29501
+# export CUDA_VISIBLE_DEVICES=4,5,6,7  # 使用两张GPU
+export CUDA_VISIBLE_DEVICES=0,1,2,3  # 使用两张GPU
 
 # "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/Sceneflow"
 # "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/Middlebury"
@@ -39,4 +42,6 @@ echo "CKPOINT_ROOT is set to: $CKPOINT_ROOT"
 
 
 
-torchrun --nnode 1 --nproc_per_node 4 train_stereo_raftstereo.py --batch_size 8 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision
+# torchrun --nnode 1 --nproc_per_node 4 train_stereo_raftstereo.py --batch_size 8 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision
+
+torchrun --nnode 1 --nproc_per_node 4 --master_port 29501 train_stereo_raftstereo.py --batch_size 8 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision --model_name "RaftStereoDisp" --exp_name "$EXP_NAME"

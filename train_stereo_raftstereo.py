@@ -28,7 +28,7 @@ from core.loss import sequence_loss
 from core.raft_stereo import RAFTStereo
 from core.stereo_datasets import fetch_dataloader
 from core.utils.ddp import ddp_init, ddp_close, get_model_ddp
-from core.utils.utils import LoggerTraining
+from core.utils.utils import LoggerTraining, init_directories, delete_directories_if_static
 
 logger = LoggerTraining("TRAIN", None, None)
 
@@ -113,7 +113,7 @@ def train(args):
             if total_steps % validation_frequency == validation_frequency - 1:
                 if args.local_rank==0 and int(NODE_RANK)==0:
                     save_path = os.path.join(CKPOINT_ROOT, 
-                                    'checkpoints/%d_%s.pth' % (total_steps + 1, args.name))
+                                    '%d_%s.pth' % (total_steps + 1, args.exp_name))
                     logger.info(f"Saving file {save_path}")
                     torch.save(model.state_dict(), save_path)
 
@@ -131,30 +131,20 @@ def train(args):
                 should_keep_training = False
                 break
 
-        if args.local_rank==0 and int(NODE_RANK)==0 and len(train_loader) >= 10000:
-            save_path = os.path.join(CKPOINT_ROOT, 
-                            'checkpoints/%d_epoch_%s.pth.gz' % (total_steps + 1, args.name))
-            logger.info(f"Saving file {save_path}")
-            torch.save(model.state_dict(), save_path)
-
     if args.local_rank==0 and int(NODE_RANK)==0:
         logger.close()
-        PATH = os.path.join(CKPOINT_ROOT, 'checkpoints/%s.pth' % args.name)
+        PATH = os.path.join(CKPOINT_ROOT, '%s.pth' % args.exp_name)
         torch.save(model.state_dict(), PATH)
         print("FINISHED TRAINING")
 
     return None
 
 
-def init_directory(args):
-    if args.local_rank==0 and int(NODE_RANK)==0 :
-        if not os.path.exists( CKPOINT_ROOT ):
-            os.makedirs( CKPOINT_ROOT )
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--name', default='raft-stereo', help="name your experiment")
+    parser.add_argument('--exp_name', default='raft-stereo', help="name your experiment")
+    parser.add_argument('--model_name', default='RaftStereo', help="name your model: raftstereo, raftstereodisp")
     parser.add_argument('--restore_ckpt', help="restore checkpoint")
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--eval', action='store_true', help='evaluation mode')
@@ -206,8 +196,12 @@ if __name__ == '__main__':
     np.random.seed(1234)
     
     ddp_init(args)
-    init_directory(args)
+    init_directories([LOG_ROOT, TB_ROOT, CKPOINT_ROOT])
 
-    train(args)
+    try:
+        train(args)
+    except Exception as err:
+        delete_directories_if_static([LOG_ROOT, TB_ROOT, CKPOINT_ROOT])
+        raise Exception(err)
 
     ddp_close()

@@ -33,6 +33,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler as DS
 
 from core.raft_stereo import RAFTStereo
+from core.raft_stereo_disp import RAFTStereoDisp
 
 
 def setup_distributed(args):
@@ -116,7 +117,13 @@ NODE_RANK    = os.getenv('NODE_RANK', default=0)
 LOCAL_RANK   = os.getenv("LOCAL_RANK", default=0)
 
 def get_model_ddp(args):
-    model  = nn.SyncBatchNorm.convert_sync_batchnorm(RAFTStereo(args))
+    if args.model_name.lower() == "raftstereo":
+        model  = nn.SyncBatchNorm.convert_sync_batchnorm(RAFTStereo(args))
+    elif args.model_name.lower() == "raftstereodisp":
+        model  = nn.SyncBatchNorm.convert_sync_batchnorm(RAFTStereoDisp(args))
+    else :
+        raise Exception("No such model: {}".format(args.model_name))
+    
     device = torch.device("cuda", args.local_rank)
     model  = model.to(device)
 

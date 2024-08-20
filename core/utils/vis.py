@@ -170,8 +170,7 @@ class Visualizer:
 
         # build directory
         sv_dir = os.path.dirname(sv_path)
-        if not os.path.exists(sv_dir) :
-            os.makedirs(sv_dir)
+        os.makedirs(sv_dir, exist_ok=True)
 
         # write prediction
         if self.dataset.lower()=="middlebury" :
@@ -198,8 +197,7 @@ class Visualizer:
 
         # build directory
         sv_dir = os.path.dirname(sv_path)
-        if not os.path.exists(sv_dir) :
-            os.makedirs(sv_dir)
+        os.makedirs(sv_dir, exist_ok=True)
 
         # C*H*W -> H*W*C
         image1 = np.transpose(image1, (1,2,0)).astype(np.uint8)
