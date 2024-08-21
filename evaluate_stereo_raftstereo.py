@@ -37,7 +37,7 @@ def validate_eth3d(model, iters=32, root="", mixed_prec=False):
 
     out_list, epe_list = [], []
     for val_id in range(len(val_dataset)):
-        (imageL_file, _, _), image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
+        (imageL_file, _, _), image1, image2, flow_gt, valid_gt = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 
@@ -81,7 +81,7 @@ def validate_kitti(model, iters=32, root="", mixed_prec=False):
 
     out_list, epe_list, elapsed_list = [], [], []
     for val_id in range(len(val_dataset)):
-        _, image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
+        _, image1, image2, flow_gt, valid_gt = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 
@@ -134,7 +134,7 @@ def validate_kitti2012(model, iters=32, root="", mixed_prec=False):
 
     out_list, epe_list, elapsed_list = [], [], []
     for val_id in range(len(val_dataset)):
-        _, image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
+        _, image1, image2, flow_gt, valid_gt = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 
@@ -187,7 +187,7 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=
     out_list_2, out_list_3 = [], []
     tqdm_disable = args is not None and (args.silence or args.local_rank>0 or int(NODE_RANK)>0)
     for val_id in tqdm(range(len(val_dataset)), disable=tqdm_disable):
-        paths, image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
+        paths, image1, image2, flow_gt, valid_gt = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 
@@ -214,7 +214,7 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=
 
         # avoid corrupted data
         if val.sum()<10 or image_epe>20 or image_out_1>0.95:
-            print("Corrupted data", paths)
+            logger.info(f"Corrupted data: {paths}")
             continue
 
         epe_list.append(image_epe)
@@ -260,7 +260,7 @@ def validate_middlebury(model, iters=32, split='F', root="", mixed_prec=False):
     out_nocc_list, epe_nocc_list = [], []
     out_mask_list, epe_mask_list = [], []
     for val_id in range(len(val_dataset)):
-        (imageL_file, _, _), image1, image2, flow_gt, valid_gt, plane_abc = val_dataset[val_id]
+        (imageL_file, _, _), image1, image2, flow_gt, valid_gt = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 

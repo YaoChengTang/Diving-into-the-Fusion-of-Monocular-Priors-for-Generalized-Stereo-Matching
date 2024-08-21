@@ -23,12 +23,12 @@ LOG_ROOT     = os.getenv('LOG_ROOT', default="logs")
 TB_ROOT      = os.getenv('TB_ROOT', default="")
 CKPOINT_ROOT = os.getenv('CKPOINT_ROOT', default="")
 
-from evaluate_stereo import *
 from core.loss import sequence_loss
 from core.raft_stereo import RAFTStereo
 from core.stereo_datasets import fetch_dataloader
 from core.utils.ddp import ddp_init, ddp_close, get_model_ddp
 from core.utils.utils import LoggerTraining, init_directories, delete_directories_if_static
+from evaluate_stereo_raftstereo import *
 
 logger = LoggerTraining("TRAIN", None, None)
 
