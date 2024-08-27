@@ -21,7 +21,7 @@ fi
 export NCCL_P2P_DISABLE=1
 # export NCCL_SOCKET_IFNAME=eth0  # 设置正确的网络接口
 # export MASTER_ADDR=127.0.0.1
-export MASTER_PORT=29501
+# export MASTER_PORT=29501
 # export CUDA_VISIBLE_DEVICES=0,1,2,3
 export CUDA_VISIBLE_DEVICES=4,5,6,7
 

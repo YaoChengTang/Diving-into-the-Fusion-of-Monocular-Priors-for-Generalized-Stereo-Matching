@@ -415,7 +415,7 @@ if __name__ == '__main__':
 
     elif args.dataset == 'things':
         if args.root is None:
-            args.root = "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/Sceneflow"
+            args.root = "/data6/sceneflow/sceneflow"
         res = validate_things(model, iters=args.valid_iters, root=args.root, 
                               mixed_prec=use_mixed_precision)
     
