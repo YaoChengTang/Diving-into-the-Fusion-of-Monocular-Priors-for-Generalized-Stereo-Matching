@@ -337,7 +337,7 @@ class Middlebury(StereoDataset):
                     self.image_list += [ [str(scene / "im0.png"), str(scene / f"im1{s}.png")] ]
                     self.disparity_list += [ str(scene / "disp0.pfm") ]
         else:
-            lines = list(map(osp.basename, glob(os.path.join(root, "MiddEval3/trainingF/*"))))
+            lines = list(map(osp.basename, glob(os.path.join(root, "MiddEval3/trainingH/*"))))
             # lines = list(filter(lambda p: any(s in p.split('/') for s in Path(os.path.join(root, "MiddEval3/official_train.txt")).read_text().splitlines()), lines))
             # lines = [line for line in lines if line.find("Playtable")!=-1 or \
             #                                    line.find("Playroom")!=-1 or \

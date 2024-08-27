@@ -142,17 +142,48 @@ TB_ROOT      = os.getenv('TB_ROOT', default="runs")
 
 class LoggerCommon:
     def __init__(self, name):
-        LOG_PATH = os.path.join(LOG_ROOT, 
-                                '{}-{}.log'.format(name, datetime.now().strftime("%y%m%d_%H%M%S")))
+        self.name = name
+        self.log_name = '{}-{}.log'.format(name, datetime.now().strftime("%y%m%d_%H%M%S"))
+        self.log_path = os.path.join(LOG_ROOT, self.log_name)
         if int(LOCAL_RANK)==0 and int(NODE_RANK)==0:
             os.makedirs(LOG_ROOT, exist_ok=True)
             logging.basicConfig(level=logging.INFO,
                                 format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
-                                handlers = [logging.FileHandler(LOG_PATH), 
+                                handlers = [logging.FileHandler(self.log_path), 
                                             logging.StreamHandler()]
                             )
             self.logger = logging.getLogger(name)
-            self.logger.addHandler(logging.FileHandler(LOG_PATH))
+            self.logger.addHandler(logging.FileHandler(self.log_path))
+    
+    def _set_handlers(self):
+        # 清除之前的所有处理器
+        self.logger.handlers.clear()
+        
+        # 设置文件和控制台处理器
+        file_handler = logging.FileHandler(self.log_path)
+        console_handler = logging.StreamHandler()
+
+        # 设置处理器格式
+        formatter = logging.Formatter('%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
+        file_handler.setFormatter(formatter)
+        console_handler.setFormatter(formatter)
+
+        # 添加处理器
+        self.logger.addHandler(file_handler)
+        self.logger.addHandler(console_handler)
+
+    def set_log_path(self, new_log_path, name=None):
+        # 删除旧日志文件（如果存在）
+        if os.path.exists(self.log_path):
+            os.remove(self.log_path)
+        
+        # 更新路径并重设处理器
+        if name is not None:
+            self.name = name
+        self.log_name = '{}-{}.log'.format(self.name, datetime.now().strftime("%y%m%d_%H%M%S"))
+        self.log_path = os.path.join(new_log_path, self.log_name)
+        self._set_handlers()
+
     
     def info(self, message):
         if int(LOCAL_RANK)==0 and int(NODE_RANK)==0:

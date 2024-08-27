@@ -14,6 +14,7 @@ from tqdm import tqdm
 from datetime import datetime
 
 from core.raft_stereo import RAFTStereo, autocast
+from core.raft_stereo_disp import RAFTStereoDisp
 import stereo_datasets as datasets
 from core.utils.utils import InputPadder, LoggerCommon
 
@@ -324,6 +325,8 @@ def validate_middlebury(model, iters=32, split='F', root="", mixed_prec=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', help="dataset root", default=None)
+    parser.add_argument('--test_exp_name', default='', help="name your experiment in testing")
+    parser.add_argument('--model_name', default='RaftStereo', help="name your model: raftstereo, raftstereodisp")
     parser.add_argument('--restore_ckpt', help="restore checkpoint", default=None)
     parser.add_argument('--dataset', help="dataset for evaluation", required=True, choices=["eth3d", "kitti", 'kitti2012', "things"] + [f"middlebury_{s}" for s in 'FHQ'])
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
@@ -341,36 +344,24 @@ if __name__ == '__main__':
     parser.add_argument('--context_norm', type=str, default="batch", choices=['group', 'batch', 'instance', 'none'], help="normalization of context encoder")
     parser.add_argument('--slow_fast_gru', action='store_true', help="iterate the low-res GRUs more frequently")
     parser.add_argument('--n_gru_layers', type=int, default=3, help="number of hidden GRU levels")
-    parser.add_argument('--slant', type=str, default=None, help="use slanted stereo matching")
-    parser.add_argument('--slant_norm', action='store_true', help="use normalization in slanted stereo matching")
-    parser.add_argument('--geo_estimator', type=str, default=None, help="the builder used to compute geometry, None is default GRU")
-    parser.add_argument('--geo_fusion', type=str, default=None, help="the fusion used in geometry builder proposals")
-    parser.add_argument('--confidence', action='store_true', help="use confidence learning")
-    parser.add_argument('--offset_memory_size', type=int, default=2, help="size of offset memory in confidence learning")
-    parser.add_argument('--offset_memory_last_iter', type=int, default=-1, help="only predict confidence using offset before xxx iters")
-    parser.add_argument('--detach_in_confidence', action='store_true', help="detach for feature and offset in confidence learning")
-    parser.add_argument('--detach_in_refinement', action='store_true', help="detach for feature in refinement")
-    parser.add_argument('--refinement', type=str, default="", help="refinement for disparity map")
-    parser.add_argument('--refine_win_size', type=int, default=[], nargs='+', help="window size for refinement")
-    parser.add_argument('--split_win', action='store_true', help="given 3*10 win, using 3*10 and 10*3 for refinement")
-    parser.add_argument('--num_heads', type=int, default=3, help="number of head in Transformer")
-    parser.add_argument('--refine_start_itr', type=int, default=3, help="start to do refinement at which iteration")
-    parser.add_argument('--update_his', action='store_true', help="update history using refined disparity")
-    parser.add_argument('--U_thold', type=float, default=0.98, help="thold used to filter out noise diaprity with uncertainty/confidence")
-    parser.add_argument('--stop_freeze_bn', action='store_true', help="stop freeze BN")
+
     args = parser.parse_args()
+
+    # 重新设定日志文件位置
+    log_path = os.path.join(LOG_ROOT, args.restore_ckpt.split("/")[-2])
+    logger.set_log_path(log_path, "TEST-{}".format(args.test_exp_name))
+
     logger.print_args(args)
 
-    if len(args.refine_win_size)==0:
-        args.refine_win_size = None
-    elif len(args.refine_win_size)==1:
-        args.refine_win_size = [args.refine_win_size[0], args.refine_win_size[0]]
-    elif len(args.refine_win_size)>2:
-        raise Exception("only support one-tuple or two-tuple.")
-
     args.eval = True
-
-    model = torch.nn.DataParallel(RAFTStereo(args), device_ids=[0])
+    
+    if args.model_name.lower() == "raftstereo":
+        model  = RAFTStereo(args)
+    elif args.model_name.lower() == "raftstereodisp":
+        model  = RAFTStereoDisp(args)
+    else :
+        raise Exception("No such model: {}".format(args.model_name))
+    model = torch.nn.DataParallel(model, device_ids=[0])
 
     if args.restore_ckpt is not None:
         assert args.restore_ckpt.endswith(".pth") or args.restore_ckpt.endswith(".tar")
@@ -391,25 +382,25 @@ if __name__ == '__main__':
 
     if args.dataset == 'eth3d':
         if args.root is None:
-            args.root = "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/ETH3D"
+            args.root = "/data6/ETH3D"
         res = validate_eth3d(model, iters=args.valid_iters, root=args.root, 
                              mixed_prec=use_mixed_precision)
 
     elif args.dataset == 'kitti':
         if args.root is None:
-            args.root = "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/KITTI2015"
+            args.root = "/data6/KITTI2015"
         res = validate_kitti(model, iters=args.valid_iters, root=args.root, 
                              mixed_prec=use_mixed_precision)
     
     elif args.dataset == 'kitti2012':
         if args.root is None:
-            args.root = "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/KITTI2012"
+            args.root = "/data6/KITTI2012"
         res = validate_kitti2012(model, iters=args.valid_iters, root=args.root, 
                                  mixed_prec=use_mixed_precision)
 
     elif args.dataset in [f"middlebury_{s}" for s in 'FHQ']:
         if args.root is None:
-            args.root = "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/Middlebury"
+            args.root = "/data6/Middlebury"
         res = validate_middlebury(model, iters=args.valid_iters, root=args.root, split=args.dataset[-1], 
                                   mixed_prec=use_mixed_precision)
 
@@ -421,7 +412,7 @@ if __name__ == '__main__':
     
     
     # write results into excel
-    res["Model"] = os.path.basename(args.restore_ckpt)
+    res["Model"] = args.test_exp_name + " - " + os.path.basename(args.restore_ckpt)
     row = pd.DataFrame([res])
     df = None
     file_path = os.path.join(LOG_ROOT,"eval.xlsx")
