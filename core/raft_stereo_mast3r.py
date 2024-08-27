@@ -1,11 +1,18 @@
+import os
+import sys
+sys.path.insert(0,'mast3r')
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from core.update_disp import DispBasicMultiUpdateBlock
-from core.extractor import BasicEncoder, MultiBasicEncoder, ResidualBlock
+from core.extractor_mast3r import Mast3rExtractor
+from core.extractor import MultiBasicEncoder, ResidualBlock
 from core.corr import CorrBlock1D, PytorchAlternateCorrBlock1D, CorrBlockFast1D, AlternateCorrBlock
 from core.utils.utils import hor_coords_grid
 
+from mast3r.model import AsymmetricMASt3R
 
 try:
     autocast = torch.cuda.amp.autocast
@@ -19,9 +26,9 @@ except:
         def __exit__(self, *args):
             pass
 
-class RAFTStereoDisp(nn.Module):
+class RAFTStereoMast3r(nn.Module):
     def __init__(self, args):
-        super(RAFTStereoDisp, self).__init__()
+        super(RAFTStereoMast3r, self).__init__()
         self.args = args
         
         context_dims = args.hidden_dims
@@ -36,7 +43,7 @@ class RAFTStereoDisp(nn.Module):
                 ResidualBlock(128, 128, 'instance', stride=1),
                 nn.Conv2d(128, 256, 3, padding=1))
         else:
-            self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', downsample=args.n_downsample)
+            self.fnet = Mast3rExtractor(model_name=args.mast3r_model_path, output_dim=256, norm_fn='instance', downsample=args.n_downsample)
 
     def freeze_bn(self):
         for m in self.modules():
@@ -82,11 +89,7 @@ class RAFTStereoDisp(nn.Module):
                 # cnet_list: [[(128,248,360), (128,248,360)], [(128,124,180),(128,124,180)], [(128,62,90),(128,62,90)]]
                 cnet_list = self.cnet(image1, num_layers=self.args.n_gru_layers)
                 # fmap1: (128,248,360), fmap2: (128,248,360)
-                fmap1, fmap2 = self.fnet([image1, image2])
-            
-            # from IPython import embed
-            # embed()
-
+                fmap1, fmap2 = self.fnet(image1, image2)
             net_list = [torch.tanh(x[0]) for x in cnet_list]
             inp_list = [torch.relu(x[1]) for x in cnet_list]
 

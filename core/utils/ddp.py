@@ -34,6 +34,7 @@ from torch.utils.data.distributed import DistributedSampler as DS
 
 from core.raft_stereo import RAFTStereo
 from core.raft_stereo_disp import RAFTStereoDisp
+from core.raft_stereo_mast3r import RAFTStereoMast3r
 
 
 def setup_distributed(args):
@@ -118,9 +119,11 @@ LOCAL_RANK   = os.getenv("LOCAL_RANK", default=0)
 
 def get_model_ddp(args):
     if args.model_name.lower() == "raftstereo":
-        model  = nn.SyncBatchNorm.convert_sync_batchnorm(RAFTStereo(args))
+        model = nn.SyncBatchNorm.convert_sync_batchnorm(RAFTStereo(args))
     elif args.model_name.lower() == "raftstereodisp":
-        model  = nn.SyncBatchNorm.convert_sync_batchnorm(RAFTStereoDisp(args))
+        model = nn.SyncBatchNorm.convert_sync_batchnorm(RAFTStereoDisp(args))
+    elif args.model_name.lower() == "raftstereomast3r":
+        model = nn.SyncBatchNorm.convert_sync_batchnorm(RAFTStereoMast3r(args))
     else :
         raise Exception("No such model: {}".format(args.model_name))
     
