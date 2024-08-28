@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from core.update_disp import DispBasicMultiUpdateBlock
 from core.extractor_mast3r import Mast3rExtractor
 from core.extractor import MultiBasicEncoder, ResidualBlock
-from core.corr import CorrBlock1D, PytorchAlternateCorrBlock1D, CorrBlockFast1D, AlternateCorrBlock
+from core.corr import CorrBlock1D, AbsCorrBlock1D, PytorchAlternateCorrBlock1D, CorrBlockFast1D, AlternateCorrBlock
 from core.utils.utils import hor_coords_grid
 
 from mast3r.model import AsymmetricMASt3R
@@ -96,8 +96,11 @@ class RAFTStereoMast3r(nn.Module):
             # Rather than running the GRU's conv layers on the context features multiple times, we do it once at the beginning 
             inp_list = [list(conv(i).split(split_size=conv.out_channels//3, dim=1)) for i,conv in zip(inp_list, self.context_zqr_convs)]
 
-        if self.args.corr_implementation == "reg": # Default
+        if self.args.corr_implementation == "reg": # Default a*b
             corr_block = CorrBlock1D
+            fmap1, fmap2 = fmap1.float(), fmap2.float()
+        if self.args.corr_implementation == "abs_reg": # Default abs(a-B)
+            corr_block = AbsCorrBlock1D
             fmap1, fmap2 = fmap1.float(), fmap2.float()
         elif self.args.corr_implementation == "alt": # More memory efficient than reg
             corr_block = PytorchAlternateCorrBlock1D

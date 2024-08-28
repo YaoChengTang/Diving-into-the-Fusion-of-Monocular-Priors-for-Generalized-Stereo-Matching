@@ -155,6 +155,61 @@ class CorrBlock1D:
         corr = corr.reshape(B, H, W1, 1, W2).contiguous()
         return corr / torch.sqrt(torch.tensor(D).float())
 
+class AbsCorrBlock1D:
+    def __init__(self, fmap1, fmap2, num_levels=4, radius=4):
+        self.num_levels = num_levels
+        self.radius = radius
+        self.abs_corr_matrix_pyramid = []
+
+        # all pairs correlation
+        abs_corr_matrix = AbsBlock1D.abs_corr(fmap1, fmap2)
+
+        batch, h1, w1, _, w2 = abs_corr_matrix.shape
+        abs_corr_matrix = abs_corr_matrix.reshape(batch*h1*w1, 1, 1, w2)
+
+        self.abs_corr_matrix_pyramid.append(abs_corr_matrix)
+        for i in range(self.num_levels):
+            abs_corr_matrix = F.avg_pool2d(abs_corr_matrix, [1,2], stride=[1,2])
+            self.abs_corr_matrix_pyramid.append(abs_corr_matrix)
+
+    def __call__(self, coords):
+        r = self.radius
+        coords = coords[:, :1].permute(0, 2, 3, 1)
+        batch, h1, w1, _ = coords.shape
+
+        out_pyramid = []
+        for i in range(self.num_levels):
+            abs_corr_matrix = self.abs_corr_matrix_pyramid[i]
+            dx = torch.linspace(-r, r, 2*r+1)
+            dx = dx.view(2*r+1, 1).to(coords.device)
+            x0 = dx + coords.reshape(batch*h1*w1, 1, 1, 1) / 2**i
+            y0 = torch.zeros_like(x0)
+
+            coords_lvl = torch.cat([x0,y0], dim=-1)
+            abs_corr_matrix = bilinear_sampler(abs_corr_matrix, coords_lvl)
+            abs_corr_matrix = abs_corr_matrix.view(batch, h1, w1, -1)
+            out_pyramid.append(abs_corr_matrix)
+
+        out = torch.cat(out_pyramid, dim=-1)
+        return out.permute(0, 3, 1, 2).contiguous().float()
+
+    @staticmethod
+    def abs_corr(fmap1, fmap2):
+        """fucntion: build the correlation matrix (not traditional cost volume) for each pixel in the same line.
+        args:
+            fmap1: feature maps from left view, B*C*H*W1;
+            fmap2: feature maps from right view, B*C*H*W2;
+        return:
+            the correlation matrix, B*H*W1*W2;
+        """
+        B, D, H, W1 = fmap1.shape
+        _, _, _, W2 = fmap2.shape
+
+        # 计算 L1 匹配代价
+        corr_matrix = torch.mean(torch.abs(fmap1.unsqueeze(-1) - correlation.unsqueeze(-2)), dim=1)  # shape (B, H, W1, W2)
+        
+        corr_matrix = corr_matrix.reshape(B, H, W1, 1, W2).contiguous()
+        return corr_matrix / torch.sqrt(torch.tensor(D).float())
 
 class AlternateCorrBlock:
     def __init__(self, fmap1, fmap2, num_levels=4, radius=4):
