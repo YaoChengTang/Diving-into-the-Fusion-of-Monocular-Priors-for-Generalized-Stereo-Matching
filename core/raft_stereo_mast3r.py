@@ -9,7 +9,8 @@ import torch.nn.functional as F
 from core.update_disp import DispBasicMultiUpdateBlock
 from core.extractor_mast3r import Mast3rExtractor
 from core.extractor import MultiBasicEncoder, ResidualBlock
-from core.corr import CorrBlock1D, AbsCorrBlock1D, PytorchAlternateCorrBlock1D, CorrBlockFast1D, AlternateCorrBlock
+from core.corr import CorrBlock1D, PytorchAlternateCorrBlock1D, CorrBlockFast1D, AlternateCorrBlock
+from core.corr import AbsCorrBlock1D, PytorchAlternateAbsCorrBlock1D
 from core.utils.utils import hor_coords_grid
 
 from mast3r.model import AsymmetricMASt3R
@@ -99,11 +100,14 @@ class RAFTStereoMast3r(nn.Module):
         if self.args.corr_implementation == "reg": # Default a*b
             corr_block = CorrBlock1D
             fmap1, fmap2 = fmap1.float(), fmap2.float()
-        if self.args.corr_implementation == "abs_reg": # Default abs(a-B)
-            corr_block = AbsCorrBlock1D
-            fmap1, fmap2 = fmap1.float(), fmap2.float()
         elif self.args.corr_implementation == "alt": # More memory efficient than reg
             corr_block = PytorchAlternateCorrBlock1D
+            fmap1, fmap2 = fmap1.float(), fmap2.float()
+        elif self.args.corr_implementation == "abs_reg": # Default abs(a-B)
+            corr_block = AbsCorrBlock1D
+            fmap1, fmap2 = fmap1.float(), fmap2.float()
+        elif self.args.corr_implementation == "abs_alt": # More memory efficient abs_reg reg
+            corr_block = PytorchAlternateAbsCorrBlock1D
             fmap1, fmap2 = fmap1.float(), fmap2.float()
         elif self.args.corr_implementation == "reg_cuda": # Faster version of reg
             corr_block = CorrBlockFast1D
@@ -120,6 +124,7 @@ class RAFTStereoMast3r(nn.Module):
         for itr in range(iters):
             hor_coords1 = hor_coords1.detach()
             corr = corr_fn(hor_coords1) # index correlation volume
+            # torch.cuda.empty_cache()
             disp = hor_coords1 - hor_coords0
             with autocast(enabled=self.args.mixed_precision):
                 if self.args.n_gru_layers == 3 and self.args.slow_fast_gru: # Update low-res GRU

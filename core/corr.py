@@ -107,6 +107,65 @@ class PytorchAlternateCorrBlock1D:
         return out.permute(0, 3, 1, 2).contiguous().float()
 
 
+class PytorchAlternateAbsCorrBlock1D:
+    def __init__(self, fmap1, fmap2, num_levels=4, radius=4):
+        self.num_levels = num_levels
+        self.radius = radius
+        self.corr_pyramid = []
+        self.fmap1 = fmap1
+
+        self.fmap2_pyramid = [fmap2]
+        for i in range(num_levels):
+            fmap2 = F.avg_pool2d(fmap2, [1, 2], stride=[1, 2])
+            self.fmap2_pyramid.append(fmap2)
+
+    def corr(self, fmap1, fmap2, coords):
+        B, C, H, W = fmap1.shape
+        # map grid coordinates to [-1,1]
+        xgrid, ygrid = coords.split([1,1], dim=-1)
+        xgrid = 2*xgrid/(W-1) - 1
+        ygrid = 2*ygrid/(H-1) - 1
+
+        grid = torch.cat([xgrid, ygrid], dim=-1)
+
+        disp_num = 2 * self.radius + 1
+        fmapw_mini = F.grid_sample(fmap2, grid.view(B, H, W*disp_num, 2), mode='bilinear',
+                                   padding_mode='zeros').view(B, C, H, W, disp_num)  # (B, C, H, W, S)
+        corr = torch.sum(fmap1.unsqueeze(-1) * fmapw_mini, dim=1)
+
+        return corr / torch.sqrt(torch.tensor(C).float())
+
+    def __call__(self, coords):
+        print(f"当前显存消耗量: {torch.distributed.get_rank()} {torch.cuda.memory_allocated() / 1024 / 1024:.2f} MB")
+
+        # in case of only disparity used in coordinates 
+        B, D, H, W = coords.shape
+        if D==1:
+            y_coord = torch.arange(H).unsqueeze(1).float().repeat(B, 1, 1, W).to(coords.device)
+            coords = torch.cat([coords,y_coord], dim=1)
+
+        r = self.radius
+        coords = coords.permute(0, 2, 3, 1)
+        batch, h1, w1, _ = coords.shape
+
+        fmap1 = self.fmap1
+        out_pyramid = []
+        for i in range(self.num_levels):
+            fmap2 = self.fmap2_pyramid[i]
+
+            dx = torch.zeros(1)
+            dy = torch.linspace(-r, r, 2*r+1)
+            delta = torch.stack(torch.meshgrid(dy, dx), axis=-1).to(coords.device)
+            centroid_lvl = coords.reshape(batch, h1, w1, 1, 2).clone()
+            centroid_lvl[...,0] = centroid_lvl[...,0] / 2**i
+            coords_lvl = centroid_lvl + delta.view(-1, 2)
+
+            corr = self.corr(fmap1, fmap2, coords_lvl)
+            out_pyramid.append(corr)
+        out = torch.cat(out_pyramid, dim=-1)
+        return out.permute(0, 3, 1, 2).contiguous().float()
+
+
 class CorrBlock1D:
     def __init__(self, fmap1, fmap2, num_levels=4, radius=4):
         self.num_levels = num_levels
@@ -128,6 +187,8 @@ class CorrBlock1D:
         r = self.radius
         coords = coords[:, :1].permute(0, 2, 3, 1)
         batch, h1, w1, _ = coords.shape
+
+        # print(f"当前显存消耗量: {torch.distributed.get_rank()} {torch.cuda.memory_allocated() / 1024 / 1024:.2f} MB")
 
         out_pyramid = []
         for i in range(self.num_levels):
@@ -162,7 +223,7 @@ class AbsCorrBlock1D:
         self.abs_corr_matrix_pyramid = []
 
         # all pairs correlation
-        abs_corr_matrix = AbsBlock1D.abs_corr(fmap1, fmap2)
+        abs_corr_matrix = AbsCorrBlock1D.abs_corr(fmap1, fmap2)
 
         batch, h1, w1, _, w2 = abs_corr_matrix.shape
         abs_corr_matrix = abs_corr_matrix.reshape(batch*h1*w1, 1, 1, w2)
@@ -206,7 +267,12 @@ class AbsCorrBlock1D:
         _, _, _, W2 = fmap2.shape
 
         # 计算 L1 匹配代价
-        corr_matrix = torch.mean(torch.abs(fmap1.unsqueeze(-1) - correlation.unsqueeze(-2)), dim=1)  # shape (B, H, W1, W2)
+        # corr_matrix = torch.einsum('aijk,aijh->ajkh', fmap1, fmap2)
+        # corr_matrix = torch.sum(torch.abs(fmap1.unsqueeze(-1) - fmap2.unsqueeze(-2)), dim=1)  # shape (B, H, W1, W2)
+        corr_matrix = (fmap1.unsqueeze(-1) - fmap2.unsqueeze(-2)).abs_().sum(dim=1)  # shape (B, H, W1, W2)
+        # corr_matrix = fmap1.sum(dim=1).unsqueeze(-1) - fmap2.sum(dim=1).unsqueeze(-2) # shape (B, H, W1, W2)
+        print("-"*10, " AbsCorrBlock1D: {} ".format(corr_matrix.shape), "-"*10)
+        print(f"当前显存消耗量: {torch.distributed.get_rank()} {torch.cuda.memory_allocated() / 1024 / 1024:.2f} MB")
         
         corr_matrix = corr_matrix.reshape(B, H, W1, 1, W2).contiguous()
         return corr_matrix / torch.sqrt(torch.tensor(D).float())

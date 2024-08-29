@@ -6,3 +6,7 @@ logs/
 logs-raw/
 logs*
 *.pyc
+
+build/
+*.egg-info/
+dist/
