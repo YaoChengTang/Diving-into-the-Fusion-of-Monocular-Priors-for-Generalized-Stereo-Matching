@@ -64,8 +64,17 @@ class Mast3rExtractor(nn.Module):
         elif self.norm_fn == 'none':
             self.norm1 = nn.Sequential()
 
+        # self.layer1 = nn.Sequential(
+        #     nn.Conv2d(32, 64, kernel_size=7, stride=1, padding=3),
+        #     self.norm1,
+        #     nn.ReLU(inplace=True),
+        # )
+
         self.layer1 = nn.Sequential(
             nn.Conv2d(32, 64, kernel_size=7, stride=1, padding=3),
+            self.norm1,
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
             self.norm1,
             nn.ReLU(inplace=True),
         )
@@ -94,10 +103,30 @@ class Mast3rExtractor(nn.Module):
     #             if m.bias is not None:
     #                 nn.init.constant_(m.bias, 0)
 
+    # def _make_layer(self, dim, stride=1):
+    #     layer1 = ResidualBlock(self.in_planes, dim, self.norm_fn, stride=stride)
+    #     layer2 = ResidualBlock(dim, dim, self.norm_fn, stride=1)
+    #     layers = (layer1, layer2)
+        
+    #     self.in_planes = dim
+    #     return nn.Sequential(*layers)
+    
+    # def _make_layer(self, dim, stride=1):
+    #     layer1 = ResidualBlock(self.in_planes, self.in_planes, self.norm_fn, stride=stride)
+    #     layer2 = ResidualBlock(self.in_planes, dim, self.norm_fn, stride=1)
+    #     layer3 = ResidualBlock(dim, dim, self.norm_fn, stride=1)
+    #     layers = (layer1, layer2, layer3)
+        
+    #     self.in_planes = dim
+    #     return nn.Sequential(*layers)
+
     def _make_layer(self, dim, stride=1):
-        layer1 = ResidualBlock(self.in_planes, dim, self.norm_fn, stride=stride)
-        layer2 = ResidualBlock(dim, dim, self.norm_fn, stride=1)
-        layers = (layer1, layer2)
+        layer1 = ResidualBlock(self.in_planes, self.in_planes, self.norm_fn, stride=stride)
+        layer1 = ResidualBlock(self.in_planes, self.in_planes, self.norm_fn, stride=stride)
+        layer2 = ResidualBlock(self.in_planes, dim, self.norm_fn, stride=1)
+        layer3 = ResidualBlock(dim, dim, self.norm_fn, stride=1)
+        layer3 = ResidualBlock(dim, dim, self.norm_fn, stride=1)
+        layers = (layer1, layer2, layer3)
         
         self.in_planes = dim
         return nn.Sequential(*layers)

@@ -101,6 +101,7 @@ def train(args):
             
             global_batch_num += 1
             scaler.scale(loss).backward()
+            # logger.info(model.module.fnet.layer1[0].weight.grad)
             scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
