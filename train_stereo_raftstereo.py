@@ -201,10 +201,12 @@ if __name__ == '__main__':
     ddp_init(args)
     init_directories([LOG_ROOT, TB_ROOT, CKPOINT_ROOT])
 
-    try:
-        train(args)
-    except Exception as err:
-        delete_directories_if_static([LOG_ROOT, TB_ROOT, CKPOINT_ROOT])
-        raise Exception(err)
+    train(args)
+
+    # try:
+    #     train(args)
+    # except Exception as err:
+    #     delete_directories_if_static([LOG_ROOT, TB_ROOT, CKPOINT_ROOT])
+    #     raise Exception(err)
 
     ddp_close()
