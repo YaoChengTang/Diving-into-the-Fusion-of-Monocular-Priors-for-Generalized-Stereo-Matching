@@ -93,6 +93,14 @@ def train(args):
             flow_predictions = model(image1, image2, iters=args.train_iters)
             assert model.training
 
+            corrupted = True
+            n_predictions = len(flow_predictions)
+            for i in range(n_predictions):
+                if not torch.isnan(flow_predictions[i]).any() and not torch.isinf(flow_predictions[i]).any():
+                    corrupted = False
+            if corrupted:
+                continue
+
             loss, metrics = sequence_loss(flow_predictions, flow, valid)
             if args.local_rank==0 and int(NODE_RANK)==0:
                 logger.push(metrics)

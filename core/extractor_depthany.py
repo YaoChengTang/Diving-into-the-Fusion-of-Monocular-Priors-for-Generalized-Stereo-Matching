@@ -76,9 +76,16 @@ class DepthAnyExtractor(nn.Module):
 
         self.outputs32 = nn.ModuleList(output_list)
 
+        self.layer1 = nn.Sequential(
+            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+        )
+
         self.in_planes = 128
-        self.layer1 = self._make_layer(128, stride=2)
         self.layer2 = self._make_layer(128, stride=2)
+        self.layer3 = self._make_layer(128, stride=2)
 
         # self._init_weights()
 
@@ -138,19 +145,20 @@ class DepthAnyExtractor(nn.Module):
         # resize image
         # [1, 128, H//4, W//4]
         x = resize_to_quarter(depth_fea, (H,W), 2**self.downsample)
+        x = self.layer1(x)
 
         outputs08 = [f(x) for f in self.outputs08]
         if num_layers == 1:
             return (outputs08, v) if dual_inp else (outputs08,)
 
         # [1, 128, H//8, W//8]
-        y = self.layer1(x)
+        y = self.layer2(x)
         outputs16 = [f(y) for f in self.outputs16]
         if num_layers == 2:
             return (outputs08, outputs16, v) if dual_inp else (outputs08, outputs16)
 
         # [1, 128, H//16, W//16]
-        z = self.layer2(y)
+        z = self.layer3(y)
         outputs32 = [f(z) for f in self.outputs32]
 
         return outputs08, outputs16, outputs32

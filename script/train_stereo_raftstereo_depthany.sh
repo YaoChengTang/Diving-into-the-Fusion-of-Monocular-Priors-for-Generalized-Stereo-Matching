@@ -24,7 +24,7 @@ export NCCL_P2P_DISABLE=1
 # export MASTER_PORT=29501
 # export CUDA_VISIBLE_DEVICES=0,1,2,3
 # export CUDA_VISIBLE_DEVICES=4,5,6,7
-export CUDA_VISIBLE_DEVICES=5,6,7
+export CUDA_VISIBLE_DEVICES=4,5,6,7
 
 # "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/Sceneflow"
 # "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/Middlebury"
@@ -43,4 +43,4 @@ echo "CKPOINT_ROOT is set to: $CKPOINT_ROOT"
 
 
 
-torchrun --nnode 1 --nproc_per_node 3 --master_port 29501 train_stereo_raftstereo.py --batch_size 8 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision --model_name "RAFTStereoDepthAny" --depthany_model_dir "/data5/yao/pretrained" --exp_name "$EXP_NAME"
+torchrun --nnode 1 --nproc_per_node 4 --master_port 29501 train_stereo_raftstereo.py --batch_size 8 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision --model_name "RAFTStereoDepthAny" --depthany_model_dir "/data5/yao/pretrained" --exp_name "$EXP_NAME"
