@@ -1,5 +1,6 @@
 import os
 import sys
+import numpy as np
 sys.path.insert(0,'mast3r')
 
 import torch
@@ -12,7 +13,32 @@ from mast3r.model import AsymmetricMASt3R
 
 
 
-def resize_and_pad_tensor(tensor, target_size=512):
+# def resize_and_pad_tensor(tensor, target_size=512):
+#     # 获取输入 tensor 的尺寸 (B, C, H, W)
+#     _, _, H, W = tensor.shape
+    
+#     # 计算 H 和 W 中较长的一边
+#     if H > W:
+#         new_H = target_size
+#         new_W = int(W * (target_size / H))
+#     else:
+#         new_W = target_size
+#         new_H = int(H * (target_size / W))
+    
+#     # 使用 interpolate 进行缩放
+#     resized_tensor = F.interpolate(tensor, size=(new_H, new_W), mode='bilinear', align_corners=False)
+    
+#     # 计算是否需要填充，使得尺寸可以被16整除
+#     pad_H = (16 - new_H % 16) if new_H % 16 != 0 else 0
+#     pad_W = (16 - new_W % 16) if new_W % 16 != 0 else 0
+    
+#     # 进行填充，确保两边可以被16整除
+#     padding = (0, pad_W, 0, pad_H)  # (left, right, top, bottom)
+#     padded_tensor = F.pad(resized_tensor, padding)
+    
+#     return padded_tensor
+
+def resize_tensor(tensor, target_size=512, ratio=16):
     # 获取输入 tensor 的尺寸 (B, C, H, W)
     _, _, H, W = tensor.shape
     
@@ -24,18 +50,13 @@ def resize_and_pad_tensor(tensor, target_size=512):
         new_W = target_size
         new_H = int(H * (target_size / W))
     
+    new_W = (np.ceil(new_W / ratio) * ratio).astype(int)
+    new_H = (np.ceil(new_H / ratio) * ratio).astype(int)
+
     # 使用 interpolate 进行缩放
-    resized_tensor = F.interpolate(tensor, size=(new_H, new_W), mode='bilinear', align_corners=False)
+    resized_tensor = F.interpolate(tensor, size=(new_H, new_W), mode='bicubic', align_corners=False)
     
-    # 计算是否需要填充，使得尺寸可以被16整除
-    pad_H = (16 - new_H % 16) if new_H % 16 != 0 else 0
-    pad_W = (16 - new_W % 16) if new_W % 16 != 0 else 0
-    
-    # 进行填充，确保两边可以被16整除
-    padding = (0, pad_W, 0, pad_H)  # (left, right, top, bottom)
-    padded_tensor = F.pad(resized_tensor, padding)
-    
-    return padded_tensor
+    return resized_tensor
 
 
 def resize_to_quarter(tensor, original_size, ratio):
@@ -134,8 +155,8 @@ class Mast3rExtractor(nn.Module):
     def forward(self, image1, image2, dual_inp=False):
         # resize image
         B, _, H, W = image1.shape
-        image1 = resize_and_pad_tensor(image1)
-        image2 = resize_and_pad_tensor(image2)
+        image1 = resize_tensor(image1)
+        image2 = resize_tensor(image2)
 
         # data format for MaSt3R
         _, _, H1, W1 = image1.shape
