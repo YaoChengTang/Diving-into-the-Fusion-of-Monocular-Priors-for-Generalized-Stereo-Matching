@@ -17,6 +17,7 @@ from core.raft_stereo import RAFTStereo, autocast
 from core.raft_stereo_disp import RAFTStereoDisp
 from core.raft_stereo_mast3r import RAFTStereoMast3r
 from core.raft_stereo_depthany import RAFTStereoDepthAny
+from core.raft_stereo_noctx import RAFTStereoNoCTX
 
 import stereo_datasets as datasets
 from core.utils.utils import InputPadder, LoggerCommon
@@ -368,6 +369,8 @@ if __name__ == '__main__':
         model = RAFTStereoMast3r(args)
     elif args.model_name.lower() == "raftstereodepthany":
         model = RAFTStereoDepthAny(args)
+    elif args.model_name.lower() == "raftstereonoctx":
+        model = RAFTStereoNoCTX(args)
     else :
         raise Exception("No such model: {}".format(args.model_name))
     model = torch.nn.DataParallel(model, device_ids=[0])
