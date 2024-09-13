@@ -84,7 +84,7 @@ class RAFTStereoDepthAny(nn.Module):
                 fmap1, fmap2 = self.conv2(x).split(dim=0, split_size=x.shape[0]//2)
             else:
                 # cnet_list: [[(128,248,360), (128,248,360)], [(128,124,180),(128,124,180)], [(128,62,90),(128,62,90)]]
-                cnet_list = self.cnet(image1, num_layers=self.args.n_gru_layers)
+                cnet_list, depth = self.cnet(image1, num_layers=self.args.n_gru_layers)
                 # fmap1: (128,248,360), fmap2: (128,248,360)
                 fmap1, fmap2 = self.fnet([image1, image2])
             

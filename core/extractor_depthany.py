@@ -139,11 +139,13 @@ class DepthAnyExtractor(nn.Module):
 
         # DepthAnything
         with torch.no_grad():
+            # out_depth: [1, 1, 518, 756]
             # out_fea: [1, 128, 296, 432]
             depth, depth_fea = self.depth_anything(img)
 
         # resize image
         # [1, 128, H//4, W//4]
+        depth = resize_to_quarter(depth, (H,W), 2**self.downsample)
         x = resize_to_quarter(depth_fea, (H,W), 2**self.downsample)
         x = self.layer1(x)
 
@@ -161,4 +163,4 @@ class DepthAnyExtractor(nn.Module):
         z = self.layer3(y)
         outputs32 = [f(z) for f in self.outputs32]
 
-        return outputs08, outputs16, outputs32
+        return (outputs08, outputs16, outputs32), depth
