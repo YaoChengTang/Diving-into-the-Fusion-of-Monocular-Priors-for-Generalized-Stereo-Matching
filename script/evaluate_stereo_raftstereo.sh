@@ -32,10 +32,23 @@ export CUDA_VISIBLE_DEVICES=0
 # python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthAny_20240908_125231/60000_RaftStereoDepthAny.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthAny" --test_exp_name "60000itr"
 
 
-python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoMast3r_fineNoPadding_20240908_133009/RaftStereoMast3r_fineNoPadding.pth --mast3r_model_path "/data5/yao/pretrained/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth" --dataset middlebury_H --model_name "RAFTStereoMast3r" --test_exp_name "final"
-python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoMast3r_fineNoPadding_20240908_133009/150000_RaftStereoMast3r_fineNoPadding.pth --mast3r_model_path "/data5/yao/pretrained/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth" --dataset middlebury_H --model_name "RAFTStereoMast3r" --test_exp_name "150000itr"
-python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoMast3r_fineNoPadding_20240908_133009/100000_RaftStereoMast3r_fineNoPadding.pth --mast3r_model_path "/data5/yao/pretrained/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth" --dataset middlebury_H --model_name "RAFTStereoMast3r" --test_exp_name "100000itr"
-python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoMast3r_fineNoPadding_20240908_133009/50000_RaftStereoMast3r_fineNoPadding.pth --mast3r_model_path "/data5/yao/pretrained/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth" --dataset middlebury_H --model_name "RAFTStereoMast3r" --test_exp_name "50000itr"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoMast3r_fineNoPadding_20240908_133009/RaftStereoMast3r_fineNoPadding.pth --mast3r_model_path "/data5/yao/pretrained/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth" --dataset middlebury_H --model_name "RAFTStereoMast3r" --test_exp_name "final"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoMast3r_fineNoPadding_20240908_133009/150000_RaftStereoMast3r_fineNoPadding.pth --mast3r_model_path "/data5/yao/pretrained/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth" --dataset middlebury_H --model_name "RAFTStereoMast3r" --test_exp_name "150000itr"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoMast3r_fineNoPadding_20240908_133009/100000_RaftStereoMast3r_fineNoPadding.pth --mast3r_model_path "/data5/yao/pretrained/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth" --dataset middlebury_H --model_name "RAFTStereoMast3r" --test_exp_name "100000itr"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoMast3r_fineNoPadding_20240908_133009/50000_RaftStereoMast3r_fineNoPadding.pth --mast3r_model_path "/data5/yao/pretrained/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth" --dataset middlebury_H --model_name "RAFTStereoMast3r" --test_exp_name "50000itr"
 
+
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoNoCTX_20240911_155418/RaftStereoNoCTX.pth --dataset middlebury_H --model_name "RaftStereoNoCTX" --test_exp_name "final"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoNoCTX_20240911_155418/90000_RaftStereoNoCTX.pth --dataset middlebury_H --model_name "RaftStereoNoCTX" --test_exp_name "90000itr"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoNoCTX_20240911_155418/80000_RaftStereoNoCTX.pth --dataset middlebury_H --model_name "RaftStereoNoCTX" --test_exp_name "80000itr"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoNoCTX_20240911_155418/70000_RaftStereoNoCTX.pth --dataset middlebury_H --model_name "RaftStereoNoCTX" --test_exp_name "70000itr"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoNoCTX_20240911_155418/60000_RaftStereoNoCTX.pth --dataset middlebury_H --model_name "RaftStereoNoCTX" --test_exp_name "60000itr"
+
+
+python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthFusion_20240913_234716/RaftStereoDepthFusion.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthFusion" --test_exp_name "final"
+python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthFusion_20240913_234716/90000_RaftStereoDepthFusion.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthFusion" --test_exp_name "90000itr"
+python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthFusion_20240913_234716/80000_RaftStereoDepthFusion.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthFusion" --test_exp_name "80000itr"
+python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthFusion_20240913_234716/70000_RaftStereoDepthFusion.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthFusion" --test_exp_name "70000itr"
+python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthFusion_20240913_234716/60000_RaftStereoDepthFusion.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthFusion" --test_exp_name "60000itr"
 
 python3 merge_sheet.py
