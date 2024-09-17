@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.init as init
 import torch.nn.functional as F
+from torch.distributions import Beta
 
 from core.extractor import ResidualBlock
 
@@ -54,3 +55,54 @@ class UpdateHistory(nn.Module):
     def forward(self, his, disp):
         hist_update = self.update( torch.cat([his,self.conv(disp)], dim=1) )
         return hist_update
+
+
+class BetaModulator(nn.Module):
+    def __init__(self, args, lbp_dim, norm_fn='batch'):
+        super(BetaModulator, self).__init__()
+        self.norm_fn = norm_fn
+        self.modulation_ratio = args.modulation_ratio
+        # self.conv_depth = nn.Sequential(
+        #     nn.Conv2d(8, 16, kernel_size=1, padding=0, bias=True),
+        #     nn.ReLU(inplace=True),
+        #     nn.Conv2d(16, 16, kernel_size=3, padding=1, bias=True),
+        # )
+        # self.conv_disp = nn.Sequential(
+        #     nn.Conv2d(8, 16, kernel_size=1, padding=0, bias=True),
+        #     nn.ReLU(inplace=True),
+        #     nn.Conv2d(16, 16, kernel_size=3, padding=1, bias=True),
+        # )
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(lbp_dim*2, lbp_dim*2, kernel_size=3, padding=1, bias=True),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(lbp_dim*2, lbp_dim*2, kernel_size=3, padding=1, bias=True),
+        )
+        self.down = nn.Sequential(
+            ResidualBlock(lbp_dim*2, 64, self.norm_fn, stride=2),
+            ResidualBlock(64, 128, self.norm_fn, stride=1)
+        )
+        self.up   = nn.ConvTranspose2d(128, lbp_dim*2, kernel_size=2, stride=2)
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(lbp_dim*4, lbp_dim, kernel_size=3, padding=1, bias=False),
+            nn.Softplus(),
+            nn.Conv2d(lbp_dim, 2, kernel_size=1, padding=0, bias=False),
+            nn.Softplus(),
+        )
+    
+    def forward(self, lbp_disp, lbp_depth, itr_ratio):
+        x1 = self.conv1( torch.cat([lbp_disp, lbp_depth], dim=1) )
+        x2 = self.up(self.down(x1))
+        beta_paras = self.conv2( torch.cat([x1,x2], dim=1) ) + 1  # enforcing alpha>=1, beta>=1
+
+        # build Beta distribution
+        alpha, beta = torch.split(beta_paras, 1, dim=1)
+        distribution = Beta(alpha, beta)
+
+        if self.training:
+            modulation = distribution.rsample()
+        else:
+            modulation = distribution.mean
+        
+        # modulation = modulation*2 - 1
+        modulation = 1 + modulation * (self.modulation_ratio * itr_ratio)   # we hope modulation has less effect at the first several iterations as the disp is unreliable and the lcoal LBP disp is unreliable
+        return modulation

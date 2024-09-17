@@ -19,6 +19,7 @@ from core.raft_stereo_mast3r import RAFTStereoMast3r
 from core.raft_stereo_depthany import RAFTStereoDepthAny
 from core.raft_stereo_noctx import RAFTStereoNoCTX
 from core.raft_stereo_depthfusion import RAFTStereoDepthFusion
+from core.raft_stereo_depthbeta import RAFTStereoDepthBeta
 
 import stereo_datasets as datasets
 from core.utils.utils import InputPadder, LoggerCommon
@@ -352,6 +353,9 @@ if __name__ == '__main__':
     parser.add_argument('--slow_fast_gru', action='store_true', help="iterate the low-res GRUs more frequently")
     parser.add_argument('--n_gru_layers', type=int, default=3, help="number of hidden GRU levels")
 
+    parser.add_argument('--lbp_neighbor_offsets', default='(-1,-1), (1,1), (1,-1), (-1,1)', help="determine the neighbors used in LBP encoder")
+    parser.add_argument('--modulation_ratio', type=float, default=1., help="hyperparameters for modulation")
+
     args = parser.parse_args()
 
     # 重新设定日志文件位置
@@ -374,6 +378,8 @@ if __name__ == '__main__':
         model = RAFTStereoNoCTX(args)
     elif args.model_name.lower() == "raftstereodepthfusion":
         model = RAFTStereoDepthFusion(args)
+    elif args.model_name.lower() == "raftstereodepthbeta":
+        model = RAFTStereoDepthBeta(args)
     else :
         raise Exception("No such model: {}".format(args.model_name))
     model = torch.nn.DataParallel(model, device_ids=[0])

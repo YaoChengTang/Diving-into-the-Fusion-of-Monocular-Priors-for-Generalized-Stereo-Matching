@@ -185,6 +185,8 @@ if __name__ == '__main__':
     parser.add_argument('--n_gru_layers', type=int, default=3, help="number of hidden GRU levels")
     parser.add_argument('--hidden_dims', nargs='+', type=int, default=[128]*3, help="hidden state and context dimensions")
     parser.add_argument('--stop_freeze_bn', action='store_true', help="stop freeze BN")
+    parser.add_argument('--lbp_neighbor_offsets', default='(-1,-1), (1,1), (1,-1), (-1,1)', help="determine the neighbors used in LBP encoder")
+    parser.add_argument('--modulation_ratio', type=float, default=1., help="hyperparameters for modulation")
     
     # Data augmentation
     parser.add_argument('--img_gamma', type=float, nargs='+', default=None, help="gamma range")

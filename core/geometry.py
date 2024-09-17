@@ -1,11 +1,12 @@
+import re
 import os
 import sys
 import logging
 import numpy as np
 from collections import OrderedDict
 
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',)
+# logging.basicConfig(level=logging.INFO,
+#                     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',)
 
 import torch
 import torch.nn as nn
@@ -109,3 +110,84 @@ class Geometry_Conv_Split(nn.Module):
         hessian_g = self.decode_curvature(latten)                     # (1,3,H,W)
         params = torch.cat([disparity,plane_ab,hessian_g], dim=1)     # (1,6,H,W)
         return params
+
+
+class LBPEncoder(nn.Module):
+    """
+    Computes the modified Local Binary Patterns (LBP) of an image using custom neighbor offsets.
+    """
+    def __init__(self, args):
+        super(LBPEncoder, self).__init__()
+        self.args = args
+        self.lbp_neighbor_offsets = self._parse_offsets(self.args.lbp_neighbor_offsets)
+
+        self._build_lbp_kernel()
+        self.sigmoid = nn.Sigmoid()
+    
+    def _build_lbp_kernel(self):
+        # Determine the kernel size based on the maximum offset
+        self.num_neighbors = len(self.lbp_neighbor_offsets)
+        self.max_offset = int(np.abs(self.lbp_neighbor_offsets).max())
+        self.kernel_size = 2 * self.max_offset + 1
+        self.padding = self.max_offset
+
+        # Initialize the convolution layer for depthwise convolution
+        self.lbp_conv = nn.Conv2d(
+            in_channels=1,
+            out_channels=self.num_neighbors,
+            kernel_size=self.kernel_size,
+            padding=self.padding,
+            padding_mode="replicate",
+            bias=False,
+            groups=1  # Since in_channels=1, groups=1 makes it depthwise
+        )
+
+        self.lbp_weight = torch.zeros(self.num_neighbors, 1, 
+                                    self.kernel_size, self.kernel_size).float()
+        center_y, center_x = self.max_offset, self.max_offset
+        for idx, (dy, dx) in enumerate(self.lbp_neighbor_offsets):
+            # Compute the position in the kernel for the neighbor
+            y, x = center_y + dy, center_x + dx
+            if 0 <= y < self.kernel_size and 0 <= x < self.kernel_size:
+                self.lbp_weight[idx, 0, y, x] = 1.0
+                self.lbp_weight[idx, 0, center_y, center_x] = -1.0
+            else:
+                raise ValueError(f"Offset ({dy}, {dx}) is out of kernel bounds.")
+        
+        # Assign the weight to the convolution layer
+        self.lbp_conv.weight = nn.Parameter(self.lbp_weight)
+        self.lbp_conv.weight.requires_grad = False  # Ensure weights are not updated during training
+    
+    def _parse_offsets(self, offsets_str):
+        """
+        Parses a string to extract neighbor offsets.
+
+        Parameters:
+            offsets_str (str): String defining neighbor offsets, e.g., "(-1,-1), (1,1), (-1,1), (1,-1)"
+
+        Returns:
+            list of tuples: List of neighbor offsets.
+        """
+        # extract coordinate pairs
+        pattern = r'\((-?\d+),\s*(-?\d+)\)'
+        matches = re.findall(pattern, offsets_str)
+        if not matches:
+            raise ValueError(offsets_str + ": not suppoted format, please check it!")
+        offsets = [(int(y), int(x)) for y, x in matches]
+        return np.array(offsets)
+        
+        
+    def forward(self, img):
+        """
+        Parameters:
+            img (torch.Tensor): Grayscale image tensor of shape [N, 1, H, W].
+        Returns:
+            torch.Tensor: Modified LBP image of shape [N, C, H, W].
+        """
+        with torch.no_grad():
+            # Apply convolution to compute differences directly
+            differences = self.lbp_conv(img)  # Shape: [1, N, H, W] due to padding
+
+            # Apply sigmoid to the differences to get encoding values between 0 and 1
+            encoding = self.sigmoid(differences)  # Shape: [1, N, H, W]
+        return encoding
