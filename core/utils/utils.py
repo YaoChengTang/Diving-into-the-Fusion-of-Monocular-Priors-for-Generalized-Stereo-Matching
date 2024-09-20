@@ -182,6 +182,7 @@ class LoggerCommon:
             self.name = name
         self.log_name = '{}-{}.log'.format(self.name, datetime.now().strftime("%y%m%d_%H%M%S"))
         self.log_path = os.path.join(new_log_path, self.log_name)
+        os.makedirs(new_log_path, exist_ok=True)
         self._set_handlers()
 
     

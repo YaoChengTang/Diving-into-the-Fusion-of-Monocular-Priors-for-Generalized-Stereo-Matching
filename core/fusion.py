@@ -89,7 +89,7 @@ class BetaModulator(nn.Module):
             nn.Softplus(),
         )
     
-    def forward(self, lbp_disp, lbp_depth, itr_ratio):
+    def forward(self, lbp_disp, lbp_depth):
         x1 = self.conv1( torch.cat([lbp_disp, lbp_depth], dim=1) )
         x2 = self.up(self.down(x1))
         beta_paras = self.conv2( torch.cat([x1,x2], dim=1) ) + 1  # enforcing alpha>=1, beta>=1
@@ -103,6 +103,9 @@ class BetaModulator(nn.Module):
         else:
             modulation = distribution.mean
         
-        # modulation = modulation*2 - 1
-        modulation = 1 + modulation * (self.modulation_ratio * itr_ratio)   # we hope modulation has less effect at the first several iterations as the disp is unreliable and the lcoal LBP disp is unreliable
         return modulation
+        
+        # # modulation = modulation*2 - 1
+        # modulation_rescale = 1 + modulation * (self.modulation_ratio * itr_ratio)   # we hope modulation has less effect at the first several iterations as the disp is unreliable and the lcoal LBP disp is unreliable
+        # return modulation_rescale
+

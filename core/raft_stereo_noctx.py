@@ -67,7 +67,7 @@ class RAFTStereoNoCTX(nn.Module):
         return up_disp.reshape(N, D, factor*H, factor*W)
 
 
-    def forward(self, image1, image2, iters=12, disp_init=None, test_mode=False):
+    def forward(self, image1, image2, iters=12, disp_init=None, test_mode=False, vis_mode=False):
         """ Estimate optical flow between pair of frames """
 
         image1 = (2 * (image1 / 255.0) - 1.0).contiguous()
@@ -136,5 +136,8 @@ class RAFTStereoNoCTX(nn.Module):
 
         if test_mode:
             return hor_coords1 - hor_coords0, disp_up
+        
+        if vis_mode:
+            return {"disp_predictions": disp_predictions, }
 
         return disp_predictions

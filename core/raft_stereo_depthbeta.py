@@ -1,6 +1,9 @@
+import numpy as np
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from core.update_disp import DispBasicMultiUpdateBlock
 from core.extractor import BasicEncoder, ResidualBlock
 from core.extractor_depthany import DepthAnyExtractor
@@ -75,8 +78,17 @@ class RAFTStereoDepthBeta(nn.Module):
         up_disp = up_disp.permute(0, 1, 4, 2, 5, 3)
         return up_disp.reshape(N, D, factor*H, factor*W)
 
+    def rescale_modulation(self, itr, iters):
+        # we hope modulation has less effect at the first several iterations as the disp is unreliable and the lcoal LBP disp is unreliable
+        if self.args.modulation_alg == "linear":
+            ratio = self.args.modulation_ratio * itr / iters
+        elif self.args.modulation_alg == "sigmoid":
+            ratio = self.args.modulation_ratio * 1 / (1 + np.exp(-2 * (itr - 5)))
+        else:
+            raise Exception("Not supported modulation_alg: {}".format(self.args.modulation_alg))
+        return ratio
 
-    def forward(self, image1, image2, iters=12, disp_init=None, test_mode=False):
+    def forward(self, image1, image2, iters=12, disp_init=None, test_mode=False, vis_mode=False):
         """ Estimate optical flow between pair of frames """
 
         image1 = (2 * (image1 / 255.0) - 1.0).contiguous()
@@ -122,6 +134,7 @@ class RAFTStereoDepthBeta(nn.Module):
             hor_coords1 = hor_coords1 + disp_init
 
         disp_predictions = []
+        modulation_predictions = []
         for itr in range(iters):
             hor_coords1 = hor_coords1.detach()
             corr = corr_fn(hor_coords1) # index correlation volume
@@ -129,7 +142,7 @@ class RAFTStereoDepthBeta(nn.Module):
 
             with autocast(enabled=self.args.mixed_precision):
                 disp_lbp = self.lbp_encoder(disp)
-                modulation = self.modulater(disp_lbp, depth_lbp, itr/iters)
+                modulation = self.modulater(disp_lbp, depth_lbp)
 
                 if self.args.n_gru_layers == 3 and self.args.slow_fast_gru: # Update low-res GRU
                     net_list = self.update_block(net_list, inp_list, iter32=True, iter16=False, iter08=False, update=False)
@@ -137,7 +150,7 @@ class RAFTStereoDepthBeta(nn.Module):
                     net_list = self.update_block(net_list, inp_list, iter32=self.args.n_gru_layers==3, iter16=True, iter08=False, update=False)
                 net_list, up_mask, delta_disp = self.update_block(net_list, inp_list, corr, disp, iter32=self.args.n_gru_layers==3, iter16=self.args.n_gru_layers>=2)
 
-                delta_disp = modulation * delta_disp
+                delta_disp = delta_disp * (1 + modulation * self.rescale_modulation(itr, iters)) 
 
             # F(t+1) = F(t) + \Delta(t)
             hor_coords1 = hor_coords1 + delta_disp
@@ -148,10 +161,18 @@ class RAFTStereoDepthBeta(nn.Module):
 
             # upsample predictions
             disp_up = self.upsample_disp(hor_coords1 - hor_coords0, up_mask)
-
+            
             disp_predictions.append(disp_up)
+
+            if vis_mode:
+                modulation_predictions.append(modulation)
 
         if test_mode:
             return hor_coords1 - hor_coords0, disp_up
+
+        if vis_mode:
+            return {"disp_predictions": disp_predictions, 
+                    "depth": depth, 
+                    "modulation_predictions": modulation_predictions}
 
         return disp_predictions

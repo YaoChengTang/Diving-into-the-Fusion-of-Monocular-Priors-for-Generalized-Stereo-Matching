@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import cv2
 import numpy as np
@@ -8,7 +9,8 @@ from frame_utils import writeDispMiddlebury, writeDispKITTI, write_gen
 
 
 
-def show_imgs(param, sv_img=False, save2where=None, fontsize=20, szWidth=10, szHeight=5, group=3, 
+def show_imgs(param, sv_img=False, save2where=None, 
+              fontsize=20, szWidth=10, szHeight=5, group=3, 
               if_inter=False, dpi=600):
     """function: visualize the input data
     args:
@@ -146,8 +148,8 @@ def compute_confidence(movement_cur, movement_pre):
 
 
 class Visualizer:
-    def __init__(self, root, sv_root, dataset=None, scratch=True, args=None):
-        self.root = root.rstrip("/")
+    def __init__(self, root, sv_root, dataset=None, scratch=True, args=None, logger=None):
+        self.root    = root.rstrip("/")
         self.sv_root = sv_root.rstrip("/")
         self.dataset = dataset
         self.scratch = scratch
@@ -155,7 +157,9 @@ class Visualizer:
         self.sv_root = self.sv_root if self.sv_root[-(1+len(self.dataset)):]=="/"+self.dataset \
                        else os.path.join(self.sv_root, self.dataset)
         self.vis_root = self.sv_root.replace(self.dataset, os.path.join("analysis", self.dataset))
-        print("saving prediction to {}, visualization to {}".format(self.sv_root, self.vis_root))
+
+        self.my_print = print if logger is None else logger.info
+        self.my_print("saving prediction to {}, visualization to {}".format(self.sv_root, self.vis_root))
 
     def save_pred_vis(self, flow_pr, imageGT_file):
         assert self.root in imageGT_file, "{} not in {}".format(self.root, imageGT_file)
@@ -165,7 +169,7 @@ class Visualizer:
         pre,lat = os.path.splitext(sv_path)
         sv_path = pre + "-pred" + lat
         if not self.scratch and os.path.exists(sv_path):
-            print("{} exists".format(sv_path))
+            self.my_print("{} exists".format(sv_path))
             return True
 
         # build directory
@@ -182,15 +186,113 @@ class Visualizer:
         else:
             raise Exception("such daatset is not supported: {}".format(dataset))
         return True
+    
+    def get_xpx(self, key_list):
+        pattern = re.compile(r'^\d+(\.\d+)?px_list$')
+        px_keys = [key for key in key_list if pattern.match(key)]
+        assert len(px_keys) <= 1, f"too many xpx in {key_list} ~ {px_keys}"
+        if len(px_keys)==0:
+            return "0px_list"
+        return px_keys[0]
+
+    def get_error_map(self, pr_list, gt_list, stop_idx=-1):
+        error_map_list = []
+        colored_error_map_list = []
+        for idx in np.arange( len(pr_list) ):
+            if stop_idx>0 and idx>=stop_idx:
+                break
+                
+            gt = gt_list[0] if len(gt_list)==1 else gt_list[idx]
+            error_map = np.abs(pr_list[idx] - gt)
+            error_map[np.isinf(gt) | np.isnan(gt) | (gt==0)] = 0
+            error_map_list.append(error_map)
+
+            # colored_error_map = colorize_error_map(error_map, ver_hor="hor")
+            colored_error_map = colorize_error_map(error_map, ver_hor="ver")
+            colored_error_map_list.append(colored_error_map)
         
-    def analyze(self, flow_pr_sequence, image1, image2, flow_gt, valid_gt, 
-                confidence_list, flow_pr_refine_sequence, imageGT_file, 
-                vis_epe_sequence, vis_xpx_sequence, vis_refine_epe_sequence, vis_refine_xpx_sequence):
-        # print(" ".join(["{}, {}, {}, {}\r\n".format(ele.shape, ele.dtype, ele.min(), ele.max()) \
-        #                 for ele in [flow_pr, image1, image2, flow_gt, valid_gt]]))
+        return error_map_list, colored_error_map_list
+    
+    def get_imp_map(self, error_map_list, stop_idx=-1):
+        imp_map_list = []
+        colored_imp_map_list = []
+        for idx in np.arange( len(error_map_list) ):
+            if stop_idx>0 and idx>=stop_idx:
+                break
+                
+            imp_map = np.zeros_like(error_map) if idx==0 else error_map_list[idx] - error_map_list[idx-1]
+            imp_map_list.append(imp_map)
+
+            # colored_imp_map = colorize_improvement_map(imp_map, ver_hor="hor")
+            colored_imp_map = colorize_improvement_map(imp_map, ver_hor="ver")
+            colored_imp_map_list.append(colored_imp_map)
+        return imp_map_list, colored_imp_map_list
+
+    def get_movement_map(self, pr_list, stop_idx=-1):
+        move_map_list = []
+        colored_move_map_list = []
+        for idx in range(0, len(pr_list)):
+            if stop_idx>0 and idx>=stop_idx:
+                break
+                
+            move_map = np.zeros_like(pr_list[idx]) if idx<1 else pr_list[idx] - pr_list[idx-1]
+            move_map_list.append(move_map)
+
+            # colored_move_map = colorize_improvement_map(move_map, ver_hor="hor")
+            colored_move_map = colorize_improvement_map(move_map, ver_hor="ver")
+            colored_move_map_list.append(colored_move_map)
+        return move_map_list, colored_move_map_list
+
+    def get_acceleration_map(self, move_map_list, stop_idx=-1):
+        # get the difference between movement vector
+        colored_acc_map_list =[]
+        for idx in range(0, len(move_map_list)):
+            if stop_idx>0 and idx>=stop_idx:
+                break
+                
+            acc_map = np.zeros_like(move_map_list[idx]) if idx<2 else move_map_list[idx] - move_map_list[idx-1]
+
+            # colored_acc_map = colorize_improvement_map(acc_map, ver_hor="hor")
+            colored_acc_map = colorize_improvement_map(acc_map, ver_hor="ver")
+            colored_acc_map_list.append(colored_acc_map)
+        return colored_acc_map_list
+
+    def get_mask(self, mask_list, binary_thold, stop_idx=-1):
+        colored_mask_list = []
+        mask_binary_list = []
+        for mask in mask_list:
+            if stop_idx>0 and idx>=stop_idx:
+                break
+                
+            # colored_mask = colorize_confidence(mask, ver_hor="hor")
+            colored_mask = colorize_confidence(mask, ver_hor="ver")
+            colored_mask_list.append(colored_mask)
+
+            mask_binary = mask < binary_thold
+            mask_binary_list.append(mask_binary)
         
+        return colored_mask_list, mask_binary_list
+
+    def analyze(self, dict_list, imageGT_file, in_one_fig=False):
+        """
+            dict_list:
+                [{"name": "disp",
+                  "img_list": [...],
+                  "cmap": "jet",
+                  "epe_list": [...],
+                  "xpx_list": [...],
+                  "GT": [tensor],
+                  "stop_idx": 20,
+                  "improvement": False,
+                  "movement": False,
+                  "error_map": True,
+                  "acceleration": False,
+                  "mask": False,
+                  "binary_thold": 0.5},
+                ]
+        """
         # create saving path
-        file_name = "-".join(imageGT_file.replace(self.root, "").split("/"))
+        file_name = "-".join(imageGT_file.replace(self.root, "").split("/"))[1:]
         pre,lat = os.path.splitext(file_name)
         file_name = pre+".png"
         sv_path = os.path.join(self.vis_root, file_name)
@@ -199,196 +301,125 @@ class Visualizer:
         sv_dir = os.path.dirname(sv_path)
         os.makedirs(sv_dir, exist_ok=True)
 
-        # C*H*W -> H*W*C
-        image1 = np.transpose(image1, (1,2,0)).astype(np.uint8)
-        image2 = np.transpose(image2, (1,2,0)).astype(np.uint8)
+        fig_data_list = []
+        for vis_dict in dict_list :
+            vis_name = vis_dict.get("name", None)
+            assert vis_name is not None, "missing 'name' in vis_dict"
+            
+            GT       = vis_dict.get("GT", None)
+            img_list = vis_dict.get("img_list", [])
+            cmap     = vis_dict.get("cmap", None)
+            stop_idx = vis_dict.get("stop_idx", -1)
 
-        # get the colored error maps for the prediction sequence
-        error_map_sequence = []
-        colored_error_map_sequence = []
-        for flow_pr in flow_pr_sequence:
-            error_map = np.abs(flow_pr-flow_gt)
-            error_map[np.isinf(flow_gt)|np.isnan(flow_gt)|(flow_gt==0)] = 0
-            print("-"*10, (np.isinf(flow_gt)|np.isnan(flow_gt)|(flow_gt==0)).sum())
-            error_map_sequence.append(error_map)
-            # colored_error_map = colorize_error_map(error_map, ver_hor="hor")
-            colored_error_map = colorize_error_map(error_map, ver_hor="ver")
-            colored_error_map_sequence.append(colored_error_map)
-        plt.figure()
-        plt.axis("off")
-        plt.imshow(colored_error_map)
-        plt.savefig("./tmp.png")
-        
-        # get the colored improvement map between adjacent iterations,
-        # the improvement map of the first iteration is empty.
-        if self.args.improvement_map:
-            improvement_map_sequence = []
-            colored_improvement_map_sequence = []
-            for idx in range(0, len(error_map_sequence)):
-                if idx==0 :
-                    improvement_map = np.zeros_like(error_map)
-                else :
-                    improvement_map = error_map_sequence[idx] - error_map_sequence[idx-1]
-                improvement_map_sequence.append(improvement_map)
-                # colored_improvement_map = colorize_improvement_map(improvement_map, ver_hor="hor")
-                colored_improvement_map = colorize_improvement_map(improvement_map, ver_hor="ver")
-                colored_improvement_map_sequence.append(colored_improvement_map)
-        
-        # get the movement vector at each step
-        start_idx = 1
-        if self.args.movement_map:
-            movement_map_sequence = []
-            colored_movement_map_sequence = []
-            for idx in range(0, len(flow_pr_sequence)):
-                if idx<start_idx :
-                    movement_map = np.zeros_like(flow_pr_sequence[idx])
-                else :
-                    movement_map = flow_pr_sequence[idx] - flow_pr_sequence[idx-1]
-                movement_map_sequence.append(movement_map)
-                # colored_movement_map = colorize_improvement_map(movement_map, ver_hor="hor")
-                colored_movement_map = colorize_improvement_map(movement_map, ver_hor="ver")
-                colored_movement_map_sequence.append(colored_movement_map)
-        
-        # get the difference between movement vector
-        if self.args.acceleration_map:
-            colored_acceleration_map_sequence =[]
-            for idx in range(0, len(movement_map_sequence)):
-                if idx<start_idx+1 :
-                    acceleration_map = np.zeros_like(movement_map_sequence[idx])
-                else :
-                    acceleration_map = movement_map_sequence[idx] - movement_map_sequence[idx-1]
-                # colored_acceleration_map = colorize_improvement_map(acceleration_map, ver_hor="hor")
-                colored_acceleration_map = colorize_improvement_map(acceleration_map, ver_hor="ver")
-                colored_acceleration_map_sequence.append(colored_acceleration_map)
+            epe_list = vis_dict.get("epe_list", None)
+            xpx_name = self.get_xpx(vis_dict.keys())
+            xpx_list = vis_dict.get(xpx_name, None)
 
-        # get confidence
-        if self.args.mask:
-            static_improvement_list = []
-            mask_sequence_list = []
-            colored_mask_sequence = []
-            for idx in range(0, len(flow_pr_sequence)):
-                if idx<=start_idx or len(confidence_list)==0 or confidence_list[idx] is None :
-                    static_improvement_list.append([0,0,0,0])
-                    confidence = np.ones_like(error_map_sequence[-1])
-                    confidence[:1,:1] = 0
-                    mask_sequence_list.append(confidence)
-                else:
-                    if len(confidence_list)>0 and confidence_list[idx] is not None:
-                        confidence = confidence_list[idx]
-                    else:
-                        improvement_map = improvement_map_sequence[idx]
-                        TP = (improvement_map<-1).sum() / ((improvement_map<-1)|(improvement_map>1)).sum()
-                        FN = (improvement_map>1).sum() / ((improvement_map<-1)|(improvement_map>1)).sum()
-                        confidence = compute_confidence(movement_map_sequence[idx], movement_map_sequence[idx-1])
-                        TP_conf = (improvement_map*confidence<-1).sum() / ((improvement_map<-1)|(improvement_map>1)).sum()
-                        FN_conf = (improvement_map*confidence>1).sum() / ((improvement_map<-1)|(improvement_map>1)).sum()
-                        static_improvement_list.append([TP,FN,TP_conf,FN_conf])
+            error_map_req    = vis_dict.get("error_map", False)
+            movement_req     = vis_dict.get("movement", False)
+            improvement_req  = vis_dict.get("improvement", False)
+            acceleration_req = vis_dict.get("acceleration", False)
+            
+            binary_thold = vis_dict.get("binary_thold", 0.5)
+            mask_req     = vis_dict.get("mask", False)
+
+            if img_list is None or len(img_list)==0 :
+                continue
+
+            # get the colored error maps for the prediction sequence
+            if error_map_req :
+                error_map_list, colored_error_map_list = self.get_error_map(img_list, GT, stop_idx)
+            
+            # get the colored improvement map between adjacent iterations,
+            # the improvement map of the first iteration is empty.
+            if error_map_req and improvement_req :
+                imp_map_list, colored_imp_map_list = self.get_imp_map(error_map_list, stop_idx)
+
+            # get the movement vector at each step
+            if movement_req :
+                move_map_list, colored_move_map_list = self.get_movement_map(img_list, stop_idx)
+
+            # get the difference between movement vector
+            if acceleration_req :
+                colored_acc_map_list = self.get_acceleration_map(move_map_list, stop_idx)
+
+            # get the colorized mask and binary mask
+            if mask_req :
+                colored_mask_list, mask_binary_list = get_mask(img_list, binary_thold)
+
+            cnt = 0
+            for idx in np.arange( len(img_list) ) :
+                if stop_idx>0 and idx>=stop_idx:
+                    break
                 
-                # colored_mask = colorize_confidence(confidence, ver_hor="hor")
-                colored_mask = colorize_confidence(confidence, ver_hor="ver")
-                mask_sequence_list.append(confidence)
-                colored_mask_sequence.append(colored_mask)
+                info = ""
+                if epe_list is not None and len(epe_list) > 0 :
+                    info = ": epe~{:.2f}".format(epe_list[idx]) + ", " + \
+                            "{}~{:.1f}".format(xpx_name[:-5], epe_list[idx]*100)
                 
-                # H,W = confidence.shape
-                # confidence = confidence[..., np.newaxis]
-                # ratio = 0.2
-                # colored_movement_map_sequence[idx][:H] = ((1-ratio*(1-confidence))*colored_movement_map_sequence[idx][:H]).astype(np.uint8)
-                # colored_improvement_map_sequence[idx][:H] = ((1-ratio*(1-confidence))*colored_improvement_map_sequence[idx][:H]).astype(np.uint8) 
-                # colored_acceleration_map_sequence[idx][:H] = ((1-ratio*(1-confidence))*colored_acceleration_map_sequence[idx][:H]).astype(np.uint8)
-
-        # get confidence
-        if self.args.mask_binary:
-            mask_binary_sequence_list = []
-            for idx in range(0, len(flow_pr_sequence)):
-                if idx<=start_idx or len(confidence_list)==0 or confidence_list[idx] is None :
-                    confidence = np.ones_like(error_map_sequence[-1])
-                else:
-                    confidence = confidence_list[idx]
+                if cmap is None or cmap.find("private") == -1 :
+                    cnt += 1
+                    title = f"{vis_name}-{idx}"
+                    fig_data_list += [{"img"  : img_list[idx], 
+                                      "title": title, 
+                                      "cmap" : cmap, },]
                 
-                mask_binary = confidence < self.args.U_thold
-                mask_binary_sequence_list.append(mask_binary)
+                if error_map_req :
+                    cnt += 1
+                    title = f"Error Map-{idx}" + info
+                    fig_data_list += [{"img"  : colored_error_map_list[idx], 
+                                       "title": title, 
+                                       "cmap" : None, },]
+                
+                if error_map_req and improvement_req :
+                    cnt += 1
+                    title = f"Improvement (err[i]-err[i-1])-{idx}"
+                    fig_data_list += [{"img"  : colored_imp_map_list[idx], 
+                                       "title": title, 
+                                       "cmap" : None, },]
+                
+                if movement_req :
+                    cnt += 1
+                    title = f"Movement (disp[i]-disp[i-1])-{idx}"
+                    fig_data_list += [{"img"  : colored_move_map_list[idx], 
+                                       "title": title, 
+                                       "cmap" : None, },]
 
-        # vis
-        ## visualize GT and the final prediction
-        info = "epe:{:.2f}".format(vis_epe_sequence[-1]) + \
-               "3px:{:.1f}".format(vis_xpx_sequence[-1]*100)
-        show_imgs([{"img":image1, "title":"Left Image", },
-                   {"img":image2, "title":"Right Image", },
-                   {"img":flow_pr, "title":"Predicted Disparity", "cmap":'jet', },
-                   {"img":valid_gt, "title":"Mask", "cmap":"gray", },
-                   {"img":flow_gt, "title":"GT Disparity", "cmap":'jet', },
-                   {"img":colored_error_map, "title":"Error Map"+": "+info, "cmap":None, },
-                   ], 
-                  sv_img=True, save2where=sv_path, if_inter=False, 
-                  fontsize=20, szWidth=10, szHeight=5, group=2)
-        # print("saving {}".format(sv_path))
-        ## visuzalize the prediction sequence
-        group = self.args.improvement_map +\
-                self.args.movement_map +\
-                self.args.acceleration_map +\
-                self.args.mask +\
-                self.args.refine_map +\
-                self.args.mask_binary
-        group = max(group+2, 3)
-        atom_dict_list = [{"img":flow_gt, "title":"GT Disparity", "cmap":'jet'},
-                          {"img":image1, "title":"Left Image", },
-                          {"img":image2, "title":"Right Image", },] +\
-                         [{"img":np.zeros_like(image2), "title":"", }]*(group-3)
-        for idx in range(0, len(error_map_sequence)-20):
-            if idx>20:
-                break
-            info = "epe:{:.2f}".format(vis_epe_sequence[idx]) + ", " + \
-                   "3px:{:.1f}".format(vis_xpx_sequence[idx]*100)
-            tmp_list = [{"img":flow_pr_sequence[idx], 
-                         "title":"Predicted Disparity-{}".format(idx), 
-                         "cmap":'jet', },]
-            tmp_list += [{"img":colored_error_map_sequence[idx], 
-                         "title":"Error Map-{}".format(idx)+": "+info, 
-                         "cmap":None, },]
-            if self.args.refine_map:
-                info_refine = "epe:{:.2f}".format(vis_refine_epe_sequence[idx]) + ", " + \
-                              "3px:{:.1f}".format(vis_refine_xpx_sequence[idx]*100)
-                tmp_list += [{"img":flow_pr_refine_sequence[idx], 
-                             "title":"Refined Disparity-{}".format(idx)+": "+info_refine, 
-                             "cmap":'jet', },]
-            if self.args.improvement_map:
-                tmp_list += [{"img":colored_improvement_map_sequence[idx], 
-                             "title":"Improvement (err[i]-err[i-1])-{}".format(idx), 
-                             "cmap":None, },]
-            if self.args.movement_map:
-                tmp_list += [{"img":colored_movement_map_sequence[idx], 
-                             "title":"Movement (disp[i]-disp[i-1])-{}".format(idx), 
-                             "cmap":None, },]
-            if self.args.acceleration_map:
-                tmp_list += [{"img":colored_acceleration_map_sequence[idx], 
-                             "title":"Acceleration (Move[i]-Move[i-1])-{}".format(idx), 
-                             "cmap":None, },]
-            if self.args.mask:
-                tmp_list += [{"img":colored_mask_sequence[idx], 
-                             "title":"Mask-{}".format(idx), 
-                             "cmap":None, },]
-            if self.args.mask_binary:
-                tmp_list += [{"img":mask_binary_sequence_list[idx], 
-                             "title":"Binary Mask-{}".format(idx), 
-                             "cmap":"gray", },]
-            atom_dict_list += tmp_list
+                if acceleration_req :
+                    cnt += 1
+                    title = f"Acceleration (Move[i]-Move[i-1])-{idx}"
+                    fig_data_list += [{"img"  : colored_acc_map_list[idx], 
+                                       "title": title, 
+                                       "cmap" : None, },]
+                
+                if mask_req:
+                    cnt += 1
+                    title = f"Mask-{idx}"
+                    fig_data_list += [{"img"  : colored_mask_list[idx], 
+                                       "title": title, 
+                                       "cmap" : None, },]
+
+                    cnt += 1
+                    title = f"Binary Mask-{idx}"
+                    fig_data_list += [{"img"  : mask_binary_list[idx], 
+                                       "title": title, 
+                                       "cmap" : "gray", },]
+            if not in_one_fig:
+                group = cnt // len(img_list)
+                H,W = img_list[0].shape
+                pre,lat = os.path.splitext(sv_path)
+                sv_path = pre + f"-sequence-{vis_name}" + lat
+                show_imgs(fig_data_list, 
+                        sv_img=True, save2where=sv_path, if_inter=False, 
+                        fontsize=20, szWidth=int(group*W/H), szHeight=5, 
+                        group=group, dpi=300)
+                fig_data_list = []
+
+        if in_one_fig:
+            show_imgs(fig_data_list, 
+                    sv_img=True, save2where=sv_path, if_inter=False, 
+                    fontsize=20, szWidth=10, szHeight=5, group=2, dpi=300)
         
-        pre,lat = os.path.splitext(sv_path)
-        sv_path = pre +"-sequence"+ lat
-        show_imgs(atom_dict_list, 
-                  sv_img=True, save2where=sv_path, if_inter=False, 
-                  fontsize=20, szWidth=int(group*image1.shape[1]/image1.shape[0]), szHeight=5, 
-                  group=group, dpi=300)
-        # print("saving {}".format(sv_path))
-        pass
-# {"img":colored_improvement_map_sequence[idx], 
-#                                 "title":"Improvement (err[i]-err[i-1])-{}".format(idx)+\
-#                                         "\nTP:{:.3f}, FN:{:.3f} ".format(static_improvement_list[idx][0],
-#                                                                          static_improvement_list[idx][1])+\
-#                                         "TP':{:.3f}, FN':{:.3f} ".format(static_improvement_list[idx][2],
-#                                                                          static_improvement_list[idx][3]), 
-#                                 "cmap":None, },
-
 
 def colorize_error_map(error_map, ver_hor="hor"):
     # Define a custom colormap for errors within 10 (shades of red)

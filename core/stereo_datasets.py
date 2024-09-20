@@ -298,7 +298,7 @@ class KITTI(StereoDataset):
     def __init__(self, aug_params=None, root='datasets/KITTI', image_set='training', args=None):
         super(KITTI, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispKITTI, args=args)
         root = root if len(root)>0 else DATASET_ROOT
-        assert os.path.exists(root), "check the existence: {}".format(self.root)
+        assert os.path.exists(root), "check the existence: {}".format(root)
 
         image1_list = sorted(glob(os.path.join(root, image_set, 'image_2/*_10.png')))
         image2_list = sorted(glob(os.path.join(root, image_set, 'image_3/*_10.png')))
@@ -313,7 +313,7 @@ class KITTI2012(StereoDataset):
     def __init__(self, aug_params=None, root='datasets/KITTI2012', image_set='training', args=None):
         super(KITTI2012, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispKITTI, args=args)
         root = root if len(root)>0 else DATASET_ROOT
-        assert os.path.exists(root), "check the existence: {}".format(self.root)
+        assert os.path.exists(root), "check the existence: {}".format(root)
 
         image1_list = sorted(glob(os.path.join(root, image_set, 'image_0/*_10.png')))
         image2_list = sorted(glob(os.path.join(root, image_set, 'image_1/*_10.png')))
@@ -328,7 +328,7 @@ class Middlebury(StereoDataset):
     def __init__(self, aug_params=None, root='datasets/Middlebury', split='F', args=None):
         super(Middlebury, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispMiddlebury, args=args)
         root = root if len(root)>0 else DATASET_ROOT
-        assert os.path.exists(root), "check the existence: {}".format(self.root)
+        assert os.path.exists(root), "check the existence: {}".format(root)
         assert split in ["F", "H", "Q", "2014"]
         if split == "2014": # datasets/Middlebury/2014/Pipes-perfect/im0.png
             scenes = list((Path(root) / "2014").glob("*"))
