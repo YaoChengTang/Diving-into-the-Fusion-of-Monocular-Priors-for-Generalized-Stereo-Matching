@@ -165,7 +165,7 @@ def validate_eth3d(model, iters=32, root="", sv_root="", mixed_prec=False, args=
                                        padder, viser, dataset_name="ETH3D", d1_thold=1.0)
         epe_list.append(image_epe)
         out_list.append(image_out)
-        logging.info(f"ETH3D {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}")
+        logger.info(f"ETH3D {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}")
     
     epe_list = np.array(epe_list)
     out_list = np.array(out_list)
@@ -173,7 +173,7 @@ def validate_eth3d(model, iters=32, root="", sv_root="", mixed_prec=False, args=
     epe = np.mean(epe_list)
     d1 = 100 * np.mean(out_list)
 
-    logging.info("Validation ETH3D: EPE %f, D1 %f" % (epe, d1))
+    logger.info("Validation ETH3D: EPE %f, D1 %f" % (epe, d1))
     return {'eth3d-epe': epe, 'eth3d-d1': d1}
 
 
@@ -206,7 +206,7 @@ def validate_kitti(model, iters=32, root="", sv_root="", mixed_prec=False, args=
         epe_list.append(image_epe)
         out_list.append(image_out)
         if val_id < 9 or (val_id+1)%10 == 0:
-            logging.info(f"KITTI Iter {val_id+1} out of {len(val_dataset)}. " +\
+            logger.info(f"KITTI Iter {val_id+1} out of {len(val_dataset)}. " +\
                          f"EPE {round(image_epe,4)} D1 {round(image_out,4)}. " +\
                          f"Runtime: {format(end-start, '.3f')}s ({format(1/(end-start), '.2f')}-FPS)")
     
@@ -218,7 +218,7 @@ def validate_kitti(model, iters=32, root="", sv_root="", mixed_prec=False, args=
 
     avg_runtime = np.mean(elapsed_list)
 
-    logging.info(f"Validation KITTI: EPE {epe}, D1 {d1}, {format(1/avg_runtime, '.2f')}-FPS ({format(avg_runtime, '.3f')}s)")
+    logger.info(f"Validation KITTI: EPE {epe}, D1 {d1}, {format(1/avg_runtime, '.2f')}-FPS ({format(avg_runtime, '.3f')}s)")
     return {'kitti-epe': epe, 'kitti-d1': d1}
 
 
@@ -248,7 +248,7 @@ def validate_things(model, iters=32, root='', sv_root="", mixed_prec=False, args
         epe_list.append(image_epe)
         out_list.append(image_out)
         if val_id%100==0:
-            logging.info(f"FlyingThings3D Iter {val_id+1} out of {len(val_dataset)}. " +\
+            logger.info(f"FlyingThings3D Iter {val_id+1} out of {len(val_dataset)}. " +\
                          f"EPE {round(image_epe,4)} D1 {round(image_out,4)}")
 
     epe_list = np.array(epe_list)
@@ -257,7 +257,7 @@ def validate_things(model, iters=32, root='', sv_root="", mixed_prec=False, args
     epe = np.mean(epe_list)
     d1 = 100 * np.mean(out_list)
 
-    logging.info("Validation FlyingThings: %f, %f" % (epe, d1))
+    logger.info("Validation FlyingThings: %f, %f" % (epe, d1))
     return {'things-epe': epe, 'things-d1': d1}
 
 
@@ -286,7 +286,7 @@ def validate_middlebury(model, iters=32, split='F', root="", sv_root="", mixed_p
                                        padder, viser, dataset_name="Middlebury", d1_thold=2.0)
         epe_list.append(image_epe)
         out_list.append(image_out)
-        logging.info(f"Middlebury Iter {val_id+1} out of {len(val_dataset)}. " +\
+        logger.info(f"Middlebury Iter {val_id+1} out of {len(val_dataset)}. " +\
                      f"EPE {round(image_epe,4)} D1 {round(image_out,4)}")
 
     epe_list = np.array(epe_list)
@@ -295,7 +295,7 @@ def validate_middlebury(model, iters=32, split='F', root="", sv_root="", mixed_p
     epe = np.mean(epe_list)
     d1 = 100 * np.mean(out_list)
 
-    logging.info(f"Validation Middlebury{split}: EPE {epe}, D1 {d1}")
+    logger.info(f"Validation Middlebury{split}: EPE {epe}, D1 {d1}")
     return {f'middlebury{split}-epe': epe, f'middlebury{split}-d1': d1}
 
 
@@ -369,12 +369,12 @@ if __name__ == '__main__':
         logger.info(f"Loading checkpoint from {args.restore_ckpt}")
         checkpoint = torch.load(args.restore_ckpt)
         model.load_state_dict(checkpoint, strict=True)
-        logging.info(f"Done loading checkpoint from {args.restore_ckpt}")
+        logger.info(f"Done loading checkpoint from {args.restore_ckpt}")
 
     model.cuda()
     model.eval()
 
-    logging.info(f"The model has {format(count_parameters(model)/1e6, '.2f')}M learnable parameters.")
+    logger.info(f"The model has {format(count_parameters(model)/1e6, '.2f')}M learnable parameters.")
 
     # The CUDA implementations of the correlation volume prevent half-precision
     # rounding errors in the correlation lookup. This allows us to use mixed precision
