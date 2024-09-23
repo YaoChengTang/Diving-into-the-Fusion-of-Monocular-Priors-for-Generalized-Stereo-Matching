@@ -134,7 +134,7 @@ def disparity_computation(params, slant=None, slant_norm=False, coords0=None):
     return offset
 
 
-def rescale_modulation(self, itr, iters, modulation_alg, modulation_ratio):
+def rescale_modulation(itr, iters, modulation_alg, modulation_ratio):
     # we hope modulation has less effect at the first several iterations as the disp is unreliable and the lcoal LBP disp is unreliable
     if modulation_alg == "linear":
         ratio = modulation_ratio * itr / iters
