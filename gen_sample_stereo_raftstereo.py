@@ -20,6 +20,7 @@ from core.raft_stereo_depthany import RAFTStereoDepthAny
 from core.raft_stereo_noctx import RAFTStereoNoCTX
 from core.raft_stereo_depthfusion import RAFTStereoDepthFusion
 from core.raft_stereo_depthbeta import RAFTStereoDepthBeta
+from core.raft_stereo_depthbeta_nolbp import RAFTStereoDepthBetaNoLBP
 
 import stereo_datasets as datasets
 from core.utils.vis import Visualizer
@@ -320,7 +321,7 @@ if __name__ == '__main__':
     parser.add_argument('--root', help="dataset root", default=None)
     parser.add_argument('--sv_root', help="visualization root", default=None)
     parser.add_argument('--test_exp_name', default='', help="name your experiment in testing")
-    parser.add_argument('--model_name', default='RaftStereo', help="name your model: raftstereo, raftstereodisp, RAFTStereoMast3r, RAFTStereoDepthAny, raftstereodepthfusion")
+    parser.add_argument('--model_name', default='RaftStereo', help="name your model: raftstereo, raftstereodisp, RAFTStereoMast3r, RAFTStereoDepthAny, raftstereodepthfusion, RAFTStereoDepthBeta, RAFTStereoDepthBetaNoLBP")
     parser.add_argument('--mast3r_model_path', default='MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth', help="pretrained model path for MaSt3R")
     parser.add_argument('--depthany_model_dir', default='/data5/yao/pretrained', help="directory of pretrained model path for DepthAnything")
     parser.add_argument('--restore_ckpt', help="restore checkpoint", default=None)
@@ -376,6 +377,8 @@ if __name__ == '__main__':
         model = RAFTStereoDepthFusion(args)
     elif args.model_name.lower() == "raftstereodepthbeta":
         model = RAFTStereoDepthBeta(args)
+    elif args.model_name.lower() == "RAFTStereoDepthBetaNoLBP".lower():
+        model = RAFTStereoDepthBetaNoLBP(args)
     else :
         raise Exception("No such model: {}".format(args.model_name))
     model = torch.nn.DataParallel(model, device_ids=[0])
