@@ -89,6 +89,7 @@ def show_imgs(param, sv_img=False, save2where=None,
     if sv_img is True and save2where is not None :
         plt.savefig(os.path.join(save2where), dpi=dpi)
     # plt.show(block=False)
+    plt.close()
 
 
 def show_dis(param, sv_img=False, fontsize=20, szWidth=10, szHeight=5, group=3):
@@ -260,15 +261,15 @@ class Visualizer:
     def get_mask(self, mask_list, binary_thold, stop_idx=-1):
         colored_mask_list = []
         mask_binary_list = []
-        for mask in mask_list:
+        for idx in range(0, len(mask_list)):
             if stop_idx>0 and idx>=stop_idx:
                 break
                 
             # colored_mask = colorize_confidence(mask, ver_hor="hor")
-            colored_mask = colorize_confidence(mask, ver_hor="ver")
+            colored_mask = colorize_confidence(mask_list[idx], ver_hor="ver")
             colored_mask_list.append(colored_mask)
 
-            mask_binary = mask < binary_thold
+            mask_binary = mask_list[idx] < binary_thold
             mask_binary_list.append(mask_binary)
         
         return colored_mask_list, mask_binary_list
@@ -345,7 +346,7 @@ class Visualizer:
 
             # get the colorized mask and binary mask
             if mask_req :
-                colored_mask_list, mask_binary_list = get_mask(img_list, binary_thold)
+                colored_mask_list, mask_binary_list = self.get_mask(img_list, binary_thold, stop_idx)
 
             cnt = 0
             for idx in np.arange( len(img_list) ) :

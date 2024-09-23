@@ -114,28 +114,44 @@ def evalute(atom_dict,
     image1 = padder.unpad(image1).cpu().squeeze(0).permute(1,2,0)
     image2 = padder.unpad(image2).cpu().squeeze(0).permute(1,2,0)
 
-    vis1 = [{"name": "Left Image", 
-             "img_list": [image1.data.numpy().astype(np.uint8)], "cmap": None},
-            {"name": "Right Image", 
-             "img_list": [image2.data.numpy().astype(np.uint8)], "cmap": None},
-            {"name": "GT Disp", "img_list": [-flow_gt.data.numpy()[0]], "cmap": "jet"},
-            {"name": "Pr Disp", "img_list": [-flow_pr_sequence[-1].data.numpy()[0]], "cmap": "jet"},]
-    viser.analyze(vis1, imageGT_file, in_one_fig=True)
+    # vis1 = [{"name": "Left Image", 
+    #          "img_list": [image1.data.numpy().astype(np.uint8)], "cmap": None},
+    #         {"name": "Right Image", 
+    #          "img_list": [image2.data.numpy().astype(np.uint8)], "cmap": None},
+    #         {"name": "GT Disp", "img_list": [-flow_gt.data.numpy()[0]], "cmap": "jet"},
+    #         {"name": "Pr Disp", "img_list": [-flow_pr_sequence[-1].data.numpy()[0]], "cmap": "jet"},]
+    # viser.analyze(vis1, imageGT_file, in_one_fig=True)
 
-    vis2 = [{"name": "Disp", 
-             "img_list": [-flow_pr.data.numpy()[0] for flow_pr in flow_pr_sequence], 
-             "cmap": "jet",
-             "epe_list": vis_epe_sequence,
-             f"{d1_thold}px_list": vis_xpx_sequence,
-             "GT": [-flow_gt.data.numpy()[0]],
-             "stop_idx": 20,
-             "improvement": viser.args.improvement,
-             "movement": viser.args.movement,
-             "error_map": True,
-             "acceleration": viser.args.acceleration,
-             "mask": viser.args.mask,
-             "binary_thold": viser.args.binary_thold},]
-    viser.analyze(vis2, imageGT_file, in_one_fig=False)
+    # vis2 = [{"name": "Disp", 
+    #          "img_list": [-flow_pr.data.numpy()[0] for flow_pr in flow_pr_sequence], 
+    #          "cmap": "jet",
+    #          "epe_list": vis_epe_sequence,
+    #          f"{d1_thold}px_list": vis_xpx_sequence,
+    #          "GT": [-flow_gt.data.numpy()[0]],
+    #          "stop_idx": 20,
+    #          "improvement": viser.args.improvement,
+    #          "movement": viser.args.movement,
+    #          "error_map": True,
+    #          "acceleration": viser.args.acceleration,
+    #          "mask": viser.args.mask,
+    #          "binary_thold": viser.args.binary_thold},]
+    # viser.analyze(vis2, imageGT_file, in_one_fig=False)
+
+    if viser.args.mask and confidence_list is not None and len(confidence_list)>0 :
+        vis3 = [{"name": "Encourage", 
+                "img_list": [conf.data.numpy()[0] for conf in confidence_list], 
+                "cmap": "gray",
+                "epe_list": None,
+                f"{d1_thold}px_list": None,
+                "GT": None,
+                "stop_idx": 20,
+                "improvement": False,
+                "movement": False,
+                "error_map": False,
+                "acceleration": False,
+                "mask": True,
+                "binary_thold": viser.args.binary_thold},]
+        viser.analyze(vis3, imageGT_file, in_one_fig=False)
 
     return image_epe, image_out
 

@@ -10,5 +10,7 @@ export CKPOINT_ROOT="/data5/yao/runs/ckpoint"
 
 # CUDA_VISIBLE_DEVICES=1 python3 gen_sample_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthAny_20240908_125231/RaftStereoDepthAny.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --sv_root /data5/yao/runs/vis --model_name "RAFTStereoDepthAny" --test_exp_name "final"
 
-CUDA_VISIBLE_DEVICES=2 python3 gen_sample_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53_20240920_165346/80000_RaftStereoDepthBetaK53.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --sv_root /data5/yao/runs/vis --model_name "RAFTStereoDepthBeta" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --test_exp_name "8000-N53"
+# CUDA_VISIBLE_DEVICES=2 python3 gen_sample_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53_20240920_165346/80000_RaftStereoDepthBetaK53.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --sv_root /data5/yao/runs/vis --model_name "RAFTStereoDepthBeta" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --test_exp_name "8000-N53"
+
+CUDA_VISIBLE_DEVICES=3 python3 gen_sample_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53_20240920_165346/80000_RaftStereoDepthBetaK53.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --sv_root /data5/yao/runs/vis --model_name "RAFTStereoDepthBeta" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --test_exp_name "8000-N53" --mask
 
