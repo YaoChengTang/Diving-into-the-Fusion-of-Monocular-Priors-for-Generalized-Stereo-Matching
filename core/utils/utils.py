@@ -134,6 +134,17 @@ def disparity_computation(params, slant=None, slant_norm=False, coords0=None):
     return offset
 
 
+def rescale_modulation(self, itr, iters, modulation_alg, modulation_ratio):
+    # we hope modulation has less effect at the first several iterations as the disp is unreliable and the lcoal LBP disp is unreliable
+    if modulation_alg == "linear":
+        ratio = modulation_ratio * itr / iters
+    elif modulation_alg == "sigmoid":
+        ratio = modulation_ratio * 1 / (1 + np.exp(-2 * (itr - 5)))
+    else:
+        raise Exception("Not supported modulation_alg: {}".format(modulation_alg))
+    return ratio
+
+
 
 NODE_RANK    = os.getenv('NODE_RANK', default=0)
 LOCAL_RANK   = os.getenv("LOCAL_RANK", default=0)

@@ -8,7 +8,7 @@ from core.update_disp import DispBasicMultiUpdateBlock
 from core.extractor import BasicEncoder, ResidualBlock
 from core.extractor_depthany import DepthAnyExtractor
 from core.corr import CorrBlock1D, PytorchAlternateCorrBlock1D, CorrBlockFast1D, AlternateCorrBlock
-from core.utils.utils import hor_coords_grid
+from core.utils.utils import hor_coords_grid, rescale_modulation
 from core.geometry import LBPEncoder
 from core.fusion import BetaModulator
 
@@ -78,15 +78,7 @@ class RAFTStereoDepthBeta(nn.Module):
         up_disp = up_disp.permute(0, 1, 4, 2, 5, 3)
         return up_disp.reshape(N, D, factor*H, factor*W)
 
-    def rescale_modulation(self, itr, iters):
-        # we hope modulation has less effect at the first several iterations as the disp is unreliable and the lcoal LBP disp is unreliable
-        if self.args.modulation_alg == "linear":
-            ratio = self.args.modulation_ratio * itr / iters
-        elif self.args.modulation_alg == "sigmoid":
-            ratio = self.args.modulation_ratio * 1 / (1 + np.exp(-2 * (itr - 5)))
-        else:
-            raise Exception("Not supported modulation_alg: {}".format(self.args.modulation_alg))
-        return ratio
+    
 
     def forward(self, image1, image2, iters=12, disp_init=None, test_mode=False, vis_mode=False):
         """ Estimate optical flow between pair of frames """
@@ -150,7 +142,10 @@ class RAFTStereoDepthBeta(nn.Module):
                     net_list = self.update_block(net_list, inp_list, iter32=self.args.n_gru_layers==3, iter16=True, iter08=False, update=False)
                 net_list, up_mask, delta_disp = self.update_block(net_list, inp_list, corr, disp, iter32=self.args.n_gru_layers==3, iter16=self.args.n_gru_layers>=2)
 
-                delta_disp = delta_disp * (1 + modulation * self.rescale_modulation(itr, iters)) 
+                modulation_weight = rescale_modulation(itr, iters, 
+                                                       self.args.modulation_alg, 
+                                                       self.args.modulation_ratio)
+                delta_disp = delta_disp * (1 + modulation * modulation_weight) 
 
             # F(t+1) = F(t) + \Delta(t)
             hor_coords1 = hor_coords1 + delta_disp
