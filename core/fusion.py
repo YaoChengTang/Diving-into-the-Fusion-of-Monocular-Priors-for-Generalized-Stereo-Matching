@@ -77,9 +77,10 @@ class BetaModulator(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(lbp_dim*2, lbp_dim*2, kernel_size=3, padding=1, bias=True),
         )
+        down_dim = 64 if lbp_dim*2<64 else 128
         self.down = nn.Sequential(
-            ResidualBlock(lbp_dim*2, 64, self.norm_fn, stride=2),
-            ResidualBlock(64, 128, self.norm_fn, stride=1)
+            ResidualBlock(lbp_dim*2, down_dim, self.norm_fn, stride=2),
+            ResidualBlock(down_dim, 128, self.norm_fn, stride=1)
         )
         self.up   = nn.ConvTranspose2d(128, lbp_dim*2, kernel_size=2, stride=2)
         self.conv2 = nn.Sequential(
