@@ -188,6 +188,7 @@ if __name__ == '__main__':
     parser.add_argument('--lbp_neighbor_offsets', default='(-1,-1), (1,1), (1,-1), (-1,1)', help="determine the neighbors used in LBP encoder")
     parser.add_argument('--modulation_ratio', type=float, default=1., help="hyperparameters for modulation")
     parser.add_argument('--modulation_alg', choices=["linear", "sigmoid"], default="linear", help="rescale modulation")
+    parser.add_argument('--noLBP_hidden_dim', type=int, default=1, help="number of hidden dim when no LBP")
     
     # Data augmentation
     parser.add_argument('--img_gamma', type=float, nargs='+', default=None, help="gamma range")

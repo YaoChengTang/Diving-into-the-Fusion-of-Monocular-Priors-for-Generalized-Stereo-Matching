@@ -58,7 +58,7 @@ class UpdateHistory(nn.Module):
 
 
 class BetaModulator(nn.Module):
-    def __init__(self, args, lbp_dim, norm_fn='batch'):
+    def __init__(self, args, lbp_dim, hidden_dim=None, norm_fn='batch'):
         super(BetaModulator, self).__init__()
         self.norm_fn = norm_fn
         self.modulation_ratio = args.modulation_ratio
@@ -72,21 +72,23 @@ class BetaModulator(nn.Module):
         #     nn.ReLU(inplace=True),
         #     nn.Conv2d(16, 16, kernel_size=3, padding=1, bias=True),
         # )
+        if hidden_dim is None:
+            hidden_dim = lbp_dim
         self.conv1 = nn.Sequential(
-            nn.Conv2d(lbp_dim*2, lbp_dim*2, kernel_size=3, padding=1, bias=True),
+            nn.Conv2d(lbp_dim*2, hidden_dim*2, kernel_size=3, padding=1, bias=True),
             nn.ReLU(inplace=True),
-            nn.Conv2d(lbp_dim*2, lbp_dim*2, kernel_size=3, padding=1, bias=True),
+            nn.Conv2d(hidden_dim*2, hidden_dim*2, kernel_size=3, padding=1, bias=True),
         )
-        down_dim = 64 if lbp_dim*2<64 else 128
+        down_dim = 64 if hidden_dim*2<64 else 128
         self.down = nn.Sequential(
-            ResidualBlock(lbp_dim*2, down_dim, self.norm_fn, stride=2),
+            ResidualBlock(hidden_dim*2, down_dim, self.norm_fn, stride=2),
             ResidualBlock(down_dim, 128, self.norm_fn, stride=1)
         )
-        self.up   = nn.ConvTranspose2d(128, lbp_dim*2, kernel_size=2, stride=2)
+        self.up   = nn.ConvTranspose2d(128, hidden_dim*2, kernel_size=2, stride=2)
         self.conv2 = nn.Sequential(
-            nn.Conv2d(lbp_dim*4, lbp_dim, kernel_size=3, padding=1, bias=False),
+            nn.Conv2d(hidden_dim*4, hidden_dim, kernel_size=3, padding=1, bias=False),
             nn.Softplus(),
-            nn.Conv2d(lbp_dim, 2, kernel_size=1, padding=0, bias=False),
+            nn.Conv2d(hidden_dim, 2, kernel_size=1, padding=0, bias=False),
             nn.Softplus(),
         )
     

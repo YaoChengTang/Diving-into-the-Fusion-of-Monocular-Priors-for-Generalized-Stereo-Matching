@@ -38,7 +38,7 @@ class RAFTStereoDepthBetaNoLBP(nn.Module):
                                       downsample=args.n_downsample)
         self.update_block = DispBasicMultiUpdateBlock(self.args, hidden_dims=args.hidden_dims)
 
-        self.modulater = BetaModulator(args, lbp_dim=1)
+        self.modulater = BetaModulator(args, lbp_dim=1, hidden_dim=self.args.noLBP_hidden_dim)
 
         self.context_zqr_convs = nn.ModuleList([nn.Conv2d(context_dims[i], args.hidden_dims[i]*3, 3, padding=3//2) for i in range(self.args.n_gru_layers)])
 
