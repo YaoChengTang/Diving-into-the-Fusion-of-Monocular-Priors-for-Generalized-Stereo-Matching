@@ -351,6 +351,44 @@ class Middlebury(StereoDataset):
                 self.image_list += [ [img1, img2] ]
                 self.disparity_list += [ disp ]
 
+
+class Booster(StereoDataset):
+    def __init__(self, aug_params=None, root='data/Booster_dataset', resolution='Q', split='train'):
+        super(Booster, self).__init__(aug_params, sparse=True)
+        assert resolution in "FHQ"
+        if resolution == 'F':
+            root = os.path.join(root, 'full')
+        elif resolution == 'H':
+            root = os.path.join(root, 'half')
+        elif resolution == 'Q':
+            root = os.path.join(root, 'quarter')
+        image1_list = sorted( glob(osp.join(root, f'{split}/balanced/*/camera_00/*.png')) )
+        image2_list = sorted( glob(osp.join(root, f'{split}/balanced/*/camera_02/*.png')) )
+
+        for img1, img2 in zip(image1_list, image2_list):
+            self.image_list += [ [img1, img2] ]
+            self.disparity_list += [ '/'.join(img1.split('/')[0:-2]) + '/disp_00.npy' ]
+
+
+class NerfStereo(data.Dataset):
+    def __init__(self, datapath='data/nerf-stereo/training_set', training_file='filenames/nerf-stereo/trainingQ.txt', conf_threshold=0.5, disp_threshold=512., aug_params=None, scale=1):
+        self.augmentor = TripletFlowAugmentor(**aug_params)
+        self.scale=scale
+        self.disp_threshold = disp_threshold
+        self.conf_threshold = conf_threshold
+        self.disp_list = []
+        self.image_list = []
+
+        training_file = open(training_file, 'r')
+
+        for line in training_file.readlines():
+            left, center, right, disp, confidence = line.split()
+            self.image_list += [[os.path.join(datapath,left), 
+                                 os.path.join(datapath,center), 
+                                 os.path.join(datapath,right), 
+                                 os.path.join(datapath,disp),
+                                 os.path.join(datapath,confidence)]]
+                                 
   
 def fetch_dataloader(args):
     """ Create the data loader for the corresponding trainign set """
