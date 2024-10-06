@@ -40,6 +40,7 @@ from core.raft_stereo_noctx import RAFTStereoNoCTX
 from core.raft_stereo_depthfusion import RAFTStereoDepthFusion
 from core.raft_stereo_depthbeta import RAFTStereoDepthBeta
 from core.raft_stereo_depthbeta_nolbp import RAFTStereoDepthBetaNoLBP
+from core.raft_stereo_depthmatch import RAFTStereoDepthMatch
 
 
 def setup_distributed(args):
@@ -137,6 +138,8 @@ def get_model_ddp(args):
         model = nn.SyncBatchNorm.convert_sync_batchnorm(RAFTStereoDepthBeta(args))
     elif args.model_name.lower() == "RAFTStereoDepthBetaNoLBP".lower():
         model = nn.SyncBatchNorm.convert_sync_batchnorm(RAFTStereoDepthBetaNoLBP(args))
+    elif args.model_name.lower() == "RAFTStereoDepthMatch".lower():
+        model = nn.SyncBatchNorm.convert_sync_batchnorm(RAFTStereoDepthMatch(args))
     else :
         raise Exception("No such model: {}".format(args.model_name))
     

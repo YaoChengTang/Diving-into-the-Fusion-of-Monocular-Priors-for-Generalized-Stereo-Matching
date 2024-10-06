@@ -21,6 +21,7 @@ from core.raft_stereo_noctx import RAFTStereoNoCTX
 from core.raft_stereo_depthfusion import RAFTStereoDepthFusion
 from core.raft_stereo_depthbeta import RAFTStereoDepthBeta
 from core.raft_stereo_depthbeta_nolbp import RAFTStereoDepthBetaNoLBP
+from core.raft_stereo_depthmatch import RAFTStereoDepthMatch
 
 import stereo_datasets as datasets
 from core.utils.utils import InputPadder, LoggerCommon
@@ -385,6 +386,8 @@ if __name__ == '__main__':
         model = RAFTStereoDepthBeta(args)
     elif args.model_name.lower() == "RAFTStereoDepthBetaNoLBP".lower():
         model = RAFTStereoDepthBetaNoLBP(args)
+    elif args.model_name.lower() == "RAFTStereoDepthMatch".lower():
+        model = RAFTStereoDepthMatch(args)
     else :
         raise Exception("No such model: {}".format(args.model_name))
     model = torch.nn.DataParallel(model, device_ids=[0])
