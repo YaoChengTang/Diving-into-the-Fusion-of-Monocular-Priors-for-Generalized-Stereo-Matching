@@ -133,7 +133,7 @@ class RAFTStereoDepthBeta(nn.Module):
             disp = hor_coords1 - hor_coords0
 
             with autocast(enabled=self.args.mixed_precision):
-                disp_lbp = self.lbp_encoder(disp)
+                disp_lbp = self.lbp_encoder(-disp)
                 modulation = self.modulater(disp_lbp, depth_lbp)
 
                 if self.args.n_gru_layers == 3 and self.args.slow_fast_gru: # Update low-res GRU
