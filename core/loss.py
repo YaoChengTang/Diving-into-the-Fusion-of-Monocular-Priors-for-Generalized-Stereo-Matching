@@ -60,6 +60,10 @@ def sequence_loss(flow_preds, flow_gt, valid, loss_gamma=0.9, max_flow=700):
 
     return flow_loss, metrics
 
+
+def my_loss(res, flow_gt, valid, loss_gamma=0.9, max_flow=700):
+    pass
+
 class Loss(nn.Module):
     def __init__(self, loss_gamma=0.9, max_flow=700, loss_zeta=0.3,
                  smoothness=None, slant=None, slant_norm=False, 

@@ -90,7 +90,8 @@ def train(args):
             image1, image2, flow, valid = [x.cuda() for x in data_blob]
 
             assert model.training
-            flow_predictions = model(image1, image2, iters=args.train_iters)
+            res = model(image1, image2, iters=args.train_iters)
+            flow_predictions = res["disp_predictions"]
             assert model.training
 
             corrupted = True

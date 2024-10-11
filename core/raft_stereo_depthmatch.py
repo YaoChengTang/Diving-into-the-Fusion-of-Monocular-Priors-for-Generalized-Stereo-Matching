@@ -148,4 +148,4 @@ class RAFTStereoDepthMatch(nn.Module):
         if vis_mode:
             return {"disp_predictions": disp_predictions, }
 
-        return disp_predictions
+        return {"disp_predictions": disp_predictions,}

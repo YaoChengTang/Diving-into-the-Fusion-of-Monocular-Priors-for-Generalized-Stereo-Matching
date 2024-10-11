@@ -92,7 +92,7 @@ class BetaModulator(nn.Module):
             nn.Softplus(),
         )
     
-    def forward(self, lbp_disp, lbp_depth):
+    def forward(self, lbp_disp, lbp_depth, out_distribution=False):
         x1 = self.conv1( torch.cat([lbp_disp, lbp_depth], dim=1) )
         x2 = self.up(self.down(x1))
         beta_paras = self.conv2( torch.cat([x1,x2], dim=1) ) + 1  # enforcing alpha>=1, beta>=1
@@ -106,9 +106,50 @@ class BetaModulator(nn.Module):
         else:
             modulation = distribution.mean
         
-        return modulation
+        if not out_distribution:
+            return modulation
+        return modulation, distribution
         
         # # modulation = modulation*2 - 1
         # modulation_rescale = 1 + modulation * (self.modulation_ratio * itr_ratio)   # we hope modulation has less effect at the first several iterations as the disp is unreliable and the lcoal LBP disp is unreliable
         # return modulation_rescale
 
+
+
+class RefinementMonStereo(nn.Module):
+    def __init__(self, args, norm_fn='batch', hidden_dim=32):
+        super(RefinementMonStereo, self).__init__()
+        self.args = argparse
+
+        corr_channel = self.args.corr_levels * (self.args.corr_radius*2 + 1)
+        self.conf_estimate = nn.Sequential(
+            nn.Conv2d(corr_channel, 128, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(128, 128, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(128, 1, 1, padding=0))
+        
+        self.mono_params_estimate = nn.Sequential(
+            nn.Conv2d(2, 32, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(32, 32, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(32, 2, 1, padding=0))
+
+        self.mask = nn.Sequential(
+            nn.Conv2d(hidden_dim+1, 256, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, (factor**2)*9, 1, padding=0))
+        
+    def forward(self, disp, depth, hidden, cost_volume, Beta_distribution):
+        conf = self.conf_estimate(cost_volume)
+
+        mono_params = self.mono_params_estimate( torch.cat([disp, depth], dim=1) )
+        a, b = torch.split(mono_params, 1, dim=1)
+        depth_registered = depth * a + b
+        
+        disp = disp * conf + (1-conf) * depth_registered
+
+        up_mask= self.mask( torch.cat([hidden, disp], dim=1) )
+        
+        return disp, up_mask, depth_registered, conf

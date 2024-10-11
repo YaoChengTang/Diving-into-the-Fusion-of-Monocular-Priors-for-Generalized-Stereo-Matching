@@ -166,4 +166,4 @@ class RAFTStereoDepthBetaNoLBP(nn.Module):
                     "depth": depth, 
                     "modulation_predictions": modulation_predictions}
 
-        return disp_predictions
+        return {"disp_predictions": disp_predictions,}

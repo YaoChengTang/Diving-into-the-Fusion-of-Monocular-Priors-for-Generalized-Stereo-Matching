@@ -1,12 +1,16 @@
+import numpy as np
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from core.update_disp import DispBasicMultiUpdateBlock
 from core.extractor import BasicEncoder, ResidualBlock
 from core.extractor_depthany import DepthAnyExtractor
 from core.corr import CorrBlock1D, PytorchAlternateCorrBlock1D, CorrBlockFast1D, AlternateCorrBlock
-from core.utils.utils import hor_coords_grid
-from core.fusion import FusionDepth, UpdateHistory
+from core.utils.utils import hor_coords_grid, rescale_modulation
+from core.geometry import LBPEncoder
+from core.fusion import BetaModulator, RefinementMonStereo
 
 
 try:
@@ -21,9 +25,9 @@ except:
         def __exit__(self, *args):
             pass
 
-class RAFTStereoDepthFusion(nn.Module):
+class RAFTStereoDepthBeta(nn.Module):
     def __init__(self, args):
-        super(RAFTStereoDepthFusion, self).__init__()
+        super(RAFTStereoDepthBeta, self).__init__()
         self.args = args
         
         context_dims = args.hidden_dims
@@ -34,10 +38,12 @@ class RAFTStereoDepthFusion(nn.Module):
                                       downsample=args.n_downsample)
         self.update_block = DispBasicMultiUpdateBlock(self.args, hidden_dims=args.hidden_dims)
 
-        self.fusion = FusionDepth(self.args)
-        self.update_hist = UpdateHistory(self.args, 128, 1)
+        self.lbp_encoder = LBPEncoder(args=args)
+        self.modulater = BetaModulator(args, lbp_dim=self.lbp_encoder.num_neighbors)
 
         self.context_zqr_convs = nn.ModuleList([nn.Conv2d(context_dims[i], args.hidden_dims[i]*3, 3, padding=3//2) for i in range(self.args.n_gru_layers)])
+
+        self.refinement = RefinementMonStereo(args, hidden_dim=args.hidden_dims[-1])
 
         if args.shared_backbone:
             self.conv2 = nn.Sequential(
@@ -45,6 +51,11 @@ class RAFTStereoDepthFusion(nn.Module):
                 nn.Conv2d(128, 256, 3, padding=1))
         else:
             self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', downsample=args.n_downsample)
+        
+        # 冻结 除refinement以外 模块的所有参数
+        for module in [self.cnet, self.update_block, self.lbp_encoder, self.modulater, self.context_zqr_convs, self.fnet]
+            for param in module.parameters():
+                param.requires_grad = False
 
     def freeze_bn(self):
         for m in self.modules():
@@ -74,6 +85,7 @@ class RAFTStereoDepthFusion(nn.Module):
         up_disp = up_disp.permute(0, 1, 4, 2, 5, 3)
         return up_disp.reshape(N, D, factor*H, factor*W)
 
+    
 
     def forward(self, image1, image2, iters=12, disp_init=None, test_mode=False, vis_mode=False):
         """ Estimate optical flow between pair of frames """
@@ -94,6 +106,8 @@ class RAFTStereoDepthFusion(nn.Module):
             
             # from IPython import embed
             # embed()
+
+            depth_lbp = self.lbp_encoder(depth)
 
             net_list = [torch.tanh(x[0]) for x in cnet_list]
             inp_list = [torch.relu(x[1]) for x in cnet_list]
@@ -119,25 +133,29 @@ class RAFTStereoDepthFusion(nn.Module):
             hor_coords1 = hor_coords1 + disp_init
 
         disp_predictions = []
+        modulation_predictions = []
         for itr in range(iters):
             hor_coords1 = hor_coords1.detach()
             corr = corr_fn(hor_coords1) # index correlation volume
             disp = hor_coords1 - hor_coords0
+
             with autocast(enabled=self.args.mixed_precision):
+                disp_lbp = self.lbp_encoder(disp)
+                modulation, distribution = self.modulater(disp_lbp, depth_lbp, out_distribution=True)
+
                 if self.args.n_gru_layers == 3 and self.args.slow_fast_gru: # Update low-res GRU
                     net_list = self.update_block(net_list, inp_list, iter32=True, iter16=False, iter08=False, update=False)
                 if self.args.n_gru_layers >= 2 and self.args.slow_fast_gru:# Update low-res GRU and mid-res GRU
                     net_list = self.update_block(net_list, inp_list, iter32=self.args.n_gru_layers==3, iter16=True, iter08=False, update=False)
                 net_list, up_mask, delta_disp = self.update_block(net_list, inp_list, corr, disp, iter32=self.args.n_gru_layers==3, iter16=self.args.n_gru_layers>=2)
 
-                disp_new = disp + delta_disp
-                delta_disp_new = self.fusion(disp_new, depth, delta_disp)
-                disp_refine = disp + delta_disp + delta_disp_new
-                net_list[0] = self.update_hist(net_list[0], disp_refine.detach())
+                modulation_weight = rescale_modulation(itr, iters, 
+                                                       self.args.modulation_alg, 
+                                                       self.args.modulation_ratio)
+                delta_disp = delta_disp * (1 + modulation * modulation_weight) 
 
             # F(t+1) = F(t) + \Delta(t)
-            # hor_coords1 = hor_coords1 + delta_disp
-            hor_coords1 = hor_coords1 + delta_disp_new
+            hor_coords1 = hor_coords1 + delta_disp
 
             # We do not need to upsample or output intermediate results in test_mode
             if test_mode and itr < iters-1:
@@ -145,13 +163,28 @@ class RAFTStereoDepthFusion(nn.Module):
 
             # upsample predictions
             disp_up = self.upsample_disp(hor_coords1 - hor_coords0, up_mask)
-
+            
             disp_predictions.append(disp_up)
+
+            if vis_mode:
+                modulation_predictions.append(modulation)
+
+        # refinement
+        corr = corr_fn(hor_coords1)
+        disp = -hor_coords1 + hor_coords0
+        disp_refine, up_mask, depth_registered, conf = self.refinement(disp, depth, net_list[0], corr, distribution)
+        disp_up = self.upsample_disp(-disp_refine, up_mask)
+        depth_registered_up = self.upsample_disp(-depth_registered, up_mask)
+        disp_predictions.append(depth_registered_up)
+        disp_predictions.append(disp_up)
 
         if test_mode:
             return hor_coords1 - hor_coords0, disp_up
-        
-        if vis_mode:
-            return {"disp_predictions": disp_predictions, }
 
-        return {"disp_predictions": disp_predictions,}
+        if vis_mode:
+            return {"disp_predictions": disp_predictions, 
+                    "depth": depth, 
+                    "modulation_predictions": modulation_predictions}
+
+        return {"disp_predictions": disp_predictions,
+                "conf": conf}
