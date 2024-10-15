@@ -119,7 +119,7 @@ class BetaModulator(nn.Module):
 class RefinementMonStereo(nn.Module):
     def __init__(self, args, norm_fn='batch', hidden_dim=32):
         super(RefinementMonStereo, self).__init__()
-        self.args = argparse
+        self.args = args
 
         corr_channel = self.args.corr_levels * (self.args.corr_radius*2 + 1)
         self.conf_estimate = nn.Sequential(
@@ -136,6 +136,7 @@ class RefinementMonStereo(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(32, 2, 1, padding=0))
 
+        factor = 2**self.args.n_downsample
         self.mask = nn.Sequential(
             nn.Conv2d(hidden_dim+1, 256, 3, padding=1),
             nn.ReLU(inplace=True),

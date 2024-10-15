@@ -25,9 +25,9 @@ except:
         def __exit__(self, *args):
             pass
 
-class RAFTStereoDepthBeta(nn.Module):
+class RAFTStereoDepthBetaRefine(nn.Module):
     def __init__(self, args):
-        super(RAFTStereoDepthBeta, self).__init__()
+        super(RAFTStereoDepthBetaRefine, self).__init__()
         self.args = args
         
         context_dims = args.hidden_dims
@@ -53,7 +53,7 @@ class RAFTStereoDepthBeta(nn.Module):
             self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', downsample=args.n_downsample)
         
         # 冻结 除refinement以外 模块的所有参数
-        for module in [self.cnet, self.update_block, self.lbp_encoder, self.modulater, self.context_zqr_convs, self.fnet]
+        for module in [self.cnet, self.update_block, self.lbp_encoder, self.modulater, self.context_zqr_convs, self.fnet]:
             for param in module.parameters():
                 param.requires_grad = False
 

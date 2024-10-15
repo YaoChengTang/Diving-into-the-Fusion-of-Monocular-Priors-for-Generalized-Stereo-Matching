@@ -41,6 +41,7 @@ from core.raft_stereo_depthfusion import RAFTStereoDepthFusion
 from core.raft_stereo_depthbeta import RAFTStereoDepthBeta
 from core.raft_stereo_depthbeta_nolbp import RAFTStereoDepthBetaNoLBP
 from core.raft_stereo_depthmatch import RAFTStereoDepthMatch
+from core.raft_stereo_depthbeta_refine import RAFTStereoDepthBetaRefine
 
 
 def setup_distributed(args):
@@ -140,6 +141,8 @@ def get_model_ddp(args):
         model = nn.SyncBatchNorm.convert_sync_batchnorm(RAFTStereoDepthBetaNoLBP(args))
     elif args.model_name.lower() == "RAFTStereoDepthMatch".lower():
         model = nn.SyncBatchNorm.convert_sync_batchnorm(RAFTStereoDepthMatch(args))
+    elif args.model_name.lower() == "RAFTStereoDepthBetaRefine".lower():
+        model = nn.SyncBatchNorm.convert_sync_batchnorm(RAFTStereoDepthBetaRefine(args))
     else :
         raise Exception("No such model: {}".format(args.model_name))
     
@@ -151,7 +154,12 @@ def get_model_ddp(args):
         if args.local_rank==0 :
             logging.info("Loading checkpoint from {} ...".format(args.restore_ckpt))
         checkpoint = torch.load(args.restore_ckpt)
-        model.load_state_dict(checkpoint, strict=True)
+        new_state_dict = {}
+        for key, value in checkpoint.items():
+            new_key = key.replace('module.', '')  # 去掉 'module.' 前缀
+            new_state_dict[new_key] = value
+        # model.load_state_dict(new_state_dict, strict=True)
+        model.load_state_dict(new_state_dict, strict=False)
         if args.local_rank==0 :
             logging.info(f"Done loading checkpoint")
             
