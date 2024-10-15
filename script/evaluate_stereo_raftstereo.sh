@@ -4,7 +4,7 @@ export LOG_ROOT="/data5/yao/runs/log"
 export TB_ROOT="/data5/yao/runs/tboard"
 export CKPOINT_ROOT="/data5/yao/runs/ckpoint"
 
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=2
 
 # python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/raftstereo_20240821_142156/raftstereo.pth --dataset middlebury_H --model_name "RaftStereo" --test_exp_name "final"
 # python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/raftstereo_20240821_142156/90000_raftstereo.pth --dataset middlebury_H --model_name "RaftStereo" --test_exp_name "90000itr"
@@ -120,12 +120,18 @@ export CUDA_VISIBLE_DEVICES=0
 # python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53Ratio3_20240930_022650/60000_RaftStereoDepthBetaK53Ratio3.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthBeta" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 2.0 --test_exp_name "60000itr-N53Ratio3"
 
 
-python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthMatch_20241007_020814/RaftStereoDepthMatch.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthMatch" --test_exp_name "final-DepthMatch"
-python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthMatch_20241007_020814/90000_RaftStereoDepthMatch.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthMatch" --test_exp_name "90000itr-DepthMatch"
-python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthMatch_20241007_020814/80000_RaftStereoDepthMatch.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthMatch" --test_exp_name "80000itr-DepthMatch"
-python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthMatch_20241007_020814/70000_RaftStereoDepthMatch.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthMatch" --test_exp_name "70000itr-DepthMatch"
-python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthMatch_20241007_020814/60000_RaftStereoDepthMatch.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthMatch" --test_exp_name "60000itr-DepthMatch"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthMatch_20241007_020814/RaftStereoDepthMatch.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthMatch" --test_exp_name "final-DepthMatch"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthMatch_20241007_020814/90000_RaftStereoDepthMatch.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthMatch" --test_exp_name "90000itr-DepthMatch"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthMatch_20241007_020814/80000_RaftStereoDepthMatch.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthMatch" --test_exp_name "80000itr-DepthMatch"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthMatch_20241007_020814/70000_RaftStereoDepthMatch.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthMatch" --test_exp_name "70000itr-DepthMatch"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthMatch_20241007_020814/60000_RaftStereoDepthMatch.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthMatch" --test_exp_name "60000itr-DepthMatch"
 
+
+python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53Disp_20241011_220622/RaftStereoDepthBetaK53Disp.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthBeta" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --test_exp_name "final-DepthBetaK53Disp"
+python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53Disp_20241011_220622/90000_RaftStereoDepthBetaK53Disp.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthBeta" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --test_exp_name "90000itr-DepthBetaK53Disp"
+python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53Disp_20241011_220622/80000_RaftStereoDepthBetaK53Disp.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthBeta" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --test_exp_name "80000itr-DepthBetaK53Disp"
+python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53Disp_20241011_220622/70000_RaftStereoDepthBetaK53Disp.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthBeta" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --test_exp_name "70000itr-DepthBetaK53Disp"
+python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53Disp_20241011_220622/60000_RaftStereoDepthBetaK53Disp.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthBeta" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --test_exp_name "60000itr-DepthBetaK53Disp"
 
 
 python3 merge_sheet.py
