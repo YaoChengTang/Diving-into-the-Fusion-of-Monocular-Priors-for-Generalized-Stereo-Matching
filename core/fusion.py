@@ -127,7 +127,9 @@ class RefinementMonStereo(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(128, 128, 3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(128, 1, 1, padding=0))
+            nn.Conv2d(128, 1, 1, padding=0),
+            nn.)
+        self.norm_conf = nn.Sigmoid()
         
         self.mono_params_estimate = nn.Sequential(
             nn.Conv2d(2, 32, 3, padding=1),
@@ -144,12 +146,13 @@ class RefinementMonStereo(nn.Module):
         
     def forward(self, disp, depth, hidden, cost_volume, Beta_distribution):
         conf = self.conf_estimate(cost_volume)
+        conf_normed = self.norm_conf(conf)
 
         mono_params = self.mono_params_estimate( torch.cat([disp, depth], dim=1) )
         a, b = torch.split(mono_params, 1, dim=1)
         depth_registered = depth * a + b
         
-        disp = disp * conf + (1-conf) * depth_registered
+        disp = disp * conf_normed + (1-conf_normed) * depth_registered
 
         up_mask= self.mask( torch.cat([hidden, disp], dim=1) )
         
