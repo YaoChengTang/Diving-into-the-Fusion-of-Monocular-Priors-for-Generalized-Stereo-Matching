@@ -127,8 +127,7 @@ class RefinementMonStereo(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(128, 128, 3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(128, 1, 1, padding=0),
-            nn.)
+            nn.Conv2d(128, 1, 1, padding=0),)
         self.norm_conf = nn.Sigmoid()
         
         self.mono_params_estimate = nn.Sequential(
