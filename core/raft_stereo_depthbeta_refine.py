@@ -176,10 +176,13 @@ class RAFTStereoDepthBetaRefine(nn.Module):
         disp_up = self.upsample_disp(-disp_refine, up_mask)
         depth_registered_up = self.upsample_disp(-depth_registered, up_mask)
         disp_predictions.append(depth_registered_up)
-        disp_predictions.append(disp_up)
+        # disp_predictions.append(disp_up)
+
+        # if test_mode:
+        #     return hor_coords1 - hor_coords0, disp_up
 
         if test_mode:
-            return hor_coords1 - hor_coords0, disp_up
+            return hor_coords1 - hor_coords0, depth_registered_up
 
         if vis_mode:
             return {"disp_predictions": disp_predictions, 
