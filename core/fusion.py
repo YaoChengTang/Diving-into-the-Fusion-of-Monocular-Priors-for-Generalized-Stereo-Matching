@@ -143,7 +143,7 @@ class RefinementMonStereo(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(256, (factor**2)*9, 1, padding=0))
         
-    def forward(self, disp, depth, hidden, cost_volume, Beta_distribution):
+    def forward(self, disp, depth, hidden, cost_volume, Beta_distribution=None):
         conf = self.conf_estimate(cost_volume)
         conf_normed = self.norm_conf(conf)
 
