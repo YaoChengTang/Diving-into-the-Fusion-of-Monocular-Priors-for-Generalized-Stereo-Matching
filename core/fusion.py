@@ -122,8 +122,12 @@ class RefinementMonStereo(nn.Module):
         self.args = args
 
         corr_channel = self.args.corr_levels * (self.args.corr_radius*2 + 1)
+        if not args.conf_from_fea:
+            conf_in_dim = corr_channel
+        else:
+            conf_in_dim = corr_channel + hidden_dim + 2
         self.conf_estimate = nn.Sequential(
-            nn.Conv2d(corr_channel, 128, 3, padding=1),
+            nn.Conv2d(conf_in_dim, 128, 3, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(128, 128, 3, padding=1),
             nn.ReLU(inplace=True),
@@ -144,7 +148,10 @@ class RefinementMonStereo(nn.Module):
             nn.Conv2d(256, (factor**2)*9, 1, padding=0))
         
     def forward(self, disp, depth, hidden, cost_volume, Beta_distribution=None):
-        conf = self.conf_estimate(cost_volume)
+        if Beta_distribution is None:
+            conf = self.conf_estimate(cost_volume)
+        else:
+            conf = self.conf_estimate( torch.cat([cost_volume,hidden,Beta_distribution.mean,Beta_distribution.variance], dim=1) )
         conf_normed = self.norm_conf(conf)
 
         mono_params = self.mono_params_estimate( torch.cat([disp, depth], dim=1) )

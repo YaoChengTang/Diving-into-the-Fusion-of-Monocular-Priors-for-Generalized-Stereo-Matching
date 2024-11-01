@@ -160,6 +160,8 @@ def get_model_ddp(args):
         new_state_dict = {}
         for key, value in checkpoint.items():
             new_key = key.replace('module.', '')  # 去掉 'module.' 前缀
+            # if key.find("refinement.conf_estimate") != -1:
+            #     continue
             new_state_dict[new_key] = value
         # model.load_state_dict(new_state_dict, strict=True)
         model.load_state_dict(new_state_dict, strict=False)
