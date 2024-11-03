@@ -4,7 +4,7 @@ export LOG_ROOT="/data5/yao/runs/log"
 export TB_ROOT="/data5/yao/runs/tboard"
 export CKPOINT_ROOT="/data5/yao/runs/ckpoint"
 
-export CUDA_VISIBLE_DEVICES=2
+export CUDA_VISIBLE_DEVICES=1
 
 # python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/raftstereo_20240821_142156/raftstereo.pth --dataset middlebury_H --model_name "RaftStereo" --test_exp_name "final"
 # python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/raftstereo_20240821_142156/90000_raftstereo.pth --dataset middlebury_H --model_name "RaftStereo" --test_exp_name "90000itr"
@@ -146,10 +146,33 @@ export CUDA_VISIBLE_DEVICES=2
 # python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch32_20241024_172455/60000_RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch32.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --test_exp_name "60000itr-RefineSigmoidPreMonoBatch32"
 
 
-python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthPostFusionBatch32_20241028_215503/RaftStereoDepthPostFusionBatch32.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthPostFusion" --test_exp_name "final-RaftStereoDepthPostFusionBatch32"
-python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthPostFusionBatch32_20241028_215503/90000_RaftStereoDepthPostFusionBatch32.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthPostFusion" --test_exp_name "90000itr-RaftStereoDepthPostFusionBatch32"
-python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthPostFusionBatch32_20241028_215503/80000_RaftStereoDepthPostFusionBatch32.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthPostFusion" --test_exp_name "80000itr-RaftStereoDepthPostFusionBatch32"
-python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthPostFusionBatch32_20241028_215503/70000_RaftStereoDepthPostFusionBatch32.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthPostFusion" --test_exp_name "70000itr-RaftStereoDepthPostFusionBatch32"
-python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthPostFusionBatch32_20241028_215503/60000_RaftStereoDepthPostFusionBatch32.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthPostFusion" --test_exp_name "60000itr-RaftStereoDepthPostFusionBatch32"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthPostFusionBatch32_20241028_215503/RaftStereoDepthPostFusionBatch32.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthPostFusion" --test_exp_name "final-RaftStereoDepthPostFusionBatch32"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthPostFusionBatch32_20241028_215503/90000_RaftStereoDepthPostFusionBatch32.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthPostFusion" --test_exp_name "90000itr-RaftStereoDepthPostFusionBatch32"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthPostFusionBatch32_20241028_215503/80000_RaftStereoDepthPostFusionBatch32.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthPostFusion" --test_exp_name "80000itr-RaftStereoDepthPostFusionBatch32"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthPostFusionBatch32_20241028_215503/70000_RaftStereoDepthPostFusionBatch32.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthPostFusion" --test_exp_name "70000itr-RaftStereoDepthPostFusionBatch32"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthPostFusionBatch32_20241028_215503/60000_RaftStereoDepthPostFusionBatch32.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthPostFusion" --test_exp_name "60000itr-RaftStereoDepthPostFusionBatch32"
 
-python3 merge_sheet.py
+
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim_20241102_014050/30000_RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_F --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --test_exp_name "30000itr-RefineSigmoidPreMonoBatch48ConfDim"
+
+
+
+
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch32_20241024_172455/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch32.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_F --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --test_exp_name "middlebury_F - final-RefineSigmoidPreMonoBatch32"
+
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53_20240920_165346/80000_RaftStereoDepthBetaK53.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_F --model_name "RAFTStereoDepthBeta" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --test_exp_name "middlebury_F - 80000itr-N53"
+
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53_20240920_165346/80000_RaftStereoDepthBetaK53.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_F --model_name "RAFTStereoDepthBeta" --lbp_neighbor_offsets "(-10,-10), (10,10), (10,-10), (-10,10), (-6,0), (6,0), (0,-6), (0,6)" --modulation_ratio 1.0 --test_exp_name "middlebury_F - 80000itr-N53"
+
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch32_20241024_172455/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch32.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_F --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-10,-10), (10,10), (10,-10), (-10,10), (-6,0), (6,0), (0,-6), (0,6)" --modulation_ratio 3.0 --test_exp_name "middlebury_F - final-RefineSigmoidPreMonoBatch32"
+
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/raftstereo_20240821_142156/raftstereo.pth --dataset middlebury_F --model_name "RaftStereo" --test_exp_name "middlebury_F - final-raftstereo"
+
+
+
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch32_20241024_172455/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch32.pth --depthany_model_dir "/data5/yao/pretrained" --dataset kitti --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --test_exp_name "middlebury_F - final-RefineSigmoidPreMonoBatch32"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch32_20241024_172455/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch32.pth --depthany_model_dir "/data5/yao/pretrained" --dataset kitti2012 --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --test_exp_name "kitti2012 - final-RefineSigmoidPreMonoBatch32"
+python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch32_20241024_172455/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch32.pth --depthany_model_dir "/data5/yao/pretrained" --dataset eth3d --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --test_exp_name "kitti2012 - final-RefineSigmoidPreMonoBatch32"
+
+
+# python3 merge_sheet.py

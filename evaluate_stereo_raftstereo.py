@@ -403,7 +403,14 @@ if __name__ == '__main__':
         assert args.restore_ckpt.endswith(".pth") or args.restore_ckpt.endswith(".tar")
         logger.info(f"Loading checkpoint from {args.restore_ckpt}")
         checkpoint = torch.load(args.restore_ckpt)
-        model.load_state_dict(checkpoint, strict=True)
+        # model.load_state_dict(checkpoint, strict=True)
+        new_state_dict = {}
+        for key, value in checkpoint.items():
+            if key.find("lbp_encoder.lbp_conv") != -1:
+                continue
+            new_state_dict[key] = value
+        # model.load_state_dict(new_state_dict, strict=True)
+        model.load_state_dict(new_state_dict, strict=False)
         logger.info(f"Done loading checkpoint")
 
     model.cuda()
@@ -424,13 +431,13 @@ if __name__ == '__main__':
 
     elif args.dataset == 'kitti':
         if args.root is None:
-            args.root = "/data6/KITTI2015"
+            args.root = "/data1/dataset_raw/KITTI/Kitti15"
         res = validate_kitti(model, iters=args.valid_iters, root=args.root, 
                              mixed_prec=use_mixed_precision)
     
     elif args.dataset == 'kitti2012':
         if args.root is None:
-            args.root = "/data6/KITTI2012"
+            args.root = "/data1/dataset_raw/KITTI/Kitti12"
         res = validate_kitti2012(model, iters=args.valid_iters, root=args.root, 
                                  mixed_prec=use_mixed_precision)
 
