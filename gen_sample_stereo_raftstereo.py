@@ -21,6 +21,9 @@ from core.raft_stereo_noctx import RAFTStereoNoCTX
 from core.raft_stereo_depthfusion import RAFTStereoDepthFusion
 from core.raft_stereo_depthbeta import RAFTStereoDepthBeta
 from core.raft_stereo_depthbeta_nolbp import RAFTStereoDepthBetaNoLBP
+from core.raft_stereo_depthmatch import RAFTStereoDepthMatch
+from core.raft_stereo_depthbeta_refine import RAFTStereoDepthBetaRefine
+from core.raft_stereo_depth_postfusion import RAFTStereoDepthPostFusion
 
 import stereo_datasets as datasets
 from core.utils.vis import Visualizer
@@ -121,22 +124,24 @@ def evalute(atom_dict,
     #          "img_list": [image2.data.numpy().astype(np.uint8)], "cmap": None},
     #         {"name": "GT Disp", "img_list": [-flow_gt.data.numpy()[0]], "cmap": "jet"},
     #         {"name": "Pr Disp", "img_list": [-flow_pr_sequence[-1].data.numpy()[0]], "cmap": "jet"},]
+    # if depth is not None:
+    #     vis1.append( {"name": "Pr Disp", "img_list": [depth.cpu().squeeze(0).data.numpy()[0]], "cmap": "jet"} )
     # viser.analyze(vis1, imageGT_file, in_one_fig=True)
 
-    # vis2 = [{"name": "Disp", 
-    #          "img_list": [-flow_pr.data.numpy()[0] for flow_pr in flow_pr_sequence], 
-    #          "cmap": "jet",
-    #          "epe_list": vis_epe_sequence,
-    #          f"{d1_thold}px_list": vis_xpx_sequence,
-    #          "GT": [-flow_gt.data.numpy()[0]],
-    #          "stop_idx": 20,
-    #          "improvement": viser.args.improvement,
-    #          "movement": viser.args.movement,
-    #          "error_map": True,
-    #          "acceleration": viser.args.acceleration,
-    #          "mask": viser.args.mask,
-    #          "binary_thold": viser.args.binary_thold},]
-    # viser.analyze(vis2, imageGT_file, in_one_fig=False)
+    vis2 = [{"name": "Disp", 
+             "img_list": [-flow_pr.data.numpy()[0] for flow_pr in flow_pr_sequence], 
+             "cmap": "jet",
+             "epe_list": vis_epe_sequence,
+             f"{d1_thold}px_list": vis_xpx_sequence,
+             "GT": [-flow_gt.data.numpy()[0]],
+             "stop_idx": 20,
+             "improvement": viser.args.improvement,
+             "movement": viser.args.movement,
+             "error_map": True,
+             "acceleration": viser.args.acceleration,
+             "mask": viser.args.mask,
+             "binary_thold": viser.args.binary_thold},]
+    viser.analyze(vis2, imageGT_file, in_one_fig=False)
 
     if viser.args.mask and confidence_list is not None and len(confidence_list)>0 :
         vis3 = [{"name": "Encourage", 
@@ -356,6 +361,8 @@ if __name__ == '__main__':
 
     args.eval = True
     assert args.sv_root is not None, "Please specify the visualization root"
+    if args.sv_root is None:
+        raise Exception("Please specify sv_root")
     args.sv_root = os.path.join(args.sv_root, 
                         args.restore_ckpt.split("/")[-2], args.test_exp_name)
 
@@ -380,6 +387,12 @@ if __name__ == '__main__':
         model = RAFTStereoDepthBeta(args)
     elif args.model_name.lower() == "RAFTStereoDepthBetaNoLBP".lower():
         model = RAFTStereoDepthBetaNoLBP(args)
+    elif args.model_name.lower() == "RAFTStereoDepthMatch".lower():
+        model = RAFTStereoDepthMatch(args)
+    elif args.model_name.lower() == "RAFTStereoDepthBetaRefine".lower():
+        model = RAFTStereoDepthBetaRefine(args)
+    elif args.model_name.lower() == "RAFTStereoDepthPostFusion".lower():
+        model = RAFTStereoDepthPostFusion(args)
     else :
         raise Exception("No such model: {}".format(args.model_name))
     model = torch.nn.DataParallel(model, device_ids=[0])
@@ -388,7 +401,14 @@ if __name__ == '__main__':
         assert args.restore_ckpt.endswith(".pth") or args.restore_ckpt.endswith(".tar")
         logger.info(f"Loading checkpoint from {args.restore_ckpt}")
         checkpoint = torch.load(args.restore_ckpt)
-        model.load_state_dict(checkpoint, strict=True)
+        # model.load_state_dict(checkpoint, strict=True)
+        new_state_dict = {}
+        for key, value in checkpoint.items():
+            if key.find("lbp_encoder.lbp_conv") != -1:
+                continue
+            new_state_dict[key] = value
+        # model.load_state_dict(new_state_dict, strict=True)
+        model.load_state_dict(new_state_dict, strict=False)
         logger.info(f"Done loading checkpoint from {args.restore_ckpt}")
 
     model.cuda()
