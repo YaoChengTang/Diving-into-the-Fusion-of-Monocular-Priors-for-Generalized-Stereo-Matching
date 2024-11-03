@@ -131,6 +131,26 @@ def writeDispKITTI(filename, disp):
     # skimage.io.imsave(filename, disp)
     cv2.imwrite(filename, disp)
 
+def readDispCRES(filename):
+    disp = cv2.imread(filename, cv2.IMREAD_UNCHANGED).astype(np.float32) / 32.0
+    valid = disp > 0.0
+    return disp, valid
+
+def writeDispCRES(filename, disp):
+    disp = np.round(disp * 32).astype(np.uint16)
+    # skimage.io.imsave(filename, disp)
+    cv2.imwrite(filename, disp)
+
+def readDispNerfS(filename):
+    disp = cv2.imread(filename, cv2.IMREAD_UNCHANGED).astype(np.float32) / 64.0
+    valid = disp > 0.0
+    return disp, valid
+
+def writeDispNerfS(filename, disp):
+    disp = np.round(disp * 64).astype(np.uint16)
+    # skimage.io.imsave(filename, disp)
+    cv2.imwrite(filename, disp)
+
 # Method taken from /n/fs/raft-depth/RAFT-Stereo/datasets/SintelStereo/sdk/python/sintel_io.py
 def readDispSintelStereo(file_name):
     a = np.array(Image.open(file_name))

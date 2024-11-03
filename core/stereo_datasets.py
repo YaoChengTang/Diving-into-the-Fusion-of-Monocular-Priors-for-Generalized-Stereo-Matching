@@ -370,25 +370,38 @@ class Booster(StereoDataset):
             self.disparity_list += [ '/'.join(img1.split('/')[0:-2]) + '/disp_00.npy' ]
 
 
-class NerfStereo(data.Dataset):
-    def __init__(self, datapath='data/nerf-stereo/training_set', training_file='filenames/nerf-stereo/trainingQ.txt', conf_threshold=0.5, disp_threshold=512., aug_params=None, scale=1):
-        self.augmentor = TripletFlowAugmentor(**aug_params)
-        self.scale=scale
-        self.disp_threshold = disp_threshold
-        self.conf_threshold = conf_threshold
-        self.disp_list = []
-        self.image_list = []
+class NerfStereo(StereoDataset):
+    def __init__(self, aug_params=None, root='datasets/NerfStereo/training_set', image_set='training', args=None):
+        super(CREStereoDataset, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispNerfS, args=args)
+        root = root if len(root)>0 else DATASET_ROOT
+        assert os.path.exists(root), "check the existence: {}".format(root)
 
-        training_file = open(training_file, 'r')
+        image1_list = sorted(glob(os.path.join(root, "*/*/baseline_*/left/*.jpg"), recursive=True))
+        image1_list = [path.replace("/left/", "/center/") for path in image1_list]
+        image2_list = sorted(glob(os.path.join(root, "*/*/baseline_*/right/*.jpg"), recursive=True))
+        disp_list = sorted(glob(os.path.join(root, "*/*/baseline_*/disparity/*.png"), recursive=True))
+        # dispr_list = sorted(glob(os.path.join(root, "**/*_right.disp.png"), recursive=True))
 
-        for line in training_file.readlines():
-            left, center, right, disp, confidence = line.split()
-            self.image_list += [[os.path.join(datapath,left), 
-                                 os.path.join(datapath,center), 
-                                 os.path.join(datapath,right), 
-                                 os.path.join(datapath,disp),
-                                 os.path.join(datapath,confidence)]]
-                                 
+        for idx, (img1, img2, disp) in enumerate(zip(image1_list, image2_list, disp_list)):
+            self.image_list += [ [img1, img2] ]
+            self.disparity_list += [ disp ]
+
+
+class CREStereoDataset(StereoDataset):
+    def __init__(self, aug_params=None, root='datasets/CREStereo_dataset', image_set='training', args=None):
+        super(CREStereoDataset, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispCRES, args=args)
+        root = root if len(root)>0 else DATASET_ROOT
+        assert os.path.exists(root), "check the existence: {}".format(root)
+
+        image1_list = sorted(glob(os.path.join(root, "**/*_left.jpg"), recursive=True))
+        image2_list = sorted(glob(os.path.join(root, "**/*_right.jpg"), recursive=True))
+        disp_list = sorted(glob(os.path.join(root, "**/*_left.disp.png"), recursive=True))
+        # dispr_list = sorted(glob(os.path.join(root, "**/*_right.disp.png"), recursive=True))
+
+        for idx, (img1, img2, disp) in enumerate(zip(image1_list, image2_list, disp_list)):
+            self.image_list += [ [img1, img2] ]
+            self.disparity_list += [ disp ]
+
   
 def fetch_dataloader(args):
     """ Create the data loader for the corresponding trainign set """
