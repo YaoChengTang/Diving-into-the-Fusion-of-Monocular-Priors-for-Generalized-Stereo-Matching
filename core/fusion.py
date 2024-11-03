@@ -148,7 +148,7 @@ class RefinementMonStereo(nn.Module):
             nn.Conv2d(256, (factor**2)*9, 1, padding=0))
         
     def forward(self, disp, depth, hidden, cost_volume, Beta_distribution=None):
-        if Beta_distribution is None:
+        if not self.args.conf_from_fea:
             conf = self.conf_estimate(cost_volume)
         else:
             conf = self.conf_estimate( torch.cat([cost_volume,hidden,Beta_distribution.mean,Beta_distribution.variance], dim=1) )
