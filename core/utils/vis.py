@@ -221,7 +221,7 @@ class Visualizer:
             if stop_idx>0 and idx>=stop_idx:
                 break
                 
-            imp_map = np.zeros_like(error_map) if idx==0 else error_map_list[idx] - error_map_list[idx-1]
+            imp_map = np.zeros_like(error_map_list[0]) if idx==0 else error_map_list[idx] - error_map_list[idx-1]
             imp_map_list.append(imp_map)
 
             # colored_imp_map = colorize_improvement_map(imp_map, ver_hor="hor")
