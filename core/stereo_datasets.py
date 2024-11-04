@@ -371,7 +371,7 @@ class Booster(StereoDataset):
 
 
 class NerfStereo(StereoDataset):
-    def __init__(self, aug_params=None, root='datasets/NerfStereo/training_set', image_set='training', args=None):
+    def __init__(self, aug_params=None, root='datasets/NerfStereo', image_set='training', args=None):
         super(CREStereoDataset, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispNerfS, args=args)
         root = root if len(root)>0 else DATASET_ROOT
         assert os.path.exists(root), "check the existence: {}".format(root)

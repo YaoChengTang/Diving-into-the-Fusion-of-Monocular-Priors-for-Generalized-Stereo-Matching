@@ -143,7 +143,17 @@ def writeDispCRES(filename, disp):
 
 def readDispNerfS(filename):
     disp = cv2.imread(filename, cv2.IMREAD_UNCHANGED).astype(np.float32) / 64.0
-    valid = disp > 0.0
+    
+    match = re.search(r"(.*?/Q/)", filename)
+    if match:
+        prefix = match.group(1)  # prefix
+        suffix = os.path.basename(filename)  # file name
+        # AO path, aka confidence
+        ao_path = f"{prefix}AO/{suffix}"
+        # print("AO图路径:", ao_path)
+    else:
+        raise Exception("corrupted path for NerfStereo: {}".format(filename))
+    valid = cv2.imread(ao_path, cv2.IMREAD_UNCHANGED).astype(np.float32) / 65535
     return disp, valid
 
 def writeDispNerfS(filename, disp):

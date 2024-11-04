@@ -10,3 +10,4 @@ logs*
 build/
 *.egg-info/
 dist/
+datasets/
