@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from PIL import Image
 from os.path import *
@@ -132,9 +133,12 @@ def writeDispKITTI(filename, disp):
     cv2.imwrite(filename, disp)
 
 def readDispCRES(filename):
-    disp = cv2.imread(filename, cv2.IMREAD_UNCHANGED).astype(np.float32) / 32.0
-    valid = disp > 0.0
-    return disp, valid
+    try:
+        disp = cv2.imread(filename, cv2.IMREAD_UNCHANGED).astype(np.float32) / 32.0
+        valid = disp > 0.0
+        return disp, valid
+    except Exception as err:
+        raise(Exception(err, "Something wrong with {}".format(filename), os.getcwd()))
 
 def writeDispCRES(filename, disp):
     disp = np.round(disp * 32).astype(np.uint16)

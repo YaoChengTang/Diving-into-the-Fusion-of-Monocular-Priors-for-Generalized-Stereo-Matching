@@ -129,7 +129,7 @@ def train(args):
 
                 # middlebury_root = "/".join(DATASET_ROOT.split("/")[:-1]) + "/Middlebury"
                 # results = validate_middlebury(model.module, iters=args.valid_iters, split="H", root=middlebury_root, )
-                results = validate_things(model.module, iters=args.valid_iters)
+                results = validate_things(model.module, iters=args.valid_iters, root="./datasets/sceneflow")
                 if args.local_rank==0 and int(NODE_RANK)==0:
                     logger.write_dict(results)
 
@@ -171,6 +171,7 @@ if __name__ == '__main__':
     parser.add_argument('--image_size', type=int, nargs='+', default=[320, 720], help="size of the random image crops used during training.")
     parser.add_argument('--train_iters', type=int, default=16, help="number of updates to the disparity field in each forward pass.")
     parser.add_argument('--wdecay', type=float, default=.00001, help="Weight decay in optimizer.")
+    parser.add_argument('--finetune', action='store_true', help='fintune model with large data')
     
     # Validation parameters
     parser.add_argument('--valid_iters', type=int, default=32, help='number of flow-field updates during validation forward pass')

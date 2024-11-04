@@ -53,9 +53,11 @@ class RAFTStereoDepthBetaRefine(nn.Module):
             self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', downsample=args.n_downsample)
         
         # 冻结 除refinement以外 模块的所有参数
-        for module in [self.cnet, self.update_block, self.lbp_encoder, self.modulater, self.context_zqr_convs, self.fnet]:
-            for param in module.parameters():
-                param.requires_grad = False
+        if not hasattr(args, 'finetune') or not args.finetune :
+            for module in [self.cnet, self.update_block, self.lbp_encoder, 
+                        self.modulater, self.context_zqr_convs, self.fnet]:
+                for param in module.parameters():
+                    param.requires_grad = False
 
     def freeze_bn(self):
         for m in self.modules():

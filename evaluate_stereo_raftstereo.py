@@ -425,31 +425,31 @@ if __name__ == '__main__':
 
     if args.dataset == 'eth3d':
         if args.root is None:
-            args.root = "/data6/ETH3D"
+            args.root = "./datasets/ETH3D"
         res = validate_eth3d(model, iters=args.valid_iters, root=args.root, 
                              mixed_prec=use_mixed_precision)
 
     elif args.dataset == 'kitti':
         if args.root is None:
-            args.root = "/data1/dataset_raw/KITTI/Kitti15"
+            args.root = "./datasets/Kitti15"
         res = validate_kitti(model, iters=args.valid_iters, root=args.root, 
                              mixed_prec=use_mixed_precision)
     
     elif args.dataset == 'kitti2012':
         if args.root is None:
-            args.root = "/data1/dataset_raw/KITTI/Kitti12"
+            args.root = "./datasets/Kitti12"
         res = validate_kitti2012(model, iters=args.valid_iters, root=args.root, 
                                  mixed_prec=use_mixed_precision)
 
     elif args.dataset in [f"middlebury_{s}" for s in 'FHQ']:
         if args.root is None:
-            args.root = "/data6/Middlebury"
+            args.root = "./datasets/Middlebury"
         res = validate_middlebury(model, iters=args.valid_iters, root=args.root, split=args.dataset[-1], 
                                   mixed_prec=use_mixed_precision)
 
     elif args.dataset == 'things':
         if args.root is None:
-            args.root = "/data6/sceneflow/sceneflow"
+            args.root = "./datasets/sceneflow"
         res = validate_things(model, iters=args.valid_iters, root=args.root, 
                               mixed_prec=use_mixed_precision)
     
