@@ -39,6 +39,122 @@ logger = LoggerCommon("EVAL")
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
+import torch.nn.functional as F
+@torch.no_grad()
+def validate_booster(model, iters=32, root="", mixed_prec=False):
+    """ Peform validation using the Booster (TRAIN balanced) split """
+    model.eval()
+    aug_params = {}
+    val_dataset = datasets.Booster(aug_params, root=root, image_set="train/balanced")
+
+    epe_list = []
+    bad1_list, bad2_list, bad3_list, bad5_list = [], [], [], []
+    epe_trans_list, epe_notrans_list = [],[]
+    bad1_trans_list, bad2_trans_list, bad3_trans_list, bad5_trans_list = [], [], [], []
+    bad1_notrans_list, bad2_notrans_list, bad3_notrans_list, bad5_notrans_list = [], [], [], []
+    # epe_trans_b_list = []
+
+    trans_b_bad1, trans_b_bad2, trans_b_bad3, trans_b_bad5, trans_b_sum = 0,0,0,0,0
+    trans_f_bad1, trans_f_bad2, trans_f_bad3, trans_f_bad5, trans_f_sum = 0,0,0,0,0
+    notrans_bad1, notrans_bad2, notrans_bad3, notrans_bad5, notrans_sum = 0,0,0,0,0
+
+    for val_id in range(len(val_dataset)):
+        (imageL_file, _, _), image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+        image1 = image1[None].cuda()
+        image2 = image2[None].cuda()
+
+        image1 = F.interpolate(image1, scale_factor=(0.25, 0.25), mode='bilinear', align_corners=True)
+        image2 = F.interpolate(image2, scale_factor=(0.25, 0.25), mode='bilinear', align_corners=True)
+        flow_gt = F.interpolate(flow_gt.unsqueeze(0), scale_factor=(0.25, 0.25), mode='bilinear', align_corners=True).squeeze(0)
+        flow_gt /= 4
+        trans_mask = (valid_gt == 3).float()   # get transparent surfaces
+        trans_mask = F.interpolate(trans_mask.unsqueeze(0).unsqueeze(0), scale_factor=(0.25, 0.25), mode='bilinear', align_corners=True).squeeze(0).squeeze(0)
+        
+        padder = InputPadder(image1.shape, divis_by=32)
+        image1, image2 = padder.pad(image1, image2)
+
+        with autocast(enabled=mixed_prec):
+            _, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+        flow_pr = padder.unpad(flow_pr).cpu().squeeze(0)
+
+        assert flow_pr.shape == flow_gt.shape, (flow_pr.shape, flow_gt.shape)
+        epe_full = torch.sum((flow_pr - flow_gt)**2, dim=0).sqrt()
+
+        epe_full = epe_full.flatten()
+        trans_mask = (trans_mask > 0).flatten()   # get transparent surfaces
+        val = (flow_gt.abs() > 1).flatten()
+
+        out1 = (epe_full > 1.0)
+        out2  = (epe_full > 2.0)
+        out3  = (epe_full > 3.0)
+        out5  = (epe_full > 5.0)
+
+        image_epe = epe_full[val].mean().item()
+        image_bad1 = out1[val].float().mean().item()
+        image_bad2 = out2[val].float().mean().item()
+        image_bad3 = out3[val].float().mean().item()
+        image_bad5 = out5[val].float().mean().item()
+        epe_list.append(image_epe)
+        bad1_list.append(image_bad1)
+        bad2_list.append(image_bad2)
+        bad3_list.append(image_bad3)
+        bad5_list.append(image_bad5)
+
+        logger.info(f"Booster Iter {val_id+1} out of {len(val_dataset)}. " + \
+                     f"EPE {round(image_epe,4)} bad1 {round(image_bad1,4)} " + \
+                     f"bad2 {round(image_bad2,4)} bad3 {round(image_bad3,4)} " + \
+                     f"bad5 {round(image_bad5,4)} " + \
+                     f"\r\n{imageL_file}")
+        
+        if (val & trans_mask).sum()>0:
+            image_epe_trans = epe_full[val & trans_mask].mean().item()
+            image_bad1_trans = out1[val & trans_mask].float().mean().item()
+            image_bad2_trans = out2[val & trans_mask].float().mean().item()
+            image_bad3_trans = out3[val & trans_mask].float().mean().item()
+            image_bad5_trans = out5[val & trans_mask].float().mean().item()
+            epe_trans_list.append(image_epe_trans)
+            bad1_trans_list.append(image_bad1_trans)
+            bad2_trans_list.append(image_bad2_trans)
+            bad3_trans_list.append(image_bad3_trans)
+            bad5_trans_list.append(image_bad5_trans)
+
+        if (val & ~trans_mask).sum()>0:
+            image_epe_notrans = epe_full[val & ~trans_mask].mean().item()
+            image_bad1_notrans = out1[val & ~trans_mask].float().mean().item()
+            image_bad2_notrans = out2[val & ~trans_mask].float().mean().item()
+            image_bad3_notrans = out3[val & ~trans_mask].float().mean().item()
+            image_bad5_notrans = out5[val & ~trans_mask].float().mean().item()
+            epe_notrans_list.append(image_epe_notrans)
+            bad1_notrans_list.append(image_bad1_notrans)
+            bad2_notrans_list.append(image_bad2_notrans)
+            bad3_notrans_list.append(image_bad3_notrans)
+            bad5_notrans_list.append(image_bad5_notrans)
+
+    epe = np.mean(np.array(epe_list))
+    bad1 = 100 * np.mean(np.array(bad1_list))
+    bad2 = 100 * np.mean(np.array(bad2_list))
+    bad3 = 100 * np.mean(np.array(bad3_list))
+    bad5 = 100 * np.mean(np.array(bad5_list))
+
+    epe_trans = np.mean(np.array(epe_trans_list))
+    bad1_trans = 100 * np.mean(np.array(bad1_trans_list))
+    bad2_trans = 100 * np.mean(np.array(bad2_trans_list))
+    bad3_trans = 100 * np.mean(np.array(bad3_trans_list))
+    bad5_trans = 100 * np.mean(np.array(bad5_trans_list))
+
+    epe_notrans = np.mean(np.array(epe_notrans_list))
+    bad1_notrans = 100 * np.mean(np.array(bad1_notrans_list))
+    bad2_notrans = 100 * np.mean(np.array(bad2_notrans_list))
+    bad3_notrans = 100 * np.mean(np.array(bad3_notrans_list))
+    bad5_notrans = 100 * np.mean(np.array(bad5_notrans_list))
+
+    logger.info("Validation full: %f, %f, %f, %f, %f" % (epe, bad1, bad2, bad3, bad5))
+    logger.info("Validation Trans foreground: %f, %f, %f, %f, %f" % (epe_trans, bad1_trans, bad2_trans, bad3_trans, bad5_trans))
+    logger.info("Validation non trans: %f, %f, %f, %f, %f" % (epe_notrans, bad1_notrans, bad2_notrans, bad3_notrans, bad5_notrans))
+    return {'booster-epe': epe, 'booster-epe_trans':epe_trans, 'booster-epe_notrans':epe_notrans}
+
+
+
 @torch.no_grad()
 def validate_eth3d(model, iters=32, root="", mixed_prec=False):
     """ Peform validation using the ETH3D (train) split """
@@ -340,7 +456,7 @@ if __name__ == '__main__':
     parser.add_argument('--mast3r_model_path', default='MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth', help="pretrained model path for MaSt3R")
     parser.add_argument('--depthany_model_dir', default='/data5/yao/pretrained', help="directory of pretrained model path for DepthAnything")
     parser.add_argument('--restore_ckpt', help="restore checkpoint", default=None)
-    parser.add_argument('--dataset', help="dataset for evaluation", required=True, choices=["eth3d", "kitti", 'kitti2012', "things"] + [f"middlebury_{s}" for s in 'FHQ'])
+    parser.add_argument('--dataset', help="dataset for evaluation", required=True, choices=["eth3d", "kitti", 'kitti2012', "things", "booster"] + [f"middlebury_{s}" for s in 'FHQ'])
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--valid_iters', type=int, default=32, help='number of flow-field updates during forward pass')
     parser.add_argument('--eval', action='store_true', help='evaluation mode')
@@ -452,6 +568,12 @@ if __name__ == '__main__':
             args.root = "./datasets/sceneflow"
         res = validate_things(model, iters=args.valid_iters, root=args.root, 
                               mixed_prec=use_mixed_precision)
+    
+    elif args.dataset == 'booster':
+        if args.root is None:
+            args.root = "./datasets/Booster"
+        res = validate_booster(model, iters=args.valid_iters, root=args.root, 
+                               mixed_prec=use_mixed_precision)
     
     
     # write results into excel

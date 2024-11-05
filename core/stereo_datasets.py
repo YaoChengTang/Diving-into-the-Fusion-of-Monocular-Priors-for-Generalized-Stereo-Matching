@@ -88,7 +88,7 @@ class StereoDataset(data.Dataset):
 
             disp = np.array(disp).astype(np.float32)
             flow = np.stack([-disp, np.zeros_like(disp)], axis=-1)
-            
+
         except Exception as err:
             raise Exception(err, "{}, {}, {}".format(self.image_list[index][0], 
                                                      self.image_list[index][1], 
@@ -108,9 +108,15 @@ class StereoDataset(data.Dataset):
             else:
                 img1, img2, flow = self.augmentor(img1, img2, flow)
 
-        img1 = torch.from_numpy(img1).permute(2, 0, 1).float()
-        img2 = torch.from_numpy(img2).permute(2, 0, 1).float()
-        flow = torch.from_numpy(flow).permute(2, 0, 1).float()
+        try:
+            img1 = torch.from_numpy(img1).permute(2, 0, 1).float()
+            img2 = torch.from_numpy(img2).permute(2, 0, 1).float()
+            flow = torch.from_numpy(flow).permute(2, 0, 1).float()
+        except Exception as err:
+            raise Exception(err, "{}, {}, {}".format(self.image_list[index][0], 
+                                                     self.image_list[index][1], 
+                                                     self.disparity_list[index]),
+                            "{}, {}, {}".format(img1.shape, img2.shape, flow.shape), )
 
         if self.sparse:
             valid = torch.from_numpy(valid)
@@ -359,21 +365,21 @@ class Middlebury(StereoDataset):
 
 
 class Booster(StereoDataset):
-    def __init__(self, aug_params=None, root='data/Booster_dataset', resolution='Q', split='train'):
-        super(Booster, self).__init__(aug_params, sparse=True)
-        assert resolution in "FHQ"
-        if resolution == 'F':
-            root = os.path.join(root, 'full')
-        elif resolution == 'H':
-            root = os.path.join(root, 'half')
-        elif resolution == 'Q':
-            root = os.path.join(root, 'quarter')
-        image1_list = sorted( glob(osp.join(root, f'{split}/balanced/*/camera_00/*.png')) )
-        image2_list = sorted( glob(osp.join(root, f'{split}/balanced/*/camera_02/*.png')) )
+    def __init__(self, aug_params=None, root='datasets/booster/train/balanced', image_set='train', args=None):
+        super(Booster, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispBooster)
+        assert os.path.exists(root)
+        # image1_list = sorted(glob(os.path.join(root, image_set, "**/camera_00/im*.png"), recursive=True))
+        image2_list = sorted(glob(os.path.join(root, image_set, "**/camera_02/im*.png"), recursive=True))
+        image1_list = [img.replace("camera_02", "camera_00") for img in image2_list]
 
-        for img1, img2 in zip(image1_list, image2_list):
-            self.image_list += [ [img1, img2] ]
-            self.disparity_list += [ '/'.join(img1.split('/')[0:-2]) + '/disp_00.npy' ]
+        disp_list = [os.path.join(os.path.split(x)[0].replace("camera_00", ""), 'disp_00.npy') for x in image1_list]
+        mask_list = [os.path.join(os.path.split(x)[0].replace("camera_00", ""), 'mask_cat.png') for x in image1_list]
+        right_disp_list = [os.path.join(os.path.split(x)[0].replace("camera_00", ""), 'disp_02.npy') for x in image1_list]
+        
+        for img1, img2, disp, disp_r, mask in zip(image1_list, image2_list, disp_list, right_disp_list,mask_list):
+            self.image_list += [[img1, img2]]
+            self.disparity_list += [disp]
+            # self.trans_mask += [mask]
 
 
 class NerfStereoDataset(StereoDataset):

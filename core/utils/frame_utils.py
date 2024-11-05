@@ -165,6 +165,19 @@ def writeDispNerfS(filename, disp):
     # skimage.io.imsave(filename, disp)
     cv2.imwrite(filename, disp)
 
+def readDispBooster(file_name):
+    disp = np.load(file_name, encoding='bytes', allow_pickle=True)
+    # mask_00  = os.path.join(os.path.split(file_name)[0], 'mask_00.png')
+    mask_cat_path = os.path.join(os.path.split(file_name)[0], 'mask_cat.png')
+    mask_cat = cv2.imread(mask_cat_path, cv2.IMREAD_ANYDEPTH).astype(np.float32)
+    valid = mask_cat
+    return disp, valid
+
+def writeDispBooster(filename, disp):
+    disp = np.round(disp).astype(np.uint16)
+    # skimage.io.imsave(filename, disp)
+    cv2.imwrite(filename, disp)
+
 # Method taken from /n/fs/raft-depth/RAFT-Stereo/datasets/SintelStereo/sdk/python/sintel_io.py
 def readDispSintelStereo(file_name):
     a = np.array(Image.open(file_name))
