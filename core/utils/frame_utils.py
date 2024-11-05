@@ -134,7 +134,7 @@ def writeDispKITTI(filename, disp):
 
 def readDispCRES(filename):
     try:
-        disp = cv2.imread(filename, cv2.IMREAD_UNCHANGED).astype(np.float32) / 32.0
+        disp = cv2.imread(filename, cv2.IMREAD_ANYDEPTH).astype(np.float32) / 32.0
         valid = disp > 0.0
         return disp, valid
     except Exception as err:
@@ -146,7 +146,7 @@ def writeDispCRES(filename, disp):
     cv2.imwrite(filename, disp)
 
 def readDispNerfS(filename):
-    disp = cv2.imread(filename, cv2.IMREAD_UNCHANGED).astype(np.float32) / 64.0
+    disp = cv2.imread(filename, cv2.IMREAD_ANYDEPTH).astype(np.float32) / 64.0
     
     match = re.search(r"(.*?/Q/)", filename)
     if match:
@@ -157,7 +157,7 @@ def readDispNerfS(filename):
         # print("AO图路径:", ao_path)
     else:
         raise Exception("corrupted path for NerfStereo: {}".format(filename))
-    valid = cv2.imread(ao_path, cv2.IMREAD_UNCHANGED).astype(np.float32) / 65535
+    valid = cv2.imread(ao_path, cv2.IMREAD_ANYDEPTH).astype(np.float32) / 65535
     return disp, valid
 
 def writeDispNerfS(filename, disp):

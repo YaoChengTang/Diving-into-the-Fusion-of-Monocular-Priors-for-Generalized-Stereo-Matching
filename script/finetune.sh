@@ -25,10 +25,6 @@ export NCCL_P2P_DISABLE=1
 # export CUDA_VISIBLE_DEVICES=0,1,2,3
 export CUDA_VISIBLE_DEVICES=4,5,6,7
 
-# "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/Sceneflow"
-# "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/Middlebury"
-# "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/KITTI2015"
-# "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/ETH3D"
 # export DATASET_ROOT="/data6/sceneflow/sceneflow"
 
 export LOG_ROOT="/data5/yao/runs/log/${FOLDER_NAME}"

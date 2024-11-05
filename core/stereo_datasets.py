@@ -72,21 +72,27 @@ class StereoDataset(data.Dataset):
                 random.seed(worker_info.id)
                 self.init_seed = True
 
-        index = index % len(self.image_list)
-        disp = self.disparity_reader(self.disparity_list[index])
-        if isinstance(disp, tuple):
-            disp, valid = disp
-        else:
-            valid = disp < 512
+        try:
+            index = index % len(self.image_list)
+            disp = self.disparity_reader(self.disparity_list[index])
+            if isinstance(disp, tuple):
+                disp, valid = disp
+            else:
+                valid = disp < 512
 
-        img1 = frame_utils.read_gen(self.image_list[index][0])
-        img2 = frame_utils.read_gen(self.image_list[index][1])
+            img1 = frame_utils.read_gen(self.image_list[index][0])
+            img2 = frame_utils.read_gen(self.image_list[index][1])
+        
+            img1 = np.array(img1).astype(np.uint8)
+            img2 = np.array(img2).astype(np.uint8)
 
-        img1 = np.array(img1).astype(np.uint8)
-        img2 = np.array(img2).astype(np.uint8)
-
-        disp = np.array(disp).astype(np.float32)
-        flow = np.stack([-disp, np.zeros_like(disp)], axis=-1)
+            disp = np.array(disp).astype(np.float32)
+            flow = np.stack([-disp, np.zeros_like(disp)], axis=-1)
+            
+        except Exception as err:
+            raise Exception(err, "{}, {}, {}".format(self.image_list[index][0], 
+                                                     self.image_list[index][1], 
+                                                     self.disparity_list[index] ))
 
         # grayscale images
         if len(img1.shape) == 2:

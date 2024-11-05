@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from glob import glob
 from tqdm import tqdm
+from PIL import Image
 from multiprocessing import Pool
 
 root='./datasets/CREStereo_dataset'
@@ -48,17 +49,31 @@ def check_validity(img1_chunk, img2_chunk, disp_chunk):
     valid_img1, valid_img2, valid_disp = [], [], []
 
     for img1_path, img2_path, disp_path in zip(img1_chunk, img2_chunk, disp_chunk):
-        img1 = cv2.imread(img1_path)
-        img2 = cv2.imread(img2_path)
-        disp = cv2.imread(disp_path)
+        try:
+            img1 = Image.open(img1_path)
+            img2 = Image.open(img2_path)
+            disp = cv2.imread(disp_path, cv2.IMREAD_ANYDEPTH).astype(np.float32) / 64.0
 
-        # 检查是否有任何图像读取失败
+            img1 = np.array(img1).astype(np.uint8)
+            img2 = np.array(img2).astype(np.uint8)
+            disp = np.array(disp).astype(np.float32)
+        except Exception as err:
+            print(err)
+            print(f"文件失效：{img1_path if img1 is None else ''} {img2_path if img2 is None else ''} {disp_path if disp is None else ''}")
+            continue
+        
         if img1 is not None and img2 is not None and disp is not None:
             valid_img1.append(img1_path)
             valid_img2.append(img2_path)
             valid_disp.append(disp_path)
-        else:
-            print(f"文件失效：{img1_path if img1 is None else ''} {img2_path if img2 is None else ''} {disp_path if disp is None else ''}")
+        
+        # # 检查是否有任何图像读取失败
+        # if img1 is not None and img2 is not None and disp is not None:
+        #     valid_img1.append(img1_path)
+        #     valid_img2.append(img2_path)
+        #     valid_disp.append(disp_path)
+        # else:
+        #     print(f"文件失效：{img1_path if img1 is None else ''} {img2_path if img2 is None else ''} {disp_path if disp is None else ''}")
 
     return valid_img1, valid_img2, valid_disp
 
