@@ -176,6 +176,7 @@ def readDispBooster(file_name):
 def writeDispBooster(filename, disp):
     disp = np.round(disp).astype(np.uint16)
     # skimage.io.imsave(filename, disp)
+    filename = filename.replace(".npy", ".jpg")
     cv2.imwrite(filename, disp)
 
 # Method taken from /n/fs/raft-depth/RAFT-Stereo/datasets/SintelStereo/sdk/python/sintel_io.py

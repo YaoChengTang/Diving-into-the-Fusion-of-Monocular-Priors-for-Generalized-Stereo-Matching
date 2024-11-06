@@ -55,6 +55,8 @@ def evalute_metric(flow_pr, flow_gt, valid_gt, d1_thold, dataset_name=None):
         val = (valid_gt.flatten() >= 0.5) & (flow_gt.abs().flatten() < 192)
     elif dataset_name.lower()=="kitti":
         val = valid_gt.flatten() >= 0.5
+    elif dataset_name.lower()=="booster":
+        val = valid_gt.flatten() >= 0.5      # we mainly focus on transparent areas in vis
     else:
         raise Exception(f"{dataset_name} is not supported")
     image_out = out[val].float().mean().item()
@@ -93,7 +95,7 @@ def evalute(atom_dict,
     len_sequence = len(flow_pr_sequence)
     flow_pr_sequence += flow_pr_refine_sequence
 
-    # compute epe and d1 for each each iteration
+    # compute epe and d1 for each iteration
     vis_epe_sequence = []
     vis_xpx_sequence = []
     for idx, flow_pr in enumerate(flow_pr_sequence):
@@ -118,30 +120,34 @@ def evalute(atom_dict,
     image1 = padder.unpad(image1).cpu().squeeze(0).permute(1,2,0)
     image2 = padder.unpad(image2).cpu().squeeze(0).permute(1,2,0)
 
-    # vis1 = [{"name": "Left Image", 
-    #          "img_list": [image1.data.numpy().astype(np.uint8)], "cmap": None},
-    #         {"name": "Right Image", 
-    #          "img_list": [image2.data.numpy().astype(np.uint8)], "cmap": None},
-    #         {"name": "GT Disp", "img_list": [-flow_gt.data.numpy()[0]], "cmap": "jet"},
-    #         {"name": "Pr Disp", "img_list": [-flow_pr_sequence[-1].data.numpy()[0]], "cmap": "jet"},]
-    # if depth is not None:
-    #     vis1.append( {"name": "Pr Disp", "img_list": [depth.cpu().squeeze(0).data.numpy()[0]], "cmap": "jet"} )
-    # viser.analyze(vis1, imageGT_file, in_one_fig=True)
-
-    vis2 = [{"name": "Disp", 
-             "img_list": [-flow_pr.data.numpy()[0] for flow_pr in flow_pr_sequence], 
+    vis1 = [{"name": "Left Image", 
+             "img_list": [image1.data.numpy().astype(np.uint8)], "cmap": None},
+            {"name": "Right Image", 
+             "img_list": [image2.data.numpy().astype(np.uint8)], "cmap": None},
+            {"name": "GT Disp", "img_list": [-flow_gt.data.numpy()[0]], "cmap": "jet"},
+            {"name": "Pr Disp", 
+             "img_list": [-flow_pr_sequence[-1].data.numpy()[0]], 
              "cmap": "jet",
-             "epe_list": vis_epe_sequence,
-             f"{d1_thold}px_list": vis_xpx_sequence,
              "GT": [-flow_gt.data.numpy()[0]],
-             "stop_idx": 20,
-             "improvement": viser.args.improvement,
-             "movement": viser.args.movement,
-             "error_map": True,
-             "acceleration": viser.args.acceleration,
-             "mask": viser.args.mask,
-             "binary_thold": viser.args.binary_thold},]
-    viser.analyze(vis2, imageGT_file, in_one_fig=False)
+             "error_map": True,},]
+    if depth is not None:
+        vis1.append( {"name": "Mono Depth", "img_list": [depth.cpu().squeeze(0).data.numpy()[0]], "cmap": "jet"} )
+    viser.analyze(vis1, imageGT_file, in_one_fig=True)
+
+    # vis2 = [{"name": "Disp", 
+    #          "img_list": [-flow_pr.data.numpy()[0] for flow_pr in flow_pr_sequence], 
+    #          "cmap": "jet",
+    #          "epe_list": vis_epe_sequence,
+    #          f"{d1_thold}px_list": vis_xpx_sequence,
+    #          "GT": [-flow_gt.data.numpy()[0]],
+    #          "stop_idx": 20,
+    #          "improvement": viser.args.improvement,
+    #          "movement": viser.args.movement,
+    #          "error_map": True,
+    #          "acceleration": viser.args.acceleration,
+    #          "mask": viser.args.mask,
+    #          "binary_thold": viser.args.binary_thold},]
+    # viser.analyze(vis2, imageGT_file, in_one_fig=False)
 
     if viser.args.mask and confidence_list is not None and len(confidence_list)>0 :
         vis3 = [{"name": "Encourage", 
@@ -321,6 +327,62 @@ def validate_middlebury(model, iters=32, split='F', root="", sv_root="", mixed_p
     return {f'middlebury{split}-epe': epe, f'middlebury{split}-d1': d1}
 
 
+@torch.no_grad()
+def validate_booster(model, iters=32, root="", mixed_prec=False, sv_root="", image_set="train/balanced", args=None):
+    """ Peform validation using the Booster (TRAIN balanced) split """
+    model.eval()
+    aug_params = {}
+    val_dataset = datasets.Booster(aug_params, root=root, image_set=image_set)
+    viser = Visualizer(root, sv_root, "booster", scratch=False, args=args, logger=logger)
+
+    epe_list = []
+    bad1_list, bad2_list, bad3_list, bad5_list = [], [], [], []
+    epe_trans_list, epe_notrans_list = [],[]
+    bad1_trans_list, bad2_trans_list, bad3_trans_list, bad5_trans_list = [], [], [], []
+    bad1_notrans_list, bad2_notrans_list, bad3_notrans_list, bad5_notrans_list = [], [], [], []
+    # epe_trans_b_list = []
+
+    trans_b_bad1, trans_b_bad2, trans_b_bad3, trans_b_bad5, trans_b_sum = 0,0,0,0,0
+    trans_f_bad1, trans_f_bad2, trans_f_bad3, trans_f_bad5, trans_f_sum = 0,0,0,0,0
+    notrans_bad1, notrans_bad2, notrans_bad3, notrans_bad5, notrans_sum = 0,0,0,0,0
+
+    out_list, epe_list = [], []
+    for val_id in range(len(val_dataset)):
+        (imageL_file, imageR_file, imageGT_file), image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+        image1 = image1[None].cuda()
+        image2 = image2[None].cuda()
+
+        image1 = F.interpolate(image1, scale_factor=(0.25, 0.25), mode='bilinear', align_corners=True)
+        image2 = F.interpolate(image2, scale_factor=(0.25, 0.25), mode='bilinear', align_corners=True)
+        flow_gt = F.interpolate(flow_gt.unsqueeze(0), scale_factor=(0.25, 0.25), mode='bilinear', align_corners=True).squeeze(0)
+        flow_gt /= 4
+        trans_mask = (valid_gt == 3).float()   # get transparent surfaces
+        trans_mask = F.interpolate(trans_mask.unsqueeze(0).unsqueeze(0), scale_factor=(0.25, 0.25), mode='bilinear', align_corners=True).squeeze(0).squeeze(0)
+        
+        padder = InputPadder(image1.shape, divis_by=32)
+        image1, image2 = padder.pad(image1, image2)
+
+        with autocast(enabled=mixed_prec):
+            atom_dict = model(image1, image2, iters=iters, test_mode=False, vis_mode=True)
+        
+        image_epe, image_out = evalute(atom_dict, 
+                                       image1, image2, flow_gt, trans_mask, imageGT_file, 
+                                       padder, viser, dataset_name="Booster", d1_thold=2.0)
+        epe_list.append(image_epe)
+        out_list.append(image_out)
+        logger.info(f"Booster-{image_set} Iter {val_id+1} out of {len(val_dataset)}. " +\
+                     f"EPE {round(image_epe,4)} D1 {round(image_out,4)}")
+
+    epe_list = np.array(epe_list)
+    out_list = np.array(out_list)
+
+    epe = np.mean(epe_list)
+    d1 = 100 * np.mean(out_list)
+
+    logger.info(f"Validation Booster-{image_set}: EPE {epe}, D1 {d1}")
+    return {f'Booster-{image_set}-epe': epe, f'Booster-{image_set}-d1': d1}
+    
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', help="dataset root", default=None)
@@ -330,7 +392,7 @@ if __name__ == '__main__':
     parser.add_argument('--mast3r_model_path', default='MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth', help="pretrained model path for MaSt3R")
     parser.add_argument('--depthany_model_dir', default='/data5/yao/pretrained', help="directory of pretrained model path for DepthAnything")
     parser.add_argument('--restore_ckpt', help="restore checkpoint", default=None)
-    parser.add_argument('--dataset', help="dataset for evaluation", required=True, choices=["eth3d", "kitti", "things"] + [f"middlebury_{s}" for s in 'FHQ'])
+    parser.add_argument('--dataset', help="dataset for evaluation", required=True, choices=["eth3d", "kitti", "things", "booster"] + [f"middlebury_{s}" for s in 'FHQ'])
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--valid_iters', type=int, default=32, help='number of flow-field updates during forward pass')
     parser.add_argument('--eval', action='store_true', help='evaluation mode')
@@ -455,3 +517,10 @@ if __name__ == '__main__':
         validate_things(model, iters=args.valid_iters, root=args.root, 
                         sv_root=args.sv_root, mixed_prec=use_mixed_precision,
                         args=args)
+    
+    elif args.dataset == 'booster':
+        if args.root is None:
+            args.root = "./datasets/Booster"
+        res = validate_booster(model, iters=args.valid_iters, root=args.root, 
+                               sv_root=args.sv_root, mixed_prec=use_mixed_precision,
+                               args=args)

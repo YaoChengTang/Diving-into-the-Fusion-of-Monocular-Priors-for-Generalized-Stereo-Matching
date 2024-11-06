@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from frame_utils import writeDispMiddlebury, writeDispKITTI, write_gen
+import frame_utils as frame_utils
 
 
 
@@ -157,7 +157,7 @@ class Visualizer:
         self.args    = args
         self.sv_root = self.sv_root if self.sv_root[-(1+len(self.dataset)):]=="/"+self.dataset \
                        else os.path.join(self.sv_root, self.dataset)
-        self.vis_root = self.sv_root.replace(self.dataset, os.path.join("analysis", self.dataset))
+        self.vis_root = os.path.dirname(self.sv_root) + os.path.join("analysis", self.dataset)
 
         self.my_print = print if logger is None else logger.info
         self.my_print("saving prediction to {}, visualization to {}".format(self.sv_root, self.vis_root))
@@ -179,11 +179,13 @@ class Visualizer:
 
         # write prediction
         if self.dataset.lower()=="middlebury" :
-            writeDispMiddlebury(sv_path, flow_pr)
+            frame_utils.writeDispMiddlebury(sv_path, flow_pr)
         elif self.dataset.lower()=="kitti2015" :
-            writeDispKITTI(sv_path, flow_pr)
+            frame_utils.writeDispKITTI(sv_path, flow_pr)
         elif self.dataset.lower()=="eth3d" :
-            write_gen(sv_path, flow_pr)
+            frame_utils.write_gen(sv_path, flow_pr)
+        elif self.dataset.lower()=="booster" :
+            frame_utils.writeDispBooster(sv_path, flow_pr)
         else:
             raise Exception("such daatset is not supported: {}".format(dataset))
         return True
