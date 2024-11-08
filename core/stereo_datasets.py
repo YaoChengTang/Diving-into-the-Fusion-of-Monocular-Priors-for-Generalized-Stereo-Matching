@@ -383,22 +383,27 @@ class Booster(StereoDataset):
 
 
 class NerfStereoDataset(StereoDataset):
-    def __init__(self, aug_params=None, root='datasets/NerfStereo', image_set='training', args=None):
+    def __init__(self, aug_params=None, root='datasets/NerfStereo', image_set='training', args=None, txt_root=None):
         super(NerfStereoDataset, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispNerfS, args=args)
         root = root if len(root)>0 else DATASET_ROOT
         assert os.path.exists(root), "check the existence: {}".format(root)
-
-        left_list = sorted(glob(os.path.join(root, "*/*/baseline_*/left/*.jpg"), recursive=True))
-        image1_list = []
-        for path in left_list:
-            match = re.search(r"(.*?/Q/)", path)
-            prefix = match.group(1)  # prefix
-            suffix = os.path.basename(path)  # file name
-            path_new = f"{prefix}center/{suffix}"
-            image1_list.append( path_new )
-        image2_list = sorted(glob(os.path.join(root, "*/*/baseline_*/right/*.jpg"), recursive=True))
-        disp_list = sorted(glob(os.path.join(root, "*/*/baseline_*/disparity/*.png"), recursive=True))
-        # dispr_list = sorted(glob(os.path.join(root, "**/*_right.disp.png"), recursive=True))
+        
+        if txt_root is None: 
+            left_list = sorted(glob(os.path.join(root, "*/*/baseline_*/left/*.jpg"), recursive=True))
+            image1_list = []
+            for path in left_list:
+                match = re.search(r"(.*?/Q/)", path)
+                prefix = match.group(1)  # prefix
+                suffix = os.path.basename(path)  # file name
+                path_new = f"{prefix}center/{suffix}"
+                image1_list.append( path_new )
+            image2_list = sorted(glob(os.path.join(root, "*/*/baseline_*/right/*.jpg"), recursive=True))
+            disp_list = sorted(glob(os.path.join(root, "*/*/baseline_*/disparity/*.png"), recursive=True))
+            # dispr_list = sorted(glob(os.path.join(root, "**/*_right.disp.png"), recursive=True))
+        else:
+            image1_list = np.load( os.path.join(txt_root, 'image1_list.npy') )
+            image2_list = np.load( os.path.join(txt_root, 'image2_list.npy') )
+            disp_list = np.load( os.path.join(txt_root, 'disp_list.npy') )
 
         for idx, (img1, img2, disp) in enumerate(zip(image1_list, image2_list, disp_list)):
             self.image_list += [ [img1, img2] ]
@@ -460,10 +465,10 @@ def fetch_dataloader(args):
             new_dataset = TartanAir(aug_params, keywords=dataset_name.split('_')[2:])
             logging.info(f"Adding {len(new_dataset)} samples from Tartain Air")
         elif 'nerfstereo' in dataset_name:
-            new_dataset = NerfStereoDataset(aug_params, args=args, root='./datasets/NerfStereo')
+            new_dataset = NerfStereoDataset(aug_params, args=args, root='./datasets/NerfStereo', txt_root='./datasets/NerfStereo/../')
             logging.info(f"Adding {len(new_dataset)} samples from NerfStereoDataset")
         elif 'crestereo' in dataset_name:
-            new_dataset = CREStereoDataset(aug_params, args=args, txt_root='./datasets/CREStereo_dataset')
+            new_dataset = CREStereoDataset(aug_params, args=args, txt_root='./datasets/CREStereo_dataset/../')
             logging.info(f"Adding {len(new_dataset)} samples from CREStereoDataset")
         train_dataset = new_dataset if train_dataset is None else train_dataset + new_dataset
 
