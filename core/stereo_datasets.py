@@ -388,8 +388,14 @@ class NerfStereoDataset(StereoDataset):
         root = root if len(root)>0 else DATASET_ROOT
         assert os.path.exists(root), "check the existence: {}".format(root)
 
-        image1_list = sorted(glob(os.path.join(root, "*/*/baseline_*/left/*.jpg"), recursive=True))
-        image1_list = [path.replace("/left/", "/center/") for path in image1_list]
+        left_list = sorted(glob(os.path.join(root, "*/*/baseline_*/left/*.jpg"), recursive=True))
+        image1_list = []
+        for path in left_list:
+            match = re.search(r"(.*?/Q/)", path)
+            prefix = match.group(1)  # prefix
+            suffix = os.path.basename(path)  # file name
+            path_new = f"{prefix}center/{suffix}"
+            image1_list.append( path_new )
         image2_list = sorted(glob(os.path.join(root, "*/*/baseline_*/right/*.jpg"), recursive=True))
         disp_list = sorted(glob(os.path.join(root, "*/*/baseline_*/disparity/*.png"), recursive=True))
         # dispr_list = sorted(glob(os.path.join(root, "**/*_right.disp.png"), recursive=True))

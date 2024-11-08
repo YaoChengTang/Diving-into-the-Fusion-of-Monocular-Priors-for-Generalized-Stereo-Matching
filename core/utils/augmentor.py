@@ -254,6 +254,23 @@ class SparseFlowAugmentor:
 
         return flow_img, valid_img
 
+    def pad_images(self, img1, img2, flow, valid):
+        ch, cw = self.crop_size
+        padded_data = []
+
+        for data in [img1, img2, flow, valid]:
+            h, w = data.shape[:2]
+            pad_h = max(0, ch - h)
+            pad_w = max(0, cw - w)
+            
+            if pad_h > 0 or pad_w > 0:
+                pad_width = ((0, pad_h), (0, pad_w)) + ((0, 0),) * (data.ndim - 2)
+                padded_data.append(np.pad(data, pad_width, mode='constant', constant_values=0))
+            else:
+                padded_data.append(data)
+
+        return padded_data
+
     def spatial_transform(self, img1, img2, flow, valid):
         # randomly sample scale
 
@@ -291,6 +308,10 @@ class SparseFlowAugmentor:
         margin_y = 20
         margin_x = 50
 
+        img1, img2, flow, valid = self.pad_images(img1, img2, flow, valid)
+        # img1_raw_shape = img1.shape
+        # valid_raw_shape = valid.shape
+
         y0 = np.random.randint(0, img1.shape[0] - self.crop_size[0] + margin_y)
         x0 = np.random.randint(-margin_x, img1.shape[1] - self.crop_size[1] + margin_x)
 
@@ -301,6 +322,8 @@ class SparseFlowAugmentor:
         img2 = img2[y0:y0+self.crop_size[0], x0:x0+self.crop_size[1]]
         flow = flow[y0:y0+self.crop_size[0], x0:x0+self.crop_size[1]]
         valid = valid[y0:y0+self.crop_size[0], x0:x0+self.crop_size[1]]
+
+        # print("-"*10, "SparseFlowAugmentor: ", self.crop_size, [x0,y0], img1.shape, img1_raw_shape, valid.shape, valid_raw_shape)
         return img1, img2, flow, valid
 
 
