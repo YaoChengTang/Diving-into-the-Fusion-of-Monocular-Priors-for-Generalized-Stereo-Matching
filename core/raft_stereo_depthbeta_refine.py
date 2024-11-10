@@ -189,6 +189,9 @@ class RAFTStereoDepthBetaRefine(nn.Module):
         if vis_mode:
             return {"disp_predictions": disp_predictions, 
                     "depth": depth, 
+                    "depth_registered": depth_registered,
+                    "depth_registered_up": -depth_registered_up,
+                    "conf_fusion": conf,
                     "modulation_predictions": modulation_predictions}
 
         return {"disp_predictions": disp_predictions,

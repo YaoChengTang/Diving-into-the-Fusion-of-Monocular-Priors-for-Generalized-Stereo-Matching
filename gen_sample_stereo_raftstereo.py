@@ -70,8 +70,11 @@ def evalute(atom_dict,
             padder, viser, dataset_name, d1_thold):
     flow_pr_sequence        = atom_dict.get("disp_predictions", [])
     depth                   = atom_dict.get("depth", None)
+    depth_registered        = atom_dict.get("depth_registered", None)
+    depth_registered_up     = atom_dict.get("depth_registered_up", None)
     modulation_predictions  = atom_dict.get("modulation_predictions", [])
     flow_pr_refine_sequence = atom_dict.get("disp_refine_predictions", [])
+    conf_fusion             = atom_dict.get("conf_fusion", None)
 
     # fill None in confidence_list with zero-matrix and
     # unpad confidence map
@@ -125,13 +128,28 @@ def evalute(atom_dict,
             {"name": "Right Image", 
              "img_list": [image2.data.numpy().astype(np.uint8)], "cmap": None},
             {"name": "GT Disp", "img_list": [-flow_gt.data.numpy()[0]], "cmap": "jet"},
-            {"name": "Pr Disp", 
+            {"name": "Pr Disp -1", 
              "img_list": [-flow_pr_sequence[-1].data.numpy()[0]], 
+             "cmap": "jet",
+             "GT": [-flow_gt.data.numpy()[0]],
+             "error_map": True,},
+            {"name": "Pr Disp -2", 
+             "img_list": [-flow_pr_sequence[-2].data.numpy()[0]], 
              "cmap": "jet",
              "GT": [-flow_gt.data.numpy()[0]],
              "error_map": True,},]
     if depth is not None:
         vis1.append( {"name": "Mono Depth", "img_list": [depth.cpu().squeeze(0).data.numpy()[0]], "cmap": "jet"} )
+    if depth_registered is not None:
+        vis1.append( {"name": "Mono depth_registered", "img_list": [depth_registered.cpu().squeeze(0).data.numpy()[0]], "cmap": "jet"} )
+    if depth_registered_up is not None:
+        vis1.append( {"name": "Mono depth_registered_up", 
+                      "img_list": [depth_registered_up.cpu().squeeze(0).data.numpy()[0]], 
+                      "cmap": "jet",
+                      "GT": [-flow_gt.data.numpy()[0]],
+                      "error_map": True,} )
+    if conf_fusion is not None:
+        vis1.append( {"name": "Mono conf_fusion", "img_list": [conf_fusion.cpu().squeeze(0).data.numpy()[0]], "cmap": "viridis"} )
     viser.analyze(vis1, imageGT_file, in_one_fig=True)
 
     # vis2 = [{"name": "Disp", 
