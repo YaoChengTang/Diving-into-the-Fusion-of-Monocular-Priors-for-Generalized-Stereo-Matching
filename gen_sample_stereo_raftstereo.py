@@ -137,6 +137,11 @@ def evalute(atom_dict,
              "img_list": [-flow_pr_sequence[-3].data.numpy()[0]], 
              "cmap": "jet",
              "GT": [-flow_gt.data.numpy()[0]],
+             "error_map": True,},
+            {"name": "Pr Disp -10", 
+             "img_list": [-flow_pr_sequence[-10].data.numpy()[0]], 
+             "cmap": "jet",
+             "GT": [-flow_gt.data.numpy()[0]],
              "error_map": True,},]
     if depth is not None:
         vis1.append( {"name": "Mono Depth", "img_list": [depth.cpu().squeeze(0).data.numpy()[0]], "cmap": "jet"} )
