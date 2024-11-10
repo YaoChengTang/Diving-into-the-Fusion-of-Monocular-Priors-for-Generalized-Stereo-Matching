@@ -133,8 +133,8 @@ def evalute(atom_dict,
              "cmap": "jet",
              "GT": [-flow_gt.data.numpy()[0]],
              "error_map": True,},
-            {"name": "Pr Disp -2", 
-             "img_list": [-flow_pr_sequence[-2].data.numpy()[0]], 
+            {"name": "Pr Disp -3", 
+             "img_list": [-flow_pr_sequence[-3].data.numpy()[0]], 
              "cmap": "jet",
              "GT": [-flow_gt.data.numpy()[0]],
              "error_map": True,},]
@@ -143,8 +143,9 @@ def evalute(atom_dict,
     if depth_registered is not None:
         vis1.append( {"name": "Mono depth_registered", "img_list": [depth_registered.cpu().squeeze(0).data.numpy()[0]], "cmap": "jet"} )
     if depth_registered_up is not None:
+        depth_registered_up = padder.unpad(depth_registered_up).cpu().squeeze(0)
         vis1.append( {"name": "Mono depth_registered_up", 
-                      "img_list": [depth_registered_up.cpu().squeeze(0).data.numpy()[0]], 
+                      "img_list": [depth_registered_up.data.numpy()[0]], 
                       "cmap": "jet",
                       "GT": [-flow_gt.data.numpy()[0]],
                       "error_map": True,} )
