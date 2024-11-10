@@ -140,6 +140,8 @@ class RefinementMonStereo(nn.Module):
             nn.Conv2d(32, 32, 3, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(32, 2, 1, padding=0))
+        if self.args.refine_pool:
+            self.mono_params_estimate.add_module("global_avg_pool", nn.AdaptiveAvgPool2d((1, 1)))
 
         factor = 2**self.args.n_downsample
         self.mask = nn.Sequential(
