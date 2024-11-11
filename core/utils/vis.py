@@ -155,9 +155,11 @@ class Visualizer:
         self.dataset = dataset
         self.scratch = scratch
         self.args    = args
-        self.sv_root = self.sv_root if self.sv_root[-(1+len(self.dataset)):]=="/"+self.dataset \
-                       else os.path.join(self.sv_root, self.dataset)
-        self.vis_root = os.path.join(os.path.dirname(self.sv_root), "analysis", self.dataset)
+        
+        tmp_dir = self.args.dataset.lower()
+        self.sv_root = self.sv_root if self.sv_root[-(1+len(tmp_dir)):]=="/"+tmp_dir \
+                       else os.path.join(self.sv_root, tmp_dir)
+        self.vis_root = os.path.join(os.path.dirname(self.sv_root), "analysis", tmp_dir)
 
         self.my_print = print if logger is None else logger.info
         self.my_print("saving prediction to {}, visualization to {}".format(self.sv_root, self.vis_root))
