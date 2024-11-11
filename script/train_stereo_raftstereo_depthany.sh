@@ -25,10 +25,6 @@ export NCCL_P2P_DISABLE=1
 # export CUDA_VISIBLE_DEVICES=0,1,2,3
 export CUDA_VISIBLE_DEVICES=4,5,6,7
 
-# "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/Sceneflow"
-# "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/Middlebury"
-# "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/KITTI2015"
-# "/horizon-bucket/saturn_v_dev/01_users/chengtang.yao/ETH3D"
 export DATASET_ROOT="/data6/sceneflow/sceneflow"
 
 export LOG_ROOT="/data5/yao/runs/log/${FOLDER_NAME}"
@@ -78,4 +74,9 @@ echo "CKPOINT_ROOT is set to: $CKPOINT_ROOT"
 
 # torchrun --nnode 1 --nproc_per_node 4 --master_port 29501 train_stereo_raftstereo.py --batch_size 32 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision --model_name "RAFTStereoDepthPostFusion" --depthany_model_dir "/data5/yao/pretrained" --restore_ckpt "/data5/yao/runs/ckpoint/RaftStereoDepthAny_20240908_125231/RaftStereoDepthAny.pth" --lr 0.0005 --exp_name "$EXP_NAME"
 
-torchrun --nnode 1 --nproc_per_node 4 --master_port 29501 train_stereo_raftstereo.py --batch_size 48 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision --model_name "RAFTStereoDepthBetaRefine" --depthany_model_dir "/data5/yao/pretrained" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --restore_ckpt "/data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispMonoDepthBatch16_20241021_222325/RaftStereoDepthBetaK53DispMonoDepthBatch16.pth" --lr 0.0005 --exp_name "$EXP_NAME"
+# torchrun --nnode 1 --nproc_per_node 4 --master_port 29501 train_stereo_raftstereo.py --batch_size 48 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision --model_name "RAFTStereoDepthBetaRefine" --depthany_model_dir "/data5/yao/pretrained" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --restore_ckpt "/data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispMonoDepthBatch16_20241021_222325/RaftStereoDepthBetaK53DispMonoDepthBatch16.pth" --lr 0.0005 --exp_name "$EXP_NAME"
+
+
+
+# mono pooling
+torchrun --nnode 1 --nproc_per_node 4 --master_port 29501 train_stereo_raftstereo.py --batch_size 48 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision --model_name "RAFTStereoDepthBetaRefine" --depthany_model_dir "/data5/yao/pretrained" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --refine_pool --restore_ckpt "/data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim_20241102_014050/50000_RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim.pth" --lr 0.0005 --train_refine_mono --exp_name "$EXP_NAME"

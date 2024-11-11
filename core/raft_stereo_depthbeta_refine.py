@@ -53,7 +53,7 @@ class RAFTStereoDepthBetaRefine(nn.Module):
             self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', downsample=args.n_downsample)
         
         # 冻结 除refinement以外 模块的所有参数
-        if not hasattr(args, 'finetune') or not args.finetune :
+        if not hasattr(self.args, 'finetune') or not self.args.finetune :
             for module in [self.cnet, self.update_block, self.lbp_encoder, 
                         self.modulater, self.context_zqr_convs, self.fnet]:
                 for param in module.parameters():
@@ -178,7 +178,8 @@ class RAFTStereoDepthBetaRefine(nn.Module):
         disp_up = self.upsample_disp(-disp_refine, up_mask)
         depth_registered_up = self.upsample_disp(-depth_registered, up_mask)
         disp_predictions.append(depth_registered_up)
-        disp_predictions.append(disp_up)
+        if not hasattr(self.args, 'train_refine_mono') or not self.args.train_refine_mono:
+            disp_predictions.append(disp_up)
 
         if test_mode:
             return hor_coords1 - hor_coords0, disp_up
