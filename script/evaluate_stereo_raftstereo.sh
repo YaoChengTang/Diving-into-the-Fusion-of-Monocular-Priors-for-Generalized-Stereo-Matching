@@ -187,7 +187,13 @@ export CUDA_VISIBLE_DEVICES=3
 
 # python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch32_20241024_172455/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch32.pth --depthany_model_dir "/data5/yao/pretrained" --dataset booster --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --test_exp_name "booster - final-RefineSigmoidPreMonoBatch32"
 
+
 # python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/raftstereo_20240821_142156/raftstereo.pth --dataset booster --model_name "RaftStereo" --test_exp_name "booster - final-raftstereo"
+
+
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim_20241102_014050/50000_RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_F --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --test_exp_name "MiddleburyF-50000itr-RefineSigmoidPreMonoBatch48ConfDim"
+
+python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim_20241102_014050/50000_RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_F --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --test_exp_name "MiddleburyF-50000itr-RefineSigmoidPreMonoBatch48ConfDim-median"
 
 
 # python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/fintune_CRE_20241105_104054/fintune_CRE.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --test_exp_name "middlebury_H - fintune_CRE"

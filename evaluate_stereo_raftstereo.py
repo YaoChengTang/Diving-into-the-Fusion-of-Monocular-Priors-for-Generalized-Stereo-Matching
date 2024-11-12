@@ -479,6 +479,7 @@ if __name__ == '__main__':
     parser.add_argument('--noLBP_hidden_dim', type=int, default=1, help="number of hidden dim when no LBP")
     parser.add_argument('--conf_from_fea', action='store_true', help="confidence in refinement not only from cost volume but also from other features")
     parser.add_argument('--refine_pool', action='store_true', help="use pooling in refinement")
+    parser.add_argument('--refine_unet', action='store_true', help="use EfficientUnet in refinement")
 
     args = parser.parse_args()
 

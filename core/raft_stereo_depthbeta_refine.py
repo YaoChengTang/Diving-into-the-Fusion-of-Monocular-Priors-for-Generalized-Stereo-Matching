@@ -182,6 +182,8 @@ class RAFTStereoDepthBetaRefine(nn.Module):
             disp_predictions.append(disp_up)
 
         if test_mode:
+            if hasattr(self.args, 'train_refine_mono') and self.args.train_refine_mono:
+                return hor_coords1 - hor_coords0, depth_registered_up
             return hor_coords1 - hor_coords0, disp_up
 
         # if test_mode:

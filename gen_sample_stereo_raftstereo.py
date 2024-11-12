@@ -437,6 +437,7 @@ if __name__ == '__main__':
     parser.add_argument('--modulation_alg', choices=["linear", "sigmoid"], default="linear", help="rescale modulation")
     parser.add_argument('--conf_from_fea', action='store_true', help="confidence in refinement not only from cost volume but also from other features")
     parser.add_argument('--refine_pool', action='store_true', help="use pooling in refinement")
+    parser.add_argument('--refine_unet', action='store_true', help="use EfficientUnet in refinement")
 
     parser.add_argument('--improvement', action='store_true', help="visualize improvement map (error_map[i] - error_map[i-1])")
     parser.add_argument('--movement', action='store_true', help="visualize movement map (flow_pr[i] - flow_pr[i-1])")

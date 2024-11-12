@@ -168,7 +168,7 @@ if __name__ == '__main__':
     parser.add_argument('--train_datasets', nargs='+', default=['sceneflow'], help="training datasets.")
     parser.add_argument('--lr', type=float, default=0.0002, help="max learning rate.")
     parser.add_argument('--num_steps', type=int, default=100000, help="length of training schedule.")
-    parser.add_argument('--image_size', type=int, nargs='+', default=[320, 720], help="size of the random image crops used during training.")
+    parser.add_argument('--image_size', type=int, nargs='+', default=[320, 736], help="size of the random image crops used during training.")
     parser.add_argument('--train_iters', type=int, default=16, help="number of updates to the disparity field in each forward pass.")
     parser.add_argument('--wdecay', type=float, default=.00001, help="Weight decay in optimizer.")
     parser.add_argument('--train_refine_mono', action='store_true', help='register mono without supervision on stereo')
@@ -194,6 +194,7 @@ if __name__ == '__main__':
     parser.add_argument('--noLBP_hidden_dim', type=int, default=1, help="number of hidden dim when no LBP")
     parser.add_argument('--conf_from_fea', action='store_true', help="confidence in refinement not only from cost volume but also from other features")
     parser.add_argument('--refine_pool', action='store_true', help="use pooling in refinement")
+    parser.add_argument('--refine_unet', action='store_true', help="use EfficientUnet in refinement")
     
     # Data augmentation
     parser.add_argument('--img_gamma', type=float, nargs='+', default=None, help="gamma range")
