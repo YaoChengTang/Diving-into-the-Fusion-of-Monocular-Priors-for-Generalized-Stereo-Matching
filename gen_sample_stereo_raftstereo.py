@@ -111,8 +111,8 @@ def evalute(atom_dict,
         vis_xpx_sequence.append(image_out)
     
     # compute the maximum and minimum value of GT and pred for consistent visualization
-    vmin = min(np.min(-disp.data.numpy()[0]) for disp in [flow_gt] + flow_pr_sequence)
-    vmax = max(np.max(-disp.data.numpy()[0]) for disp in [flow_gt] + flow_pr_sequence)
+    vmin = 0
+    vmax = max(np.max(-disp.data.numpy()[0]) for disp in [flow_gt])
     
     # split the results from flow_pr_sequence and flow_pr_refine_sequence
     flow_pr_refine_sequence = flow_pr_sequence[len_sequence:]
