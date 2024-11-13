@@ -110,6 +110,10 @@ def evalute(atom_dict,
         vis_epe_sequence.append(image_epe)
         vis_xpx_sequence.append(image_out)
     
+    # compute the maximum and minimum value of GT and pred for consistent visualization
+    vmin = min(np.min(-disp.data.numpy()[0]) for disp in [flow_gt] + flow_pr_sequence)
+    vmax = max(np.max(-disp.data.numpy()[0]) for disp in [flow_gt] + flow_pr_sequence)
+    
     # split the results from flow_pr_sequence and flow_pr_refine_sequence
     flow_pr_refine_sequence = flow_pr_sequence[len_sequence:]
     flow_pr_sequence = flow_pr_sequence[:len_sequence]
@@ -127,22 +131,25 @@ def evalute(atom_dict,
              "img_list": [image1.data.numpy().astype(np.uint8)], "cmap": None},
             {"name": "Right Image", 
              "img_list": [image2.data.numpy().astype(np.uint8)], "cmap": None},
-            {"name": "GT Disp", "img_list": [-flow_gt.data.numpy()[0]], "cmap": "jet"},
+            {"name": "GT Disp", "img_list": [-flow_gt.data.numpy()[0]], "cmap": "jet", "vmin": vmin, "vmax": vmax},
             {"name": "Pr Disp -1", 
              "img_list": [-flow_pr_sequence[-1].data.numpy()[0]], 
              "cmap": "jet",
              "GT": [-flow_gt.data.numpy()[0]],
-             "error_map": True,},
+             "error_map": True,
+             "vmin": vmin, "vmax": vmax,},
             {"name": "Pr Disp -3", 
              "img_list": [-flow_pr_sequence[-3].data.numpy()[0]], 
              "cmap": "jet",
              "GT": [-flow_gt.data.numpy()[0]],
-             "error_map": True,},
+             "error_map": True,
+             "vmin": vmin, "vmax": vmax,},
             {"name": "Pr Disp -10", 
              "img_list": [-flow_pr_sequence[-10].data.numpy()[0]], 
              "cmap": "jet",
              "GT": [-flow_gt.data.numpy()[0]],
-             "error_map": True,},]
+             "error_map": True,
+             "vmin": vmin, "vmax": vmax,},]
     if depth is not None:
         vis1.append( {"name": "Mono Depth", "img_list": [depth.cpu().squeeze(0).data.numpy()[0]], "cmap": "jet"} )
     if depth_registered is not None:
@@ -153,7 +160,8 @@ def evalute(atom_dict,
                       "img_list": [depth_registered_up.data.numpy()[0]], 
                       "cmap": "jet",
                       "GT": [-flow_gt.data.numpy()[0]],
-                      "error_map": True,} )
+                      "error_map": True,
+                      "vmin": vmin, "vmax": vmax,} )
     if conf_fusion is not None:
         vis1.append( {"name": "Mono conf_fusion", "img_list": [conf_fusion.cpu().squeeze(0).data.numpy()[0]], "cmap": "viridis"} )
     viser.analyze(vis1, imageGT_file, in_one_fig=True)

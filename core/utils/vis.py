@@ -48,7 +48,8 @@ def show_imgs(param, sv_img=False, save2where=None,
         plt.subplot(rows,cols,i+1)
 #         plt.subplots_adjust(wspace =0, hspace =0)#调整子图间距
         plt.title(plt_par.get("title").replace("\t","   "), fontsize=fontsize)
-        im = plt.imshow(plt_par.get("img"), cmap=plt_par.get("cmap"), alpha=plt_par.get("alpha"))
+        im = plt.imshow(plt_par.get("img"), cmap=plt_par.get("cmap"), alpha=plt_par.get("alpha"), 
+                        vmin=plt_par.get("vmin"), vmax=plt_par.get("vmax"))
         
         if plt_par.get("colorbar") == True :
             plt.colorbar(im, orientation='horizontal', fraction=0.02, pad=0.0004)
@@ -315,6 +316,8 @@ class Visualizer:
             img_list = vis_dict.get("img_list", [])
             cmap     = vis_dict.get("cmap", None)
             stop_idx = vis_dict.get("stop_idx", -1)
+            vmin     = vis_dict.get("vmin", None)
+            vmax     = vis_dict.get("vmax", None)
 
             epe_list = vis_dict.get("epe_list", None)
             xpx_name = self.get_xpx(vis_dict.keys())
@@ -366,8 +369,10 @@ class Visualizer:
                     cnt += 1
                     title = f"{vis_name}-{idx}"
                     fig_data_list += [{"img"  : img_list[idx], 
-                                      "title": title, 
-                                      "cmap" : cmap, },]
+                                      "title" : title, 
+                                      "cmap"  : cmap, 
+                                      "vmin"  : vmin,
+                                      "vmax"  : vmax,},]
                 
                 if error_map_req :
                     cnt += 1
