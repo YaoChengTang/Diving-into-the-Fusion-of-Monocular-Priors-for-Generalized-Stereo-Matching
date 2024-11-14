@@ -25,7 +25,15 @@ export CKPOINT_ROOT="/data5/yao/runs/ckpoint"
 
 # CUDA_VISIBLE_DEVICES=4 python3 gen_sample_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim_20241102_014050/50000_RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim.pth --depthany_model_dir "/data5/yao/pretrained" --dataset booster --sv_root /data5/yao/runs/vis --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --test_exp_name "booster-50000itr-RefineSigmoidPreMonoBatch48ConfDim-visRange"
 
+CUDA_VISIBLE_DEVICES=4 python3 gen_sample_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim_20241102_014050/50000_RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --sv_root /data5/yao/runs/vis --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --test_exp_name "50000itr-RefineSigmoidPreMonoBatch48ConfDim"
+
+# CUDA_VISIBLE_DEVICES=4 python3 gen_sample_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim_20241102_014050/50000_RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim.pth --depthany_model_dir "/data5/yao/pretrained" --dataset eth3d --sv_root /data5/yao/runs/vis --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --test_exp_name "50000itr-RefineSigmoidPreMonoBatch48ConfDim"
+
 
 # CUDA_VISIBLE_DEVICES=1 python3 gen_sample_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/raftstereo_20240821_142156/raftstereo.pth --dataset booster --sv_root /data5/yao/runs/vis --model_name "RaftStereo" --test_exp_name "booster - final-raftstereo"
 
-CUDA_VISIBLE_DEVICES=6 python3 gen_sample_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/raftstereo_20240821_142156/raftstereo.pth --dataset booster --sv_root /data5/yao/runs/vis --model_name "RaftStereo" --test_exp_name "booster-final-raftstereo-visRange"
+# CUDA_VISIBLE_DEVICES=6 python3 gen_sample_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/raftstereo_20240821_142156/raftstereo.pth --dataset booster --sv_root /data5/yao/runs/vis --model_name "RaftStereo" --test_exp_name "booster-final-raftstereo-visRange"
+
+
+
+# CUDA_VISIBLE_DEVICES=6 python3 gen_sample_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthAny_20240908_125231/RaftStereoDepthAny.pth --depthany_model_dir "/data5/yao/pretrained" --dataset booster --sv_root /data5/yao/runs/vis --model_name "RAFTStereoDepthAny" --test_exp_name "booster-final-RAFTStereoDepthAny-visRange"
