@@ -151,7 +151,10 @@ def validate_booster(model, iters=32, root="", mixed_prec=False):
     logger.info("Validation full: %f, %f, %f, %f, %f" % (epe, bad1, bad2, bad3, bad5))
     logger.info("Validation Trans foreground: %f, %f, %f, %f, %f" % (epe_trans, bad1_trans, bad2_trans, bad3_trans, bad5_trans))
     logger.info("Validation non trans: %f, %f, %f, %f, %f" % (epe_notrans, bad1_notrans, bad2_notrans, bad3_notrans, bad5_notrans))
-    return {'booster-epe': epe, 'booster-epe_trans':epe_trans, 'booster-epe_notrans':epe_notrans}
+    # return {'booster-epe': epe, 'booster-epe_trans':epe_trans, 'booster-epe_notrans':epe_notrans}
+    return {'booster-epe': epe, 'booster-bad1': bad1, 'booster-bad2': bad2, 'booster-bad3': bad3, 'booster-bad5': bad5,
+            'booster-epe_trans':epe_trans, 'booster-bad1_trans':bad1_trans, 'booster-bad2_trans':bad2_trans, 'booster-bad3_trans':bad3_trans, 'booster-bad5_trans':bad5_trans,
+            'booster-epe_notrans':epe_notrans, 'booster-bad1_notrans':bad1_notrans, 'booster-bad2_notrans':bad2_notrans, 'booster-bad3_notrans':bad3_notrans, 'booster-bad5_notrans':bad5_notrans,}
 
 
 
