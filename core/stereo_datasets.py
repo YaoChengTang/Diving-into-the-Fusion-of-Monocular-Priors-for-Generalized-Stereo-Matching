@@ -46,7 +46,7 @@ class StereoDataset(data.Dataset):
         #     self.slant = None 
         #     self.slant_norm = False
 
-        self.is_test = False
+        self.is_test = args.is_test if hasattr(args, "is_test") and args.is_test else False
         self.init_seed = False
         self.flow_list = []
         self.disparity_list = []
@@ -62,7 +62,8 @@ class StereoDataset(data.Dataset):
             img2 = np.array(img2).astype(np.uint8)[..., :3]
             img1 = torch.from_numpy(img1).permute(2, 0, 1).float()
             img2 = torch.from_numpy(img2).permute(2, 0, 1).float()
-            return img1, img2, self.extra_info[index]
+            return self.image_list[index] + [self.disparity_list[index]], \
+                   img1, img2, torch.zeros_like(torch.zeros_like(img1))[:1], torch.ones_like(torch.zeros_like(img1))[:1]
 
         if not self.init_seed:
             worker_info = torch.utils.data.get_worker_info()
@@ -132,17 +133,6 @@ class StereoDataset(data.Dataset):
 
         return self.image_list[index] + [self.disparity_list[index]], \
                img1, img2, flow, valid.float()
-
-        # if self.slant is None:
-        #     plane_abc = torch.zeros_like(flow)
-        # else:
-        #     plane_abc = plane.extract_plane(-flow.unsqueeze(0),
-        #                                     slant=self.slant, 
-        #                                     slant_norm=self.slant_norm, 
-        #                                     patch_size=4, thold=3)
-        #     plane_abc = plane_abc.squeeze(0)
-        # return self.image_list[index] + [self.disparity_list[index]], \
-        #        img1, img2, flow, valid.float(), plane_abc
 
 
     def __mul__(self, v):
@@ -337,7 +327,7 @@ class KITTI2012(StereoDataset):
 
 
 class Middlebury(StereoDataset):
-    def __init__(self, aug_params=None, root='datasets/Middlebury', split='F', args=None):
+    def __init__(self, aug_params=None, root='datasets/Middlebury', split='F', image_set='training', args=None):
         super(Middlebury, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispMiddlebury, args=args)
         root = root if len(root)>0 else DATASET_ROOT
         assert os.path.exists(root), "check the existence: {}".format(root)
@@ -349,16 +339,15 @@ class Middlebury(StereoDataset):
                     self.image_list += [ [str(scene / "im0.png"), str(scene / f"im1{s}.png")] ]
                     self.disparity_list += [ str(scene / "disp0.pfm") ]
         else:
-            lines = list(map(osp.basename, glob(os.path.join(root, "MiddEval3/trainingH/*"))))
-            # lines = list(filter(lambda p: any(s in p.split('/') for s in Path(os.path.join(root, "MiddEval3/official_train.txt")).read_text().splitlines()), lines))
-            # lines = [line for line in lines if line.find("Playtable")!=-1 or \
-            #                                    line.find("Playroom")!=-1 or \
-            #                                    line.find("Recycle")!=-1 or \
-            #                                    line.find("Vintage")!=-1 ]   # for fast visualization
-            image1_list = sorted([os.path.join(root, "MiddEval3", f'training{split}', f'{name}/im0.png') for name in lines])
-            image2_list = sorted([os.path.join(root, "MiddEval3", f'training{split}', f'{name}/im1.png') for name in lines])
-            disp_list = sorted([os.path.join(root, "MiddEval3", f'training{split}', f'{name}/disp0GT.pfm') for name in lines])
-            assert len(image1_list) == len(image2_list) == len(disp_list) > 0, [image1_list, split]
+            lines = list(map(osp.basename, glob(os.path.join(root, f"MiddEval3/{image_set}{split}/*"))))
+            image1_list = sorted([os.path.join(root, "MiddEval3", f'{image_set}{split}', f'{name}/im0.png') for name in lines])
+            image2_list = sorted([os.path.join(root, "MiddEval3", f'{image_set}{split}', f'{name}/im1.png') for name in lines])
+            disp_list = sorted([os.path.join(root, "MiddEval3", f'{image_set}{split}', f'{name}/disp0GT.pfm') for name in lines])
+            print("-"*30, len(lines), os.path.join(root, "MiddEval3/{image_set}{split}/*"))
+            if image_set=="training":
+                assert len(image1_list) == len(image2_list) == len(disp_list) > 0, [image1_list, root, image_set, split]
+            else:
+                assert len(image1_list) == len(image2_list) > 0, [image1_list, root, image_set, split]
             for img1, img2, disp in zip(image1_list, image2_list, disp_list):
                 self.image_list += [ [img1, img2] ]
                 self.disparity_list += [ disp ]
