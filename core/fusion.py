@@ -10,6 +10,7 @@ from torch.distributions import Beta
 
 from core.extractor import ResidualBlock
 from core.confidence import EfficientUNetSimple
+from core.utils.utils import sv_intermediate_results
 
 
 
@@ -167,5 +168,12 @@ class RefinementMonStereo(nn.Module):
         disp = disp * conf_normed + (1-conf_normed) * depth_registered
 
         up_mask= self.mask( torch.cat([hidden, disp], dim=1) )
+
+        if self.args is not None and hasattr(self.args, "vis_inter") and self.args.vis_inter:
+            sv_intermediate_results(disp, f"disp_refine", self.args.sv_root)
+            sv_intermediate_results(depth_registered, f"depth_registered", self.args.sv_root)
+            sv_intermediate_results(conf_normed, f"conf", self.args.sv_root)
+            sv_intermediate_results(a, f"a", self.args.sv_root)
+            sv_intermediate_results(b, f"b", self.args.sv_root)
         
         return disp, up_mask, depth_registered, conf

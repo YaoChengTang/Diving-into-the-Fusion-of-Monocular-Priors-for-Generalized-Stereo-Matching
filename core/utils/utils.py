@@ -134,6 +134,24 @@ def disparity_computation(params, slant=None, slant_norm=False, coords0=None):
     return offset
 
 
+def sv_intermediate_results(data, name, sv_path):
+    try:
+        sv_path = os.path.join(sv_path, "data")
+        if not os.path.exists(sv_path):
+            os.makedirs(sv_path)
+        
+        data_numpy = data.cpu().data.numpy()
+        np.save(os.path.join(sv_path, name+".npy"), data_numpy)
+        print("saving to {}".format( os.path.join(sv_path, name+".npy") ))
+    except Exception as err:
+        raise Exception(err, data.shape, name, sv_path)
+
+def load_intermediate_results(name, sv_path):
+    sv_path = os.path.join(sv_path, "data")
+    data = np.load(os.path.join(sv_path, name+".npy"))
+    return data
+
+
 def rescale_modulation(itr, iters, modulation_alg, modulation_ratio):
     # we hope modulation has less effect at the first several iterations as the disp is unreliable and the lcoal LBP disp is unreliable
     if modulation_alg == "linear":

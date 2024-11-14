@@ -10,6 +10,7 @@ import torchvision.transforms as T
 
 from core.extractor import ResidualBlock
 from depth_anything_v2.dpt import DepthAnythingV2
+from core.utils.utils import sv_intermediate_results
 
 
 
@@ -46,8 +47,9 @@ def resize_to_quarter(tensor, original_size, ratio):
 
 
 class DepthAnyExtractor(nn.Module):
-    def __init__(self, model_dir, output_dim=[128], norm_fn='batch', downsample=2):
+    def __init__(self, model_dir, output_dim=[128], norm_fn='batch', downsample=2, args=None):
         super(DepthAnyExtractor, self).__init__()
+        self.args = args
         self.norm_fn = norm_fn
         self.downsample = downsample
 
@@ -147,8 +149,11 @@ class DepthAnyExtractor(nn.Module):
         # [1, 128, H//4, W//4]
         depth = resize_to_quarter(depth, (H,W), 2**self.downsample)
         x = resize_to_quarter(depth_fea, (H,W), 2**self.downsample)
-        x = self.layer1(x)
 
+        if self.args is not None and hasattr(self.args, "vis_inter") and self.args.vis_inter:
+            sv_intermediate_results(x, "depthAnything_features", self.args.sv_root)
+
+        x = self.layer1(x)
         outputs08 = [f(x) for f in self.outputs08]
         if num_layers == 1:
             return (outputs08, v) if dual_inp else (outputs08,)

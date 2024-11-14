@@ -11,6 +11,7 @@ from core.corr import CorrBlock1D, PytorchAlternateCorrBlock1D, CorrBlockFast1D,
 from core.utils.utils import hor_coords_grid, rescale_modulation
 from core.geometry import LBPEncoder
 from core.fusion import BetaModulator, RefinementMonStereo
+from core.utils.utils import sv_intermediate_results
 
 
 try:
@@ -35,7 +36,8 @@ class RAFTStereoDepthBetaRefine(nn.Module):
         self.cnet = DepthAnyExtractor(model_dir=args.depthany_model_dir,
                                       output_dim=[args.hidden_dims, context_dims], 
                                       norm_fn=args.context_norm, 
-                                      downsample=args.n_downsample)
+                                      downsample=args.n_downsample,
+                                      args=args)
         self.update_block = DispBasicMultiUpdateBlock(self.args, hidden_dims=args.hidden_dims)
 
         self.lbp_encoder = LBPEncoder(args=args)
@@ -117,6 +119,15 @@ class RAFTStereoDepthBetaRefine(nn.Module):
             # Rather than running the GRU's conv layers on the context features multiple times, we do it once at the beginning 
             inp_list = [list(conv(i).split(split_size=conv.out_channels//3, dim=1)) for i,conv in zip(inp_list, self.context_zqr_convs)]
 
+            if hasattr(self.args, "vis_inter") and self.args.vis_inter:
+                sv_intermediate_results(depth, "monocular_depth", self.args.sv_root)
+                sv_intermediate_results(depth_lbp, "depth_lbp", self.args.sv_root)
+                for i in range(len(inp_list)):
+                    for j in range(3):
+                        sv_intermediate_results(inp_list[i][j], f"inp_list-{i}-{j}", self.args.sv_root)
+                for i in range(len(net_list)):
+                    sv_intermediate_results(net_list[i], f"net_list-{i}", self.args.sv_root)
+
         if self.args.corr_implementation == "reg": # Default
             corr_block = CorrBlock1D
             fmap1, fmap2 = fmap1.float(), fmap2.float()
@@ -144,6 +155,8 @@ class RAFTStereoDepthBetaRefine(nn.Module):
             with autocast(enabled=self.args.mixed_precision):
                 disp_lbp = self.lbp_encoder(disp)
                 modulation, distribution = self.modulater(disp_lbp, depth_lbp, out_distribution=True)
+                if vis_mode:
+                    modulation_predictions.append(modulation)
 
                 if self.args.n_gru_layers == 3 and self.args.slow_fast_gru: # Update low-res GRU
                     net_list = self.update_block(net_list, inp_list, iter32=True, iter16=False, iter08=False, update=False)
@@ -151,10 +164,20 @@ class RAFTStereoDepthBetaRefine(nn.Module):
                     net_list = self.update_block(net_list, inp_list, iter32=self.args.n_gru_layers==3, iter16=True, iter08=False, update=False)
                 net_list, up_mask, delta_disp = self.update_block(net_list, inp_list, corr, disp, iter32=self.args.n_gru_layers==3, iter16=self.args.n_gru_layers>=2)
 
+                if hasattr(self.args, "vis_inter") and self.args.vis_inter:
+                    sv_intermediate_results(disp_lbp, f"disp_lbp-itr{itr+1}", self.args.sv_root)
+                    sv_intermediate_results(delta_disp, f"delta_disp-itr{itr+1}", self.args.sv_root)
+                    for i in range(len(net_list)):
+                        sv_intermediate_results(net_list[i], f"net_list-{i}-itr{itr+1}", self.args.sv_root)
+
                 modulation_weight = rescale_modulation(itr, iters, 
                                                        self.args.modulation_alg, 
                                                        self.args.modulation_ratio)
                 delta_disp = delta_disp * (1 + modulation * modulation_weight) 
+
+                if hasattr(self.args, "vis_inter") and self.args.vis_inter:
+                    sv_intermediate_results(modulation, f"modulation-itr{itr+1}", self.args.sv_root)
+                    sv_intermediate_results(delta_disp, f"reweighted_delta_disp-itr{itr+1}", self.args.sv_root)
 
             # F(t+1) = F(t) + \Delta(t)
             hor_coords1 = hor_coords1 + delta_disp
@@ -165,21 +188,25 @@ class RAFTStereoDepthBetaRefine(nn.Module):
 
             # upsample predictions
             disp_up = self.upsample_disp(hor_coords1 - hor_coords0, up_mask)
-            
             disp_predictions.append(disp_up)
 
-            if vis_mode:
-                modulation_predictions.append(modulation)
+            if hasattr(self.args, "vis_inter") and self.args.vis_inter:
+                sv_intermediate_results(disp_up, f"disp_up-itr{itr+1}", self.args.sv_root)
 
         # refinement
         corr = corr_fn(hor_coords1)
         disp = -hor_coords1 + hor_coords0
         disp_refine, up_mask, depth_registered, conf = self.refinement(disp, depth, net_list[0], corr, distribution)
+
         disp_up = self.upsample_disp(-disp_refine, up_mask)
         depth_registered_up = self.upsample_disp(-depth_registered, up_mask)
         disp_predictions.append(depth_registered_up)
         if not hasattr(self.args, 'train_refine_mono') or not self.args.train_refine_mono:
             disp_predictions.append(disp_up)
+
+        if hasattr(self.args, "vis_inter") and self.args.vis_inter:
+            sv_intermediate_results(disp_up, f"disp_refine_up", self.args.sv_root)
+            sv_intermediate_results(depth_registered_up, f"depth_registered_up", self.args.sv_root)
 
         if test_mode:
             if hasattr(self.args, 'train_refine_mono') and self.args.train_refine_mono:

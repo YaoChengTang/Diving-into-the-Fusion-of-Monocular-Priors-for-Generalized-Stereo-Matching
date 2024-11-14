@@ -418,9 +418,9 @@ class Visualizer:
                 group = cnt // (stop_idx if stop_idx>0 else len(img_list))
                 H,W = img_list[0].shape
                 pre,lat = os.path.splitext(sv_path)
-                sv_path = pre + f"-sequence-{vis_name}" + lat
+                tmp_sv_path = pre + f"-sequence-{vis_name}" + lat
                 show_imgs(fig_data_list, 
-                        sv_img=True, save2where=sv_path, if_inter=False, 
+                        sv_img=True, save2where=tmp_sv_path, if_inter=False, 
                         fontsize=20, szWidth=np.ceil(W/H)*5, szHeight=5, 
                         group=group, dpi=300)
                 fig_data_list = []
