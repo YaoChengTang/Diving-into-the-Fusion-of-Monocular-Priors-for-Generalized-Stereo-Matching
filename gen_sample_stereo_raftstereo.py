@@ -41,12 +41,12 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
-def evalute_metric(flow_pr, flow_gt, valid_gt, d1_thold, dataset_name=None):
+def evalute_metric(flow_pr, flow_gt, valid_gt, bad_thold, dataset_name=None):
     assert flow_pr.shape == flow_gt.shape, (flow_pr.shape, flow_gt.shape)
     epe = torch.sum((flow_pr - flow_gt)**2, dim=0).sqrt()
 
     epe_flattened = epe.flatten()
-    out = (epe_flattened > d1_thold)
+    out = (epe_flattened > bad_thold)
     if dataset_name.lower()=="middlebury":
         val = (valid_gt.reshape(-1) >= -0.5) & (flow_gt[0].reshape(-1) > -1000)
     elif dataset_name.lower()=="eth3d":
@@ -67,7 +67,7 @@ def evalute_metric(flow_pr, flow_gt, valid_gt, d1_thold, dataset_name=None):
 @torch.no_grad()
 def evalute(atom_dict, 
             image1, image2, flow_gt, valid_gt, imageGT_file, 
-            padder, viser, dataset_name, d1_thold):
+            padder, viser, dataset_name, bad_thold):
     flow_pr_sequence        = atom_dict.get("disp_predictions", [])
     depth                   = atom_dict.get("depth", None)
     depth_registered        = atom_dict.get("depth_registered", None)
@@ -98,7 +98,7 @@ def evalute(atom_dict,
     len_sequence = len(flow_pr_sequence)
     flow_pr_sequence += flow_pr_refine_sequence
 
-    # compute epe and d1 for each iteration
+    # compute epe and bad for each iteration
     vis_epe_sequence = []
     vis_xpx_sequence = []
     for idx, flow_pr in enumerate(flow_pr_sequence):
@@ -106,7 +106,7 @@ def evalute(atom_dict,
         flow_pr_sequence[idx] = flow_pr
 
         image_epe, image_out = evalute_metric(flow_pr, flow_gt, valid_gt,
-                                              d1_thold=d1_thold, dataset_name=dataset_name)
+                                              bad_thold=bad_thold, dataset_name=dataset_name)
         vis_epe_sequence.append(image_epe)
         vis_xpx_sequence.append(image_out)
     
@@ -170,7 +170,7 @@ def evalute(atom_dict,
     #          "img_list": [-flow_pr.data.numpy()[0] for flow_pr in flow_pr_sequence], 
     #          "cmap": "jet",
     #          "epe_list": vis_epe_sequence,
-    #          f"{d1_thold}px_list": vis_xpx_sequence,
+    #          f"{bad_thold}px_list": vis_xpx_sequence,
     #          "GT": [-flow_gt.data.numpy()[0]],
     #          "stop_idx": 20,
     #          "improvement": viser.args.improvement,
@@ -186,7 +186,7 @@ def evalute(atom_dict,
                 "img_list": [conf.data.numpy()[0] for conf in confidence_list], 
                 "cmap": "gray",
                 "epe_list": None,
-                f"{d1_thold}px_list": None,
+                f"{bad_thold}px_list": None,
                 "GT": None,
                 "stop_idx": 20,
                 "improvement": False,
@@ -222,19 +222,19 @@ def validate_eth3d(model, iters=32, root="", sv_root="", mixed_prec=False, args=
 
         image_epe, image_out = evalute(atom_dict, 
                                        image1, image2, flow_gt, valid_gt, imageGT_file, 
-                                       padder, viser, dataset_name="ETH3D", d1_thold=1.0)
+                                       padder, viser, dataset_name="ETH3D", bad_thold=1.0)
         epe_list.append(image_epe)
         out_list.append(image_out)
-        logger.info(f"ETH3D {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}")
+        logger.info(f"ETH3D {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} bad1 {round(image_out,4)}")
     
     epe_list = np.array(epe_list)
     out_list = np.array(out_list)
 
     epe = np.mean(epe_list)
-    d1 = 100 * np.mean(out_list)
+    bad1 = 100 * np.mean(out_list)
 
-    logger.info("Validation ETH3D: EPE %f, D1 %f" % (epe, d1))
-    return {'eth3d-epe': epe, 'eth3d-d1': d1}
+    logger.info("Validation ETH3D: EPE %f, bad1 %f" % (epe, bad1))
+    return {'eth3d-epe': epe, 'eth3d-bad1': bad1}
 
 
 @torch.no_grad()
@@ -262,24 +262,24 @@ def validate_kitti(model, iters=32, root="", sv_root="", mixed_prec=False, args=
         
         image_epe, image_out = evalute(atom_dict, 
                                        image1, image2, flow_gt, valid_gt, imageGT_file, 
-                                       padder, viser, dataset_name="kitti", d1_thold=3.0)
+                                       padder, viser, dataset_name="kitti", bad_thold=3.0)
         epe_list.append(image_epe)
         out_list.append(image_out)
         if val_id < 9 or (val_id+1)%10 == 0:
             logger.info(f"KITTI Iter {val_id+1} out of {len(val_dataset)}. " +\
-                         f"EPE {round(image_epe,4)} D1 {round(image_out,4)}. " +\
+                         f"EPE {round(image_epe,4)} bad3 {round(image_out,4)}. " +\
                          f"Runtime: {format(end-start, '.3f')}s ({format(1/(end-start), '.2f')}-FPS)")
     
     epe_list = np.array(epe_list)
     out_list = np.concatenate(out_list)
 
     epe = np.mean(epe_list)
-    d1 = 100 * np.mean(out_list)
+    bad3 = 100 * np.mean(out_list)
 
     avg_runtime = np.mean(elapsed_list)
 
-    logger.info(f"Validation KITTI: EPE {epe}, D1 {d1}, {format(1/avg_runtime, '.2f')}-FPS ({format(avg_runtime, '.3f')}s)")
-    return {'kitti-epe': epe, 'kitti-d1': d1}
+    logger.info(f"Validation KITTI: EPE {epe}, bad3 {bad3}, {format(1/avg_runtime, '.2f')}-FPS ({format(avg_runtime, '.3f')}s)")
+    return {'kitti-epe': epe, 'kitti-bad3': bad3}
 
 
 @torch.no_grad()
@@ -304,21 +304,21 @@ def validate_things(model, iters=32, root='', sv_root="", mixed_prec=False, args
         image_epe, image_out = evalute(atom_dict, 
                                        image1, image2, flow_gt, valid_gt, imageGT_file, 
                                        padder, viser, dataset_name="FlyingThings3D",
-                                       d1_thold=3.0)
+                                       bad_thold=3.0)
         epe_list.append(image_epe)
         out_list.append(image_out)
         if val_id%100==0:
             logger.info(f"FlyingThings3D Iter {val_id+1} out of {len(val_dataset)}. " +\
-                         f"EPE {round(image_epe,4)} D1 {round(image_out,4)}")
+                         f"EPE {round(image_epe,4)} bad3 {round(image_out,4)}")
 
     epe_list = np.array(epe_list)
     out_list = np.concatenate(out_list)
 
     epe = np.mean(epe_list)
-    d1 = 100 * np.mean(out_list)
+    bad3 = 100 * np.mean(out_list)
 
-    logger.info("Validation FlyingThings: %f, %f" % (epe, d1))
-    return {'things-epe': epe, 'things-d1': d1}
+    logger.info("Validation FlyingThings: %f, %f" % (epe, bad3))
+    return {'things-epe': epe, 'things-bad3': bad3}
 
 
 @torch.no_grad()
@@ -343,20 +343,20 @@ def validate_middlebury(model, iters=32, split='F', root="", sv_root="", mixed_p
 
         image_epe, image_out = evalute(atom_dict, 
                                        image1, image2, flow_gt, valid_gt, imageGT_file, 
-                                       padder, viser, dataset_name="Middlebury", d1_thold=2.0)
+                                       padder, viser, dataset_name="Middlebury", bad_thold=2.0)
         epe_list.append(image_epe)
         out_list.append(image_out)
         logger.info(f"Middlebury Iter {val_id+1} out of {len(val_dataset)}. " +\
-                     f"EPE {round(image_epe,4)} D1 {round(image_out,4)}")
+                     f"EPE {round(image_epe,4)} bad2 {round(image_out,4)}")
 
     epe_list = np.array(epe_list)
     out_list = np.array(out_list)
 
     epe = np.mean(epe_list)
-    d1 = 100 * np.mean(out_list)
+    bad2 = 100 * np.mean(out_list)
 
-    logger.info(f"Validation Middlebury{split}: EPE {epe}, D1 {d1}")
-    return {f'middlebury{split}-epe': epe, f'middlebury{split}-d1': d1}
+    logger.info(f"Validation Middlebury{split}: EPE {epe}, bad2 {bad2}")
+    return {f'middlebury{split}-epe': epe, f'middlebury{split}-bad2': bad2}
 
 
 @torch.no_grad()
@@ -399,20 +399,20 @@ def validate_booster(model, iters=32, root="", mixed_prec=False, sv_root="", ima
         
         image_epe, image_out = evalute(atom_dict, 
                                        image1, image2, flow_gt, trans_mask, imageGT_file, 
-                                       padder, viser, dataset_name="Booster", d1_thold=2.0)
+                                       padder, viser, dataset_name="Booster", bad_thold=2.0)
         epe_list.append(image_epe)
         out_list.append(image_out)
         logger.info(f"Booster-{image_set} Iter {val_id+1} out of {len(val_dataset)}. " +\
-                     f"EPE {round(image_epe,4)} D1 {round(image_out,4)}")
+                     f"EPE {round(image_epe,4)} bad2 {round(image_out,4)}")
 
     epe_list = np.array(epe_list)
     out_list = np.array(out_list)
 
     epe = np.mean(epe_list)
-    d1 = 100 * np.mean(out_list)
+    bad2 = 100 * np.mean(out_list)
 
-    logger.info(f"Validation Booster-{image_set}: EPE {epe}, D1 {d1}")
-    return {f'Booster-{image_set}-epe': epe, f'Booster-{image_set}-d1': d1}
+    logger.info(f"Validation Booster-{image_set}: EPE {epe}, bad2 {bad2}")
+    return {f'Booster-{image_set}-epe': epe, f'Booster-{image_set}-bad2': bad2}
     
 
 if __name__ == '__main__':
