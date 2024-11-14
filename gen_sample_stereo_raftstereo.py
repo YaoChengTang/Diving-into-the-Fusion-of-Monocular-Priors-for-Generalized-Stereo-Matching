@@ -112,6 +112,7 @@ def evalute(atom_dict,
     
     # compute the maximum and minimum value of GT and pred for consistent visualization
     vmin = 0
+    flow_gt = torch.nan_to_num(flow_gt, nan=0.0, posinf=0.0, neginf=0.0)
     vmax = max(np.max(-disp.data.numpy()[0]) for disp in [flow_gt])
     
     # split the results from flow_pr_sequence and flow_pr_refine_sequence
@@ -126,6 +127,9 @@ def evalute(atom_dict,
     viser.save_pred_vis(-flow_pr.data.numpy()[0], imageGT_file)
     image1 = padder.unpad(image1).cpu().squeeze(0).permute(1,2,0)
     image2 = padder.unpad(image2).cpu().squeeze(0).permute(1,2,0)
+
+    # print("-"*30, (-flow_pr_sequence[-1].data.numpy()[0]).max(), (-flow_pr_sequence[-1].data.numpy()[0]).min(),
+    #       (-flow_gt.data.numpy()[0]).max(), (-flow_gt.data.numpy()[0]).min())
 
     vis1 = [{"name": "Left Image", 
              "img_list": [image1.data.numpy().astype(np.uint8)], "cmap": None},
