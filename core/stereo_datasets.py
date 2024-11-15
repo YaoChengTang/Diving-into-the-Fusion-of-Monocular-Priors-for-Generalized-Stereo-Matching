@@ -343,7 +343,6 @@ class Middlebury(StereoDataset):
             image1_list = sorted([os.path.join(root, "MiddEval3", f'{image_set}{split}', f'{name}/im0.png') for name in lines])
             image2_list = sorted([os.path.join(root, "MiddEval3", f'{image_set}{split}', f'{name}/im1.png') for name in lines])
             disp_list = sorted([os.path.join(root, "MiddEval3", f'{image_set}{split}', f'{name}/disp0GT.pfm') for name in lines])
-            print("-"*30, len(lines), os.path.join(root, "MiddEval3/{image_set}{split}/*"))
             if image_set=="training":
                 assert len(image1_list) == len(image2_list) == len(disp_list) > 0, [image1_list, root, image_set, split]
             else:

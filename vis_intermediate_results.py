@@ -148,7 +148,8 @@ def vis_inter(viser, args, vmin=None, vmax=None):
     depth_lbp = load_intermediate_results("depth_lbp", args.sv_root)
     vis_data += [{"name": "depth_lbp", 
                   "img_list": [depth_lbp[tuple( [0] * (len(depth_lbp.shape) - 2) + [slice(None)] * 2 )]], 
-                  "cmap": None} ]
+                  "cmap": "viridis",
+                  "vmin": 0, "vmax": 1,} ]
 
     for i in range(3):
         for j in range(3):
@@ -168,7 +169,8 @@ def vis_inter(viser, args, vmin=None, vmax=None):
         disp_lbp = load_intermediate_results(f"disp_lbp-itr{itr+1}", args.sv_root)
         vis_data += [{"name": f"disp_lbp-itr{itr+1}", 
                       "img_list": [disp_lbp[tuple( [0] * (len(disp_lbp.shape) - 2) + [slice(None)] * 2 )]], 
-                      "cmap": None} ]
+                      "cmap": "viridis",
+                      "vmin": 0, "vmax": 1,} ]
 
         delta_disp = load_intermediate_results(f"delta_disp-itr{itr+1}", args.sv_root)
         vis_data += [{"name": f"delta_disp-itr{itr+1}", 
@@ -419,7 +421,7 @@ def validate_booster(model, iters=32, root="", mixed_prec=False, sv_root="", ima
     out_list, epe_list = [], []
     for val_id in range(len(val_dataset)):
         (imageL_file, imageR_file, imageGT_file), image1, image2, flow_gt, valid_gt = val_dataset[val_id]
-        if imageL_file.find("Case/camera_00/im10.png") == -1:
+        if imageL_file.find("Case/camera_00/im9.png") == -1:
             continue
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
@@ -444,6 +446,8 @@ def validate_booster(model, iters=32, root="", mixed_prec=False, sv_root="", ima
         out_list.append(image_out)
         logger.info(f"Booster-{image_set} Iter {val_id+1} out of {len(val_dataset)}. " +\
                      f"EPE {round(image_epe,4)} bad2 {round(image_out,4)}")
+        
+        break
 
     epe_list = np.array(epe_list)
     out_list = np.array(out_list)
