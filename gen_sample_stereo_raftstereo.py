@@ -136,38 +136,36 @@ def evalute(atom_dict,
             {"name": "Right Image", 
              "img_list": [image2.data.numpy().astype(np.uint8)], "cmap": None},
             {"name": "GT Disp", "img_list": [-flow_gt.data.numpy()[0]], "cmap": "jet", "vmin": vmin, "vmax": vmax},
-            {"name": "Pr Disp -1", 
+            {"name": "Final Fused Disp", 
              "img_list": [-flow_pr_sequence[-1].data.numpy()[0]], 
              "cmap": "jet",
              "GT": [-flow_gt.data.numpy()[0]],
              "error_map": True,
              "vmin": vmin, "vmax": vmax,},
-            {"name": "Pr Disp -3", 
+            {"name": "Disp Before Fusion", 
              "img_list": [-flow_pr_sequence[-3].data.numpy()[0]], 
              "cmap": "jet",
              "GT": [-flow_gt.data.numpy()[0]],
              "error_map": True,
-             "vmin": vmin, "vmax": vmax,},
-            {"name": "Pr Disp -10", 
-             "img_list": [-flow_pr_sequence[-10].data.numpy()[0]], 
-             "cmap": "jet",
-             "GT": [-flow_gt.data.numpy()[0]],
-             "error_map": True,
              "vmin": vmin, "vmax": vmax,},]
-    if depth is not None:
-        vis1.append( {"name": "Mono Depth", "img_list": [depth.cpu().squeeze(0).data.numpy()[0]], "cmap": "jet"} )
-    if depth_registered is not None:
-        vis1.append( {"name": "Mono depth_registered", "img_list": [depth_registered.cpu().squeeze(0).data.numpy()[0]], "cmap": "jet"} )
     if depth_registered_up is not None:
         depth_registered_up = padder.unpad(depth_registered_up).cpu().squeeze(0)
-        vis1.append( {"name": "Mono depth_registered_up", 
+        vis1.append( {"name": "Upsampled Registered Mono Depth", 
                       "img_list": [depth_registered_up.data.numpy()[0]], 
                       "cmap": "jet",
                       "GT": [-flow_gt.data.numpy()[0]],
                       "error_map": True,
                       "vmin": vmin, "vmax": vmax,} )
     if conf_fusion is not None:
-        vis1.append( {"name": "Mono conf_fusion", "img_list": [conf_fusion.cpu().squeeze(0).data.numpy()[0]], "cmap": "viridis"} )
+        vis1.append( {"name": "Mono Confidence for Fusion", "img_list": [conf_fusion.cpu().squeeze(0).data.numpy()[0]], "cmap": "viridis"} )
+    if depth is not None:
+        vis1.append( {"name": "Mono Depth from DepthAnything", 
+                      "img_list": [depth.cpu().squeeze(0).data.numpy()[0]], 
+                      "cmap": "jet", "vmin": None, "vmax": None,} )
+    if depth_registered is not None:
+        vis1.append( {"name": "Registered Mono Depth", 
+                      "img_list": [depth_registered.cpu().squeeze(0).data.numpy()[0]], 
+                      "cmap": "jet", "vmin": vmin/4, "vmax": vmax/4,} )
     viser.analyze(vis1, imageGT_file, in_one_fig=True)
 
     # vis2 = [{"name": "Disp", 

@@ -365,9 +365,11 @@ class Visualizer:
                     info = ": epe~{:.2f}".format(epe_list[idx]) + ", " + \
                             "{}~{:.1f}".format(xpx_name[:-5], epe_list[idx]*100)
                 
+                idx_mark = f"" if len(img_list)==1 else f"-{idx}"
+                
                 if cmap is None or cmap.find("private") == -1 :
                     cnt += 1
-                    title = f"{vis_name}-{idx}"
+                    title = f"{vis_name}" + idx_mark
                     fig_data_list += [{"img"  : img_list[idx], 
                                       "title" : title, 
                                       "cmap"  : cmap, 
@@ -376,41 +378,41 @@ class Visualizer:
                 
                 if error_map_req :
                     cnt += 1
-                    title = f"Error Map-{idx}" + info
+                    title = f"{vis_name}-Error Map" + idx_mark + info
                     fig_data_list += [{"img"  : colored_error_map_list[idx], 
                                        "title": title, 
                                        "cmap" : None, },]
                 
                 if error_map_req and improvement_req :
                     cnt += 1
-                    title = f"Improvement (err[i]-err[i-1])-{idx}"
+                    title = f"Improvement (err[i]-err[i-1])" + idx_mark
                     fig_data_list += [{"img"  : colored_imp_map_list[idx], 
                                        "title": title, 
                                        "cmap" : None, },]
                 
                 if movement_req :
                     cnt += 1
-                    title = f"Movement (disp[i]-disp[i-1])-{idx}"
+                    title = f"Movement (disp[i]-disp[i-1])" + idx_mark
                     fig_data_list += [{"img"  : colored_move_map_list[idx], 
                                        "title": title, 
                                        "cmap" : None, },]
 
                 if acceleration_req :
                     cnt += 1
-                    title = f"Acceleration (Move[i]-Move[i-1])-{idx}"
+                    title = f"Acceleration (Move[i]-Move[i-1])" + idx_mark
                     fig_data_list += [{"img"  : colored_acc_map_list[idx], 
                                        "title": title, 
                                        "cmap" : None, },]
                 
                 if mask_req:
                     cnt += 1
-                    title = f"Mask-{idx}"
+                    title = f"Mask" + idx_mark
                     fig_data_list += [{"img"  : colored_mask_list[idx], 
                                        "title": title, 
                                        "cmap" : None, },]
 
                     cnt += 1
-                    title = f"Binary Mask-{idx}"
+                    title = f"Binary Mask" + idx_mark
                     fig_data_list += [{"img"  : mask_binary_list[idx], 
                                        "title": title, 
                                        "cmap" : "gray", },]
