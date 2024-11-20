@@ -461,7 +461,7 @@ def validate_booster(model, iters=32, root="", mixed_prec=False, sv_root="", ima
         logger.info(f"Booster-{image_set} Iter {val_id+1} out of {len(val_dataset)}. " +\
                      f"EPE {round(image_epe,4)} bad2 {round(image_out,4)}")
         
-        break
+        # break
 
     epe_list = np.array(epe_list)
     out_list = np.array(out_list)
