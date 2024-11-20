@@ -142,7 +142,7 @@ def sv_intermediate_results(data, name, sv_path):
         
         data_numpy = data.cpu().data.numpy()
         np.save(os.path.join(sv_path, name+".npy"), data_numpy)
-        print("saving to {}".format( os.path.join(sv_path, name+".npy") ))
+        # print("saving to {}".format( os.path.join(sv_path, name+".npy") ))
     except Exception as err:
         raise Exception(err, data.shape, name, sv_path)
 

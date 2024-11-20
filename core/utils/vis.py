@@ -52,7 +52,8 @@ def show_imgs(param, sv_img=False, save2where=None,
                         vmin=plt_par.get("vmin"), vmax=plt_par.get("vmax"))
         
         if plt_par.get("colorbar") == True :
-            plt.colorbar(im, orientation='horizontal', fraction=0.02, pad=0.0004)
+            # plt.colorbar(im, orientation='horizontal', fraction=0.02, pad=0.0004)
+            plt.colorbar(im, orientation='horizontal')
         
         if plt_par.get("point_x") is not None and plt_par.get("point_y") is not None :
             plt.scatter(plt_par.get("point_x"), plt_par.get("point_y"), s=plt_par.get("point_s"), c=plt_par.get("point_c"), marker=plt_par.get("point_m"), alpha=plt_par.get("point_alpha"))
@@ -279,7 +280,7 @@ class Visualizer:
         
         return colored_mask_list, mask_binary_list
 
-    def analyze(self, dict_list, imageGT_file, in_one_fig=False):
+    def analyze(self, dict_list, imageGT_file, in_one_fig=False, group=2):
         """
             dict_list:
                 [{"name": "disp",
@@ -318,6 +319,7 @@ class Visualizer:
             stop_idx = vis_dict.get("stop_idx", -1)
             vmin     = vis_dict.get("vmin", None)
             vmax     = vis_dict.get("vmax", None)
+            colorbar = vis_dict.get("colorbar", False)
 
             epe_list = vis_dict.get("epe_list", None)
             xpx_name = self.get_xpx(vis_dict.keys())
@@ -366,15 +368,16 @@ class Visualizer:
                             "{}~{:.1f}".format(xpx_name[:-5], epe_list[idx]*100)
                 
                 idx_mark = f"" if len(img_list)==1 else f"-{idx}"
-                
+
                 if cmap is None or cmap.find("private") == -1 :
                     cnt += 1
                     title = f"{vis_name}" + idx_mark
                     fig_data_list += [{"img"  : img_list[idx], 
-                                      "title" : title, 
-                                      "cmap"  : cmap, 
-                                      "vmin"  : vmin,
-                                      "vmax"  : vmax,},]
+                                       "title" : title, 
+                                       "cmap"  : cmap, 
+                                       "vmin"  : vmin,
+                                       "vmax"  : vmax,
+                                       "colorbar": colorbar},]
                 
                 if error_map_req :
                     cnt += 1
@@ -417,20 +420,20 @@ class Visualizer:
                                        "title": title, 
                                        "cmap" : "gray", },]
             if not in_one_fig:
-                group = cnt // (stop_idx if stop_idx>0 else len(img_list))
+                tmp_group = cnt // (stop_idx if stop_idx>0 else len(img_list))
                 H,W = img_list[0].shape
                 pre,lat = os.path.splitext(sv_path)
                 tmp_sv_path = pre + f"-sequence-{vis_name}" + lat
                 show_imgs(fig_data_list, 
                         sv_img=True, save2where=tmp_sv_path, if_inter=False, 
                         fontsize=20, szWidth=np.ceil(W/H)*5, szHeight=5, 
-                        group=group, dpi=300)
+                        group=tmp_group, dpi=300)
                 fig_data_list = []
 
         if in_one_fig:
             show_imgs(fig_data_list, 
                     sv_img=True, save2where=sv_path, if_inter=False, 
-                    fontsize=20, szWidth=10, szHeight=5, group=2, dpi=300)
+                    fontsize=20, szWidth=10, szHeight=5, group=group, dpi=300)
         
 
 def colorize_error_map(error_map, ver_hor="hor"):

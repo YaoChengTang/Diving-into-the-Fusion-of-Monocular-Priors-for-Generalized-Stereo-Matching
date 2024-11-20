@@ -126,119 +126,133 @@ def evalute(atom_dict,
     # save prediction and the corresponding path for visualization
     image1 = padder.unpad(image1).cpu().squeeze(0).permute(1,2,0)
     image2 = padder.unpad(image2).cpu().squeeze(0).permute(1,2,0)
-
-    vis_inter(viser, args, vmin, vmax)
+    
+    vis1 = [{"name": "Left Image", 
+             "img_list": [image1.data.numpy().astype(np.uint8)], "cmap": None},
+            {"name": "GT Disp", "img_list": [-flow_gt.data.numpy()[0]], "cmap": "jet", "vmin": vmin, "vmax": vmax},
+    ]
+    vis_inter(viser, args, imageGT_file, vmin, vmax, vis_data=vis1)
 
     return image_epe, image_out
 
 
-def vis_inter(viser, args, vmin=None, vmax=None):
-    vis_data = []
-
-    depth = load_intermediate_results("monocular_depth", args.sv_root)
-    vis_data += [{"name": "depth", 
-                  "img_list": [depth[tuple( [0] * (len(depth.shape) - 2) + [slice(None)] * 2 )]], 
-                  "cmap": "jet"} ]
+def vis_inter(viser, args, imageGT_file, vmin=None, vmax=None, vis_data=[]):
     
     depth_fea= load_intermediate_results("depthAnything_features", args.sv_root)
-    vis_data += [{"name": "depth_fea", 
+    vis_data += [{"name": "Features from DepthAnything", 
                   "img_list": [depth_fea[tuple( [0] * (len(depth_fea.shape) - 2) + [slice(None)] * 2 )]], 
                   "cmap": "viridis"} ]
 
-    depth_lbp = load_intermediate_results("depth_lbp", args.sv_root)
-    vis_data += [{"name": "depth_lbp", 
-                  "img_list": [depth_lbp[tuple( [0] * (len(depth_lbp.shape) - 2) + [slice(None)] * 2 )]], 
-                  "cmap": "viridis",
-                  "vmin": 0, "vmax": 1,} ]
-
     for i in range(3):
         for j in range(3):
+            zrq = {0:"cz", 1:"cr", 2:"cq"}[j]
             ctx = load_intermediate_results(f"inp_list-{i}-{j}", args.sv_root)
-            vis_data += [{"name": f"ctx-{i}-{j}", 
+            vis_data += [{"name": f"Context-scale:{i}-{zrq}", 
                           "img_list": [ctx[tuple( [0] * (len(ctx.shape) - 2) + [slice(None)] * 2 )]], 
                           "cmap": "viridis"} ]
 
     for i in range(3):
         hidden = load_intermediate_results(f"net_list-{i}", args.sv_root)
-        vis_data += [{"name": f"hidden-{i}", 
+        vis_data += [{"name": f"Hidden State-scale:{i}", 
                       "img_list": [hidden[tuple( [0] * (len(hidden.shape) - 2) + [slice(None)] * 2 )]], 
                       "cmap": "viridis"} ]
-        
-    
-    for itr in range(args.valid_iters):
+
+
+
+    # for itr in range(args.valid_iters):
+    for itr in [0,1,2,3,4,5,7,9,12,15,20,args.valid_iters-1]:
+        depth_lbp = load_intermediate_results("depth_lbp", args.sv_root)
+        vis_data += [{"name": "Local Ordering Map from Mono", 
+                      "img_list": [depth_lbp[tuple( [0] * (len(depth_lbp.shape) - 2) + [slice(None)] * 2 )]], 
+                      "cmap": "viridis",
+                      "vmin": 0, "vmax": 1,} ]
+                    
         disp_lbp = load_intermediate_results(f"disp_lbp-itr{itr+1}", args.sv_root)
-        vis_data += [{"name": f"disp_lbp-itr{itr+1}", 
+        vis_data += [{"name": f"Local Ordering Map from Bino-itr:{itr+1}", 
                       "img_list": [disp_lbp[tuple( [0] * (len(disp_lbp.shape) - 2) + [slice(None)] * 2 )]], 
                       "cmap": "viridis",
                       "vmin": 0, "vmax": 1,} ]
 
         delta_disp = load_intermediate_results(f"delta_disp-itr{itr+1}", args.sv_root)
-        vis_data += [{"name": f"delta_disp-itr{itr+1}", 
+        vis_data += [{"name": f"Delta Disp-itr:{itr+1}", 
                       "img_list": [delta_disp[tuple( [0] * (len(delta_disp.shape) - 2) + [slice(None)] * 2 )]], 
                       "cmap": "viridis"} ]
 
+
         for i in range(3):
             hidden = load_intermediate_results(f"net_list-{i}-itr{itr+1}", args.sv_root)
-            vis_data += [{"name": f"hidden-{i}-{itr+1}", 
+            vis_data += [{"name": f"Hidden State-scale:{i}-itr:{itr+1}", 
                           "img_list": [hidden[tuple( [0] * (len(hidden.shape) - 2) + [slice(None)] * 2 )]], 
                           "cmap": "viridis"} ]
         
         modulation = load_intermediate_results(f"modulation-itr{itr+1}", args.sv_root)
-        vis_data += [{"name": f"modulation-{itr+1}", 
+        vis_data += [{"name": f"Guidance-itr:{itr+1}", 
                       "img_list": [modulation[tuple( [0] * (len(modulation.shape) - 2) + [slice(None)] * 2 )]], 
                       "cmap": "viridis"} ]
 
         delta_disp = load_intermediate_results(f"reweighted_delta_disp-itr{itr+1}", args.sv_root)
-        vis_data += [{"name": f"reweighted_delta_disp-{itr+1}", 
+        vis_data += [{"name": f"Reweighted Delta Disp-itr:{itr+1}", 
                       "img_list": [delta_disp[tuple( [0] * (len(delta_disp.shape) - 2) + [slice(None)] * 2 )]], 
                       "cmap": "viridis"} ]
         
         disp_up = load_intermediate_results(f"disp_up-itr{itr+1}", args.sv_root)
-        vis_data += [{"name": f"disp_up-{itr+1}", 
+        vis_data += [{"name": f"Upsampled Disp-itr:{itr+1}", 
                       "img_list": [-disp_up[tuple( [0] * (len(disp_up.shape) - 2) + [slice(None)] * 2 )]], 
                       "cmap": "jet",
                       "vmin": vmin, "vmax": vmax,} ]
+
+
     
-    disp_refine = load_intermediate_results(f"disp_refine", args.sv_root)
-    vis_data += [{"name": "disp_refine", 
-                  "img_list": [-disp_refine[tuple( [0] * (len(disp_refine.shape) - 2) + [slice(None)] * 2 )]], 
-                  "cmap": "jet",
-                  "vmin": None, "vmax": None,} ]
+    depth = load_intermediate_results("monocular_depth", args.sv_root)
+    vis_data += [{"name": "Mono Depth", 
+                  "img_list": [depth[tuple( [0] * (len(depth.shape) - 2) + [slice(None)] * 2 )]], 
+                  "cmap": "jet"} ]
 
     depth_registered = load_intermediate_results(f"depth_registered", args.sv_root)
-    vis_data += [{"name": "depth_registered", 
+    vis_data += [{"name": "Registered Depth", 
                   "img_list": [depth_registered[tuple( [0] * (len(depth_registered.shape) - 2) + [slice(None)] * 2 )]], 
                   "cmap": "jet",
-                  "vmin": None, "vmax": None,} ]
+                  "vmin": vmin/4, "vmax": vmax/4,} ]
     
-    disp_refine_up = load_intermediate_results(f"disp_refine_up", args.sv_root)
-    vis_data += [{"name": "disp_refine_up", 
-                  "img_list": [-disp_refine_up[tuple( [0] * (len(disp_refine_up.shape) - 2) + [slice(None)] * 2 )]], 
-                  "cmap": "jet",
-                  "vmin": vmin, "vmax": vmax,} ]
-
     depth_registered_up = load_intermediate_results(f"depth_registered_up", args.sv_root)
-    vis_data += [{"name": "depth_registered_up", 
+    vis_data += [{"name": "Upsampled Registered Depth", 
                   "img_list": [-depth_registered_up[tuple( [0] * (len(depth_registered_up.shape) - 2) + [slice(None)] * 2 )]], 
                   "cmap": "jet",
                   "vmin": vmin, "vmax": vmax,} ]
 
-    conf = load_intermediate_results(f"conf", args.sv_root)
-    vis_data += [{"name": "conf", 
-                  "img_list": [conf[tuple( [0] * (len(conf.shape) - 2) + [slice(None)] * 2 )]], 
-                  "cmap": "viridis"} ]
-
     a = load_intermediate_results(f"a", args.sv_root)
-    vis_data += [{"name": "a", 
+    vis_data += [{"name": "Registration Parameter a", 
                   "img_list": [a[tuple( [0] * (len(a.shape) - 2) + [slice(None)] * 2 )]], 
-                  "cmap": "viridis"} ]
+                  "cmap": "viridis",
+                  "colorbar": True,} ]
 
     b = load_intermediate_results(f"b", args.sv_root)
-    vis_data += [{"name": "b", 
+    vis_data += [{"name": "Registration Parameter b", 
                   "img_list": [b[tuple( [0] * (len(b.shape) - 2) + [slice(None)] * 2 )]], 
-                  "cmap": "viridis"} ]
+                  "cmap": "viridis",
+                  "colorbar": True,} ]
+    
+
+
+    # disp_refine = load_intermediate_results(f"disp_refine", args.sv_root)
+    # vis_data += [{"name": "disp_refine", 
+    #               "img_list": [-disp_refine[tuple( [0] * (len(disp_refine.shape) - 2) + [slice(None)] * 2 )]], 
+    #               "cmap": "jet",
+    #               "vmin": vmin/4, "vmax": vmax/4,} ]
+
+    # disp_refine_up = load_intermediate_results(f"disp_refine_up", args.sv_root)
+    # vis_data += [{"name": "disp_refine_up", 
+    #               "img_list": [-disp_refine_up[tuple( [0] * (len(disp_refine_up.shape) - 2) + [slice(None)] * 2 )]], 
+    #               "cmap": "jet",
+    #               "vmin": vmin, "vmax": vmax,} ]
+
+    # conf = load_intermediate_results(f"conf", args.sv_root)
+    # vis_data += [{"name": "conf", 
+    #               "img_list": [conf[tuple( [0] * (len(conf.shape) - 2) + [slice(None)] * 2 )]], 
+    #               "cmap": "viridis"} ]
+
             
-    viser.analyze(vis_data, "example", in_one_fig=False)
+    viser.analyze(vis_data, imageGT_file, in_one_fig=True, group=3)
 
 @torch.no_grad()
 def validate_eth3d(model, iters=32, root="", sv_root="", mixed_prec=False, args=None):
@@ -421,8 +435,8 @@ def validate_booster(model, iters=32, root="", mixed_prec=False, sv_root="", ima
     out_list, epe_list = [], []
     for val_id in range(len(val_dataset)):
         (imageL_file, imageR_file, imageGT_file), image1, image2, flow_gt, valid_gt = val_dataset[val_id]
-        if imageL_file.find("Case/camera_00/im9.png") == -1:
-            continue
+        # if imageL_file.find("Case/camera_00/im9.png") == -1:
+        #     continue
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 
@@ -468,7 +482,7 @@ if __name__ == '__main__':
     parser.add_argument('--mast3r_model_path', default='MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth', help="pretrained model path for MaSt3R")
     parser.add_argument('--depthany_model_dir', default='/data5/yao/pretrained', help="directory of pretrained model path for DepthAnything")
     parser.add_argument('--restore_ckpt', help="restore checkpoint", default=None)
-    parser.add_argument('--dataset', help="dataset for evaluation", required=True, choices=["eth3d", "kitti", "things", "booster"] + [f"middlebury_{s}" for s in 'FHQ'])
+    parser.add_argument('--dataset', help="dataset for evaluation", required=True, choices=["eth3d", "kitti", "kitti2012", "things", "booster"] + [f"middlebury_{s}" for s in 'FHQ'])
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--valid_iters', type=int, default=32, help='number of flow-field updates during forward pass')
     parser.add_argument('--eval', action='store_true', help='evaluation mode')
@@ -564,35 +578,35 @@ if __name__ == '__main__':
 
     if args.dataset == 'eth3d':
         if args.root is None:
-            args.root = "/data6/ETH3D"
+            args.root = "./datasets/ETH3D"
         validate_eth3d(model, iters=args.valid_iters, root=args.root, 
                        sv_root=args.sv_root, mixed_prec=use_mixed_precision,
                        args=args)
 
     elif args.dataset == 'kitti':
         if args.root is None:
-            args.root = "/data6/KITTI2015"
+            args.root = "./datasets/Kitti15"
         validate_kitti(model, iters=args.valid_iters, root=args.root, 
                        sv_root=args.sv_root, mixed_prec=use_mixed_precision,
                        args=args)
     
     elif args.dataset == 'kitti2012':
         if args.root is None:
-            args.root = "/data6/KITTI2012"
+            args.root = "./datasets/Kitti12"
         validate_kitti(model, iters=args.valid_iters, root=args.root, 
                        sv_root=args.sv_root, mixed_prec=use_mixed_precision,
                        args=args)
 
     elif args.dataset in [f"middlebury_{s}" for s in 'FHQ']:
         if args.root is None:
-            args.root = "/data6/Middlebury"
+            args.root = "./datasets/Middlebury"
         validate_middlebury(model, iters=args.valid_iters, root=args.root, split=args.dataset[-1], 
                             sv_root=args.sv_root, mixed_prec=use_mixed_precision,
                             args=args)
 
     elif args.dataset == 'things':
         if args.root is None:
-            args.root = "/data6/sceneflow/sceneflow"
+            args.root = "./datasets/sceneflow"
         validate_things(model, iters=args.valid_iters, root=args.root, 
                         sv_root=args.sv_root, mixed_prec=use_mixed_precision,
                         args=args)

@@ -426,7 +426,7 @@ if __name__ == '__main__':
     parser.add_argument('--mast3r_model_path', default='MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth', help="pretrained model path for MaSt3R")
     parser.add_argument('--depthany_model_dir', default='/data5/yao/pretrained', help="directory of pretrained model path for DepthAnything")
     parser.add_argument('--restore_ckpt', help="restore checkpoint", default=None)
-    parser.add_argument('--dataset', help="dataset for evaluation", required=True, choices=["eth3d", "kitti", "things", "booster"] + [f"middlebury_{s}" for s in 'FHQ'])
+    parser.add_argument('--dataset', help="dataset for evaluation", required=True, choices=["eth3d", "kitti", "kitti2012", "things", "booster"] + [f"middlebury_{s}" for s in 'FHQ'])
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--valid_iters', type=int, default=32, help='number of flow-field updates during forward pass')
     parser.add_argument('--eval', action='store_true', help='evaluation mode')
@@ -521,35 +521,35 @@ if __name__ == '__main__':
 
     if args.dataset == 'eth3d':
         if args.root is None:
-            args.root = "/data6/ETH3D"
+            args.root = "./datasets/ETH3D"
         validate_eth3d(model, iters=args.valid_iters, root=args.root, 
                        sv_root=args.sv_root, mixed_prec=use_mixed_precision,
                        args=args)
 
     elif args.dataset == 'kitti':
         if args.root is None:
-            args.root = "/data6/KITTI2015"
+            args.root = "./datasets/Kitti15"
         validate_kitti(model, iters=args.valid_iters, root=args.root, 
                        sv_root=args.sv_root, mixed_prec=use_mixed_precision,
                        args=args)
     
     elif args.dataset == 'kitti2012':
         if args.root is None:
-            args.root = "/data6/KITTI2012"
+            args.root = "./datasets/Kitti12"
         validate_kitti(model, iters=args.valid_iters, root=args.root, 
                        sv_root=args.sv_root, mixed_prec=use_mixed_precision,
                        args=args)
 
     elif args.dataset in [f"middlebury_{s}" for s in 'FHQ']:
         if args.root is None:
-            args.root = "/data6/Middlebury"
+            args.root = "./datasets/Middlebury"
         validate_middlebury(model, iters=args.valid_iters, root=args.root, split=args.dataset[-1], 
                             sv_root=args.sv_root, mixed_prec=use_mixed_precision,
                             args=args)
 
     elif args.dataset == 'things':
         if args.root is None:
-            args.root = "/data6/sceneflow/sceneflow"
+            args.root = "./datasets/sceneflow"
         validate_things(model, iters=args.valid_iters, root=args.root, 
                         sv_root=args.sv_root, mixed_prec=use_mixed_precision,
                         args=args)
