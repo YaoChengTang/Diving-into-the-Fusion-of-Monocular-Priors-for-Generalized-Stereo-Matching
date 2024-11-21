@@ -36,11 +36,11 @@ X = pred[valid].reshape((-1,1))
 X = np.hstack([X, np.ones_like(X)])
 print(X.shape, Y.shape, X.max(), Y.max())
 
-# 创建并拟合模型
-model = LinearRegression(fit_intercept=False)  # 不需要自动添加截距项
+
+model = LinearRegression(fit_intercept=False) 
 model.fit(X, Y)
 
-# 获取估计的a和y
+
 a, b = model.coef_[0][0], model.coef_[0][1]
 reg_pred = pred * a + b
 epe = np.abs(reg_pred[valid]-gt[valid]).mean()
@@ -63,7 +63,7 @@ print(f"{a}, {b}: ", epe, bad3)
 ransac = RANSACRegressor(estimator=LinearRegression(), max_trials=1000, min_samples=500, residual_threshold=1.0)
 ransac.fit(X, Y)
 
-# 获取估计的系数
+
 a = ransac.estimator_.coef_[0][0]
 b = ransac.estimator_.intercept_
 reg_pred = pred * a + b
