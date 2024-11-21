@@ -127,9 +127,8 @@ def train(args):
                     logger.info(f"Saving file {save_path}")
                     torch.save(model.state_dict(), save_path)
 
-                # middlebury_root = "/".join(DATASET_ROOT.split("/")[:-1]) + "/Middlebury"
-                # results = validate_middlebury(model.module, iters=args.valid_iters, split="H", root=middlebury_root, )
-                results = validate_things(model.module, iters=args.valid_iters, root="./datasets/sceneflow")
+                # results = validate_things(model.module, iters=args.valid_iters, root="./datasets/sceneflow")
+                results = validate_things(model.module, iters=args.valid_iters, root=DATASET_ROOT)
                 if args.local_rank==0 and int(NODE_RANK)==0:
                     logger.write_dict(results)
 
