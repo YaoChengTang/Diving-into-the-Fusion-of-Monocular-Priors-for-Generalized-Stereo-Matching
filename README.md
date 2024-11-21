@@ -1,152 +1,158 @@
-# RAFT-Stereo: Multilevel Recurrent Field Transforms for Stereo Matching
-This repository contains the source code for our paper:
+# Generalized Stereo Matching with Fusion of Monocular Priors
 
-[RAFT-Stereo: Multilevel Recurrent Field Transforms for Stereo Matching](https://arxiv.org/pdf/2109.07547.pdf)<br/>
-3DV 2021, Best Student Paper Award<br/>
-Lahav Lipson, Zachary Teed and Jia Deng<br/>
+> ⚠️ **Warning**: It is highly recommended to view this markdown in a preview format！
+> ⚠️ **Warning**: We strongly recommend researchers retrain the model on GPUs other than A40 for better results.
 
-```
-@inproceedings{lipson2021raft,
-  title={RAFT-Stereo: Multilevel Recurrent Field Transforms for Stereo Matching},
-  author={Lipson, Lahav and Teed, Zachary and Deng, Jia},
-  booktitle={International Conference on 3D Vision (3DV)},
-  year={2021}
-}
-```
-
-<img src="RAFTStereo.png">
-
-<img src="https://media.giphy.com/media/nYqxbmAdGDgVJ2lQYK/giphy.gif" alt="drawing" width="400"/> <img src="https://media.giphy.com/media/y8hD5SNh1QHc8yCGBv/giphy.gif" alt="drawing" width="400"/>
-
-##  [<img src="https://i.imgur.com/QCojoJk.png" width="40"> RAFT-Stereo + Point-Cloud Visualization in Google Colab](https://colab.research.google.com/drive/1G8WJCQt9y55qxQH6QV6PpPvWEbd393g2?usp=sharing)
 
 ## Requirements
-The code has been tested with PyTorch 1.7 and Cuda 10.2
 ```Shell
-conda env create -f environment.yaml
+conda env create -f envs/environment_GStereo.yaml
 conda activate raftstereo
 ```
-and with PyTorch 1.11 and Cuda 11.3
-```Shell
-conda env create -f environment_cuda11.yaml
-conda activate raftstereo
-```
-
 
 
 ## Required Data
-To evaluate/train RAFT-stereo, you will need to download the required datasets. 
-* [Sceneflow](https://lmb.informatik.uni-freiburg.de/resources/datasets/SceneFlowDatasets.en.html#:~:text=on%20Academic%20Torrents-,FlyingThings3D,-Driving) (Includes FlyingThings3D, Driving & Monkaa)
-* [Middlebury](https://vision.middlebury.edu/stereo/data/)
-* [ETH3D](https://www.eth3d.net/datasets#low-res-two-view-test-data)
-* [KITTI](http://www.cvlibs.net/datasets/kitti/eval_scene_flow.php?benchmark=stereo)
-
-To download the ETH3D and Middlebury test datasets for the [demos](#demos), run 
-```Shell
-bash download_datasets.sh
-```
-
-By default `stereo_datasets.py` will search for the datasets in these locations. You can create symbolic links to wherever the datasets were downloaded in the `datasets` folder
-
 ```Shell
 ├── datasets
-    ├── FlyingThings3D
-        ├── frames_cleanpass
-        ├── frames_finalpass
-        ├── disparity
-    ├── Monkaa
-        ├── frames_cleanpass
-        ├── frames_finalpass
-        ├── disparity
-    ├── Driving
-        ├── frames_cleanpass
-        ├── frames_finalpass
-        ├── disparity
-    ├── KITTI
+    ├── sceneflow
+        ├── driving                                               
+        │   ├── disparity                                         
+        │   ├── frames_cleanpass                                  
+        │   └── frames_finalpass                                  
+        ├── flying3d                                              
+        │   ├── disparity                                         
+        │   ├── frames_cleanpass                                  
+        │   └── frames_finalpass                                  
+        └── monkaa                                                
+            ├── disparity                                         
+            ├── frames_cleanpass                                                                                             
+            └── frames_finalpass
+    ├── Kitti15
         ├── testing
-        ├── training
-        ├── devkit
+        │   ├── image_2
+        │   └── image_3
+        └── training
+            ├── disp_noc_0
+            ├── disp_noc_1
+            ├── disp_occ_0
+            ├── disp_occ_1
+            ├── flow_noc
+            ├── flow_occ
+            ├── image_2
+            ├── image_3
+            └── obj_map
+    ├── Kitti12
+        ├── testing
+        │   ├── calib
+        │   ├── colored_0
+        │   ├── colored_1
+        │   ├── disp_noc
+        │   ├── disp_occ
+        │   ├── flow_noc
+        │   ├── flow_occ
+        │   ├── image_0
+        │   └── image_1
+        └── training
+            ├── calib
+            ├── colored_0
+            └── colored_1
     ├── Middlebury
-        ├── MiddEval3
+        └── MiddEval3  
+            ├── testF
+            ├── testH
+            ├── testQ    
+            ├── trainingF                               
+            ├── trainingH                                         
+            └── trainingQ
     ├── ETH3D
         ├── two_view_testing
+        └── two_view_training
+            ├── delivery_area_1l
+            ├── delivery_area_1s
+            ├── delivery_area_2l
+    ├── Booster
+        ├── test
+        │   ├── balanced
+        │   └── unbalanced
+        └── train
+            ├── balanced
+            └── unbalanced
 ```
 
-## **(New 03/17/23)**: Robust Vision Challenge 2022
 
-iRaftStereo_RVC ranked 2nd on the [stereo leaderboard](http://www.robustvision.net/leaderboard.php) at the Robust Vision Challenge at ECCV 2022.
 
-To use the model, download + unzip [models.zip](https://www.dropbox.com/s/ftveifyqcomiwaq/models.zip) and run
-```
-python demo.py --restore_ckpt models/iraftstereo_rvc.pth --context_norm instance -l=datasets/ETH3D/two_view_testing/*/im0.png -r=datasets/ETH3D/two_view_testing/*/im1.png
-```
+## Code
+All codes are provided here, including DepthAnything v2.
+Since we modified `dpt.py` to get intermediate features and depth output, please use the modified code.
 
-Thank you to [Insta360](https://www.insta360.com/) and Jiang et al. for their excellent work.
 
-See their manuscript for training details: [An Improved RaftStereo Trained with A Mixed Dataset for the Robust Vision Challenge 2022](https://arxiv.org/pdf/2210.12785.pdf)
+- ### Training  
+    All training script is presented in [script/train_stereo_raftstereo.sh](script/train_stereo_raftstereo.sh) and [script/train_stereo_raftstereo_depthany.sh](script/train_stereo_raftstereo_depthany.sh).
+    Please specify the following variable in scripts before training.
+    | variable      | meaning                 |
+    |---------------|----------------------|
+    | `NCCL_P2P_DISABLE`      | We set `NCCL_P2P_DISABLE=1` as the distributed training went wrong at our `A40` GPU.       |
+    | `CUDA_VISIBLE_DEVICES`  | avaliable GPU id, e.g., `CUDA_VISIBLE_DEVICES=0,1,2,3`       |
+    | `DATASET_ROOT`  | the training dataset path, e.g., `./datasets/sceneflow`        |
+    | `LOG_ROOT`      | path to save log file     |
+    | `TB_ROOT`       | path to save tensorboard data        |
+    | `CKPOINT_ROOT`  | path to save checkpoint       |
+    
+    
+    In order to reproduce our results, please download `depth_anything_v2_vitl.pth` from DepthAnything v2 before training and specify `--depthany_model_dir` in script shell to path of directory where `depth_anything_v2_vitl.pth` is saved. Here, we do not provide the link as it maybe conflicts to the CVPR guideline.
+    We also explain the code for ablation study, in which each experiment is mostly controlled by the `--model_name` used in the training shell.
+    | `--model_name`      | meaning                 |
+    |-----------------|-------------------------|
+    | `RaftStereo`          | Original RaftStereo model       |
+    | `RaftStereoDisp`      | The output of GRU is a single channel for disparity instead of two channels for optical flow, `Baseline` in Table 3 of the main text.      |
+    | `RAFTStereoMast3r`    | The pre-trained MASt3R is used as the backbone and its features are used for cost volume construction, `RaftStereo + backbone Mast3r` in supplemental text.       |
+    | `RaftStereoNoCTX`     | RaftStereo model without context network, `Baseline w/o mono feature` in Table 3 of the main text.   |
+    | `RAFTStereoDepthAny`  | RaftStereo model with our monocular encoder, `Baseline + ME` in Table 3 of the main text.       |
+    | `RAFTStereoDepthFusion`  | RaftStereo model with our monocular encoder, `Baseline + ME + IDF` in Table 3 of the main text.       |
+    | `RAFTStereoDepthBeta`  | RaftStereo model with our monocular encoder and iterative local fusion, `Baseline + ME + ILF` in Table 3 of the main text.       |
+    | `RAFTStereoDepthBetaNoLBP`  | RaftStereo model with our monocular encoder and iterative local fusion without LBPEncoder, `L(6)` and `L(7)` in Table 4 of the main text.       |
+    | `RAFTStereoDepthMatch`  | RaftStereo model with DepthAnything v2 as feature extractor for cost volume construction, `RaftStereo + backbone DepthAnything` in the supplemental text.       |
+    | `RAFTStereoDepthPostFusion`  | RaftStereo model with our monocular encoder, iterative local fusion and post fusion, `Baseline + ME + PF` in Table 3 of the main text.       |
+    | `RAFTStereoDepthBetaRefine`  | RaftStereo model with our monocular encoder, iterative local fusion, and global fusion, `Baseline + ME + ILF + GF` in Table 3 of the main text.       |
 
-## Demos
-Pretrained models can be downloaded by running
-```Shell
-bash download_models.sh
-```
-or downloaded from [google drive](https://drive.google.com/drive/folders/1booUFYEXmsdombVuglatP0nZXb5qI89J). We recommend our [Middlebury model](https://drive.google.com/file/d/1m3KoukUmKDoMv-ySOO6vBzYfWLyj9yqd/view?usp=sharing) for in-the-wild images.
 
-You can demo a trained model on pairs of images. To predict stereo for Middlebury, run
-```Shell
-python demo.py --restore_ckpt models/raftstereo-middlebury.pth --corr_implementation alt --mixed_precision -l=datasets/Middlebury/MiddEval3/testF/*/im0.png -r=datasets/Middlebury/MiddEval3/testF/*/im1.png
-```
-Or for ETH3D:
-```Shell
-python demo.py --restore_ckpt models/raftstereo-eth3d.pth -l=datasets/ETH3D/two_view_testing/*/im0.png -r=datasets/ETH3D/two_view_testing/*/im1.png
-```
-Our fastest model (uses the [faster implementation](#optional-faster-implementation)):
-```Shell
-python demo.py --restore_ckpt models/raftstereo-realtime.pth --shared_backbone --n_downsample 3 --n_gru_layers 2 --slow_fast_gru --valid_iters 7 --corr_implementation reg_cuda --mixed_precision
-```
+    |         variable         | meaning                 |
+    |--------------------------|-------------------------|
+    | `--lbp_neighbor_offsets` | control `LBP Kernel` used in Table 4 of the main text.   |
+    | `--modulation_ratio`     | control `r` amplitude parameter used in Table 4 of the main text. |
+    | `--conf_from_fea`        | `Cost` or `Hybrid` for `COnfidence` used in Table 4 of the main text. |
+    | `--refine_pool`          | learning regitration paramters via pooling in the supplemental text. |
 
-To save the disparity values as `.npy` files, run any of the demos with the `--save_numpy` flag. 
 
-## Converting Disparity to Depth 
+    The training is launched by follows
+    ```Shell
+    bash ./script/train_stereo_raftstereo_depthany.sh EXP_NAME
+    ```
+    `EXP_NAME` specifiy the experiment name, we use this name to save each log file, tensorboard data, and checkpoint for different experiments. The corresponding file structure is like follows
+    ```Shell
+    ├── runs
+        ├── ckpoint
+        │   ├── RaftStereoDepthAny
+        │   ├── RaftStereoMast3r
+        │   └── RaftStereoNoCTX
+        ├── log
+        │   ├── RaftStereoDepthAny
+        │   ├── RaftStereoMast3r
+        │   └── RaftStereoNoCTX
+        └── tboard
+            ├── RaftStereoDepthAny
+            ├── RaftStereoMast3r
+            └── RaftStereoNoCTX
+    ```
+    > ⚠️ **Warning**: **Please follow the training process mentioned in our main text.** We first train the model without the global fusion module. Then, we train the monocular registration of the global fusion module while keeping the other modules frozen with well-trained model from first stage. Finally, we train the entire global fusion module while keeping the other modules frozen with well-trained model from second stage.
 
-If the camera intrinsics and camera baseline are known, disparity predictions can be converted to depth values using
+- ### Evaluation  
+    Evaluation script is presented in [script/evaluate_stereo_raftstereo.sh](script/evaluate_stereo_raftstereo.sh).
+    We use `--test_exp_name` to specifiy the evaluation experiment name.
+    The results of each experiment are restored in `LOG_ROOT/eval.xlsx`. We also merge all experiments' result in `LOG_ROOT/merged_eval.xlsx` through `python3 merge_sheet.py`.
+    The evaluation metrics remain the same for different methods.
+    The `mean ± std` is computed via [tools/get_statistics.py](tools/get_statistics.py).
 
-<img src="depth_eq.png" width="320">
-
-Note that the units of the focal length are _pixels_ not millimeters. (cx1-cx0) is the x-difference of principal points.
-
-## Evaluation
-
-To evaluate a trained model on a validation set (e.g. Middlebury), run
-```Shell
-python evaluate_stereo.py --restore_ckpt models/raftstereo-middlebury.pth --dataset middlebury_H
-```
-
-## Training
-
-Our model is trained on two RTX-6000 GPUs using the following command. Training logs will be written to `runs/` which can be visualized using tensorboard.
-
-```Shell
-python train_stereo.py --batch_size 8 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 200000 --mixed_precision
-```
-To train using significantly less memory, change `--n_downsample 2` to `--n_downsample 3`. This will slightly reduce accuracy.
-
-To finetune the sceneflow model on the 23 scenes from the [Middlebury 2014 stereo dataset](https://vision.middlebury.edu/stereo/data/scenes2014/), download the data using
-
-```Shell
-chmod ug+x download_middlebury_2014.sh && ./download_middlebury_2014.sh
-```
-and run
-```Shell
-python train_stereo.py --train_datasets middlebury_2014 --num_steps 4000 --image_size 384 1000 --lr 0.00002 --restore_ckpt models/raftstereo-sceneflow.pth --batch_size 2 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2  --mixed_precision
-```
-
-## (Optional) Faster Implementation
-
-We provide a faster CUDA implementation of the correlation sampler which works with mixed precision feature maps.
-```Shell
-cd sampler && python setup.py install && cd ..
-```
-Running demo.py, train_stereo.py or evaluate.py with `--corr_implementation reg_cuda` together with `--mixed_precision` will speed up the model without impacting performance.
-
-To significantly decrease memory consumption on high resolution images, use `--corr_implementation alt`. This implementation is slower than the default, however.
+- ### Visualization  
+    We visualize the error map via [script/gen_sample_stereo_raftstereo.sh](script/gen_sample_stereo_raftstereo.sh) and intermediate results via [script/vis_inter_stereo_raftstereo.sh](script/vis_inter_stereo_raftstereo.sh).
+    We provide an easy-to-use visualization toolbox to fully understand each module.
