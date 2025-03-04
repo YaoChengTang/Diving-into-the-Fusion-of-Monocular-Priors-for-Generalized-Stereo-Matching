@@ -35,9 +35,9 @@ export CUDA_VISIBLE_DEVICES=4
 # python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthAny_20240908_125231/90000_RaftStereoDepthAny.pth --depthany_model_dir "/data5/yao/pretrained" --dataset booster --model_name "RAFTStereoDepthAny" --test_exp_name "booster-90000itr"
 # python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthAny_20240908_125231/80000_RaftStereoDepthAny.pth --depthany_model_dir "/data5/yao/pretrained" --dataset booster --model_name "RAFTStereoDepthAny" --test_exp_name "booster-80000itr"
 
-python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthAny_20240908_125231/RaftStereoDepthAny.pth --depthany_model_dir "/data5/yao/pretrained" --dataset eth3d --model_name "RAFTStereoDepthAny" --test_exp_name "eth3d-final"
-python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthAny_20240908_125231/RaftStereoDepthAny.pth --depthany_model_dir "/data5/yao/pretrained" --dataset kitti2015 --model_name "RAFTStereoDepthAny" --test_exp_name "kitti2015-final"
-python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthAny_20240908_125231/RaftStereoDepthAny.pth --depthany_model_dir "/data5/yao/pretrained" --dataset kitti --model_name "RAFTStereoDepthAny" --test_exp_name "kitti-final"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthAny_20240908_125231/RaftStereoDepthAny.pth --depthany_model_dir "/data5/yao/pretrained" --dataset eth3d --model_name "RAFTStereoDepthAny" --test_exp_name "eth3d-final"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthAny_20240908_125231/RaftStereoDepthAny.pth --depthany_model_dir "/data5/yao/pretrained" --dataset kitti2015 --model_name "RAFTStereoDepthAny" --test_exp_name "kitti2015-final"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthAny_20240908_125231/RaftStereoDepthAny.pth --depthany_model_dir "/data5/yao/pretrained" --dataset kitti --model_name "RAFTStereoDepthAny" --test_exp_name "kitti-final"
 
 
 # python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoMast3r_fineNoPadding_20240908_133009/RaftStereoMast3r_fineNoPadding.pth --mast3r_model_path "/data5/yao/pretrained/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth" --dataset middlebury_H --model_name "RAFTStereoMast3r" --test_exp_name "final"
