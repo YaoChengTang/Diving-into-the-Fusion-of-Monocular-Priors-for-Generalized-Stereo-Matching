@@ -134,7 +134,7 @@ class FlowAugmentor:
             flow = cv2.resize(flow, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR)
             flow = flow * [scale_x, scale_y]
             if intrinsic is not None:
-                intrinsic = [intrinsic[0], intrinsic[1], intrinsic[2]*scale_x, intrinsic[3]*scale_y]
+                intrinsic = [intrinsic[0]*scale_x, intrinsic[1]*scale_y, intrinsic[2]*scale_x, intrinsic[3]*scale_y]
 
         if self.do_flip:
             if np.random.rand() < self.h_flip_prob and self.do_flip == 'hf': # h-flip
@@ -296,7 +296,7 @@ class SparseFlowAugmentor:
             img2 = cv2.resize(img2, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR)
             flow, valid = self.resize_sparse_flow_map(flow, valid, fx=scale_x, fy=scale_y)
             if intrinsic is not None:
-                intrinsic = [intrinsic[0], intrinsic[1], intrinsic[2]*scale_x, intrinsic[3]*scale_y]
+                intrinsic = [intrinsic[0]*scale_x, intrinsic[1]*scale_y, intrinsic[2]*scale_x, intrinsic[3]*scale_y]
 
         if self.do_flip:
             if np.random.rand() < self.h_flip_prob and self.do_flip == 'hf': # h-flip
