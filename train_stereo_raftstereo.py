@@ -87,10 +87,10 @@ def train(args):
         
         for i_batch, (_, *data_blob) in enumerate(tqdm(train_loader, disable=tqdm_disable)):
             optimizer.zero_grad()
-            image1, image2, flow, valid = [x.cuda() for x in data_blob]
+            image1, image2, flow, valid, intrinsic = [x.cuda() for x in data_blob]
 
             assert model.training
-            res = model(image1, image2, iters=args.train_iters)
+            res = model(image1, image2, iters=args.train_iters, intrinsic=intrinsic)
             flow_predictions = res["disp_predictions"]
             assert model.training
 

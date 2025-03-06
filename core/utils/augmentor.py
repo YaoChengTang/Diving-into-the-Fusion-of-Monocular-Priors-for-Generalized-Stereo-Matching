@@ -110,7 +110,7 @@ class FlowAugmentor:
 
         return img1, img2
 
-    def spatial_transform(self, img1, img2, flow):
+    def spatial_transform(self, img1, img2, flow, intrinsic):
         # randomly sample scale
         ht, wd = img1.shape[:2]
         min_scale = np.maximum(
@@ -133,6 +133,8 @@ class FlowAugmentor:
             img2 = cv2.resize(img2, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR)
             flow = cv2.resize(flow, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR)
             flow = flow * [scale_x, scale_y]
+            if intrinsic is not None:
+                intrinsic = [intrinsic[0], intrinsic[1], intrinsic[2]*scale_x, intrinsic[3]*scale_y]
 
         if self.do_flip:
             if np.random.rand() < self.h_flip_prob and self.do_flip == 'hf': # h-flip
@@ -166,20 +168,25 @@ class FlowAugmentor:
             img1 = img1[y0:y0+self.crop_size[0], x0:x0+self.crop_size[1]]
             img2 = img2[y0:y0+self.crop_size[0], x0:x0+self.crop_size[1]]
             flow = flow[y0:y0+self.crop_size[0], x0:x0+self.crop_size[1]]
+        if intrinsic is not None:
+            intrinsic[2] = intrinsic[2] - x0
+            intrinsic[3] = intrinsic[3] - y0 
 
-        return img1, img2, flow
+        return img1, img2, flow, intrinsic
 
 
-    def __call__(self, img1, img2, flow):
+    def __call__(self, img1, img2, flow, intrinsic=None):
         img1, img2 = self.color_transform(img1, img2)
         img1, img2 = self.eraser_transform(img1, img2)
-        img1, img2, flow = self.spatial_transform(img1, img2, flow)
+        img1, img2, flow, intrinsic = self.spatial_transform(img1, img2, flow, intrinsic)
 
         img1 = np.ascontiguousarray(img1)
         img2 = np.ascontiguousarray(img2)
         flow = np.ascontiguousarray(flow)
+        if intrinsic is not None:
+            intrinsic= np.array(intrinsic)
 
-        return img1, img2, flow
+        return img1, img2, flow, intrinsic
 
 class SparseFlowAugmentor:
     def __init__(self, crop_size, min_scale=-0.2, max_scale=0.5, do_flip=False, yjitter=False, saturation_range=[0.7,1.3], gamma=[1,1,1,1]):
@@ -254,7 +261,7 @@ class SparseFlowAugmentor:
 
         return flow_img, valid_img
 
-    def pad_images(self, img1, img2, flow, valid):
+    def pad_images(self, img1, img2, flow, valid, intrinsic):
         ch, cw = self.crop_size
         padded_data = []
 
@@ -269,9 +276,9 @@ class SparseFlowAugmentor:
             else:
                 padded_data.append(data)
 
-        return padded_data
+        return padded_data, intrinsic
 
-    def spatial_transform(self, img1, img2, flow, valid):
+    def spatial_transform(self, img1, img2, flow, valid, intrinsic):
         # randomly sample scale
 
         ht, wd = img1.shape[:2]
@@ -288,6 +295,8 @@ class SparseFlowAugmentor:
             img1 = cv2.resize(img1, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR)
             img2 = cv2.resize(img2, None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR)
             flow, valid = self.resize_sparse_flow_map(flow, valid, fx=scale_x, fy=scale_y)
+            if intrinsic is not None:
+                intrinsic = [intrinsic[0], intrinsic[1], intrinsic[2]*scale_x, intrinsic[3]*scale_y]
 
         if self.do_flip:
             if np.random.rand() < self.h_flip_prob and self.do_flip == 'hf': # h-flip
@@ -308,7 +317,7 @@ class SparseFlowAugmentor:
         margin_y = 20
         margin_x = 50
 
-        img1, img2, flow, valid = self.pad_images(img1, img2, flow, valid)
+        img1, img2, flow, valid, intrinsic = self.pad_images(img1, img2, flow, valid, intrinsic)
         # img1_raw_shape = img1.shape
         # valid_raw_shape = valid.shape
 
@@ -323,18 +332,24 @@ class SparseFlowAugmentor:
         flow = flow[y0:y0+self.crop_size[0], x0:x0+self.crop_size[1]]
         valid = valid[y0:y0+self.crop_size[0], x0:x0+self.crop_size[1]]
 
+        if intrinsic is not None:
+            intrinsic[2] = intrinsic[2] - x0
+            intrinsic[3] = intrinsic[3] - y0
+
         # print("-"*10, "SparseFlowAugmentor: ", self.crop_size, [x0,y0], img1.shape, img1_raw_shape, valid.shape, valid_raw_shape)
-        return img1, img2, flow, valid
+        return img1, img2, flow, valid, intrinsic
 
 
-    def __call__(self, img1, img2, flow, valid):
+    def __call__(self, img1, img2, flow, valid, intrinsic=None):
         img1, img2 = self.color_transform(img1, img2)
         img1, img2 = self.eraser_transform(img1, img2)
-        img1, img2, flow, valid = self.spatial_transform(img1, img2, flow, valid)
+        img1, img2, flow, valid, intrinsic = self.spatial_transform(img1, img2, flow, valid, intrinsic)
 
         img1 = np.ascontiguousarray(img1)
         img2 = np.ascontiguousarray(img2)
         flow = np.ascontiguousarray(flow)
         valid = np.ascontiguousarray(valid)
+        if intrinsic is not None:
+            intrinsic= np.array(intrinsic)
 
-        return img1, img2, flow, valid
+        return img1, img2, flow, valid, intrinsic

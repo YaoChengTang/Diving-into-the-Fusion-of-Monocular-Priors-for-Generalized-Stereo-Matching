@@ -8,6 +8,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as T
 
+from attrdict import AttrDict
+
 from core.extractor import ResidualBlock
 from depth_anything_v2.dpt import DepthAnythingV2
 from core.utils.utils import sv_intermediate_results
@@ -46,220 +48,288 @@ def resize_to_quarter(tensor, original_size, ratio):
     return resized_tensor
 
 
-class DepthAnyExtractor(nn.Module):
-    def __init__(self, model_dir, output_dim=[128], norm_fn='batch', downsample=2, args=None):
-        super(DepthAnyExtractor, self).__init__()
+
+from mono.utils.comm import get_func
+
+class Metric3DExtractor(nn.Module):
+    def __init__(self, args) -> None:
+        super(Metric3DExtractor, self).__init__()
         self.args = args
-        self.norm_fn = norm_fn
-        self.downsample = downsample
 
-        output_list = []
-        for dim in output_dim:
-            conv_out = nn.Sequential(
-                ResidualBlock(128, 128, self.norm_fn, stride=1),
-                nn.Conv2d(128, dim[2], 3, padding=1))
-            output_list.append(conv_out)
+        cfg = dict(
+            model = dict(
+                type='DensePredModel',
+                backbone=dict(
+                    type='vit_large_reg',
+                    prefix='backbones.',
+                    out_channels=[1024, 1024, 1024, 1024],
+                    drop_path_rate = 0.0,
+                    checkpoint="./pretrained/metric3d/dinov2_vitl14_reg4_pretrain.pth",
+                ),
+                decode_head=dict(
+                    type='RAFTDepthNormalDPT5',
+                    # type='RAFTDepthDPT',
+                    prefix='decode_heads.',
+                    in_channels=[1024, 1024, 1024, 1024],
+                    use_cls_token=True,
+                    feature_channels = [256, 512, 1024, 1024], # [2/7, 1/7, 1/14, 1/14]
+                    decoder_channels = [128, 256, 512, 1024, 1024], # [4/7, 2/7, 1/7, 1/14, 1/14]
+                    up_scale = 7,
+                    hidden_channels=[128, 128, 128, 128], # [x_4, x_8, x_16, x_32] [192, 384, 768, 1536]
+                    n_gru_layers=3,
+                    n_downsample=2,
+                    iters=8,
+                    slow_fast_gru=True,
+                    num_register_tokens=4,
+                    # detach=False
+                ),
+            ),
 
-        self.outputs08 = nn.ModuleList(output_list)
-
-        output_list = []
-        for dim in output_dim:
-            conv_out = nn.Sequential(
-                ResidualBlock(128, 128, self.norm_fn, stride=1),
-                nn.Conv2d(128, dim[1], 3, padding=1))
-            output_list.append(conv_out)
-
-        self.outputs16 = nn.ModuleList(output_list)
-
-        output_list = []
-        for dim in output_dim:
-            conv_out = nn.Conv2d(128, dim[0], 3, padding=1)
-            output_list.append(conv_out)
-
-        self.outputs32 = nn.ModuleList(output_list)
-
-        self.layer1 = nn.Sequential(
-            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(inplace=True),
+            data_basic = dict(
+                canonical_space = dict(
+                    # img_size=(540, 960),
+                    focal_length=1000.0,
+                ),
+                depth_range=(0, 1),
+                depth_normalize=(0.1, 200),
+                crop_size = (616, 1064),  # %28 = 0
+                clip_depth_range=(0.1, 200),
+                vit_size=(616,1064)
+            ),
         )
+        self.cfg = AttrDict(cfg)
 
-        self.in_planes = 128
-        self.layer2 = self._make_layer(128, stride=2)
-        self.layer3 = self._make_layer(128, stride=2)
+        self.encoder = get_func('mono.model.' + self.cfg.model.backbone.prefix + self.cfg.model.backbone.type)(**self.cfg.model.backbone) 
+        self.decoder = get_func('mono.model.' + self.cfg.model.decode_head.prefix + self.cfg.model.decode_head.type)(self.cfg)
+        # print(get_func('mono.model.' + self.cfg.model.backbone.prefix + self.cfg.model.backbone.type))
+        # print(self.encoder)
 
-        # self._init_weights()
+        self.hidden_dims = self.cfg.model.decode_head.hidden_channels
+        self.n_gru_layers = self.cfg.model.decode_head.n_gru_layers
+        self.inp_convs = nn.ModuleList([ 
+                            nn.Sequential(
+                                nn.Conv2d(self.hidden_dims[i]*3, self.hidden_dims[i]*3, kernel_size=3, stride=1, padding=1),
+                                nn.ReLU(inplace=True),
+                                nn.Conv2d(self.hidden_dims[i]*3, self.hidden_dims[i]*3, kernel_size=3, stride=1, padding=1),
+                                nn.ReLU(inplace=True),
+                                nn.Conv2d(self.hidden_dims[i]*3, self.hidden_dims[i]*3, kernel_size=3, stride=1, padding=1),
+                            ) for i in range(self.n_gru_layers)
+                        ])
+        self.net_convs = nn.ModuleList([
+                            nn.Sequential(
+                                nn.Conv2d(self.hidden_dims[i], self.hidden_dims[i], 3, padding=3//2),
+                                nn.ReLU(inplace=True),
+                                nn.Conv2d(self.hidden_dims[i], self.hidden_dims[i], 3, padding=3//2),
+                                nn.ReLU(inplace=True),
+                                nn.Conv2d(self.hidden_dims[i], self.hidden_dims[i], 3, padding=3//2),
+                            ) for i in range(self.n_gru_layers)
+                        ])
 
-        model_configs = {
-            'vits': {'encoder': 'vits', 'features': 64, 'out_channels': [48, 96, 192, 384]},
-            'vitb': {'encoder': 'vitb', 'features': 128, 'out_channels': [96, 192, 384, 768]},
-            'vitl': {'encoder': 'vitl', 'features': 256, 'out_channels': [256, 512, 1024, 1024]},
-            'vitg': {'encoder': 'vitg', 'features': 384, 'out_channels': [1536, 1536, 1536, 1536]}
-        }
-        
-        encoder = "vitl"
-        depth_anything = DepthAnythingV2(**model_configs[encoder])
-        depth_anything.load_state_dict(torch.load(os.path.join(model_dir, f'depth_anything_v2_{encoder}.pth'), 
-                                                  map_location='cpu'))
-        self.depth_anything = depth_anything.to('cuda')
+        load_path = "./pretrained/metric3d/metric_depth_vit_large_800k.pth"
+        checkpoint = torch.load(load_path, map_location="cpu")
+        state_dict = checkpoint['model_state_dict']
 
-        mean = [0.485, 0.456, 0.406]
-        std = [0.229, 0.224, 0.225]
-        self.mean = torch.tensor(mean).view(1, 3, 1, 1).cuda()
-        self.std = torch.tensor(std).view(1, 3, 1, 1).cuda()
+        encoder_state_dict = {k.replace("depth_model.encoder.", ""): v for k, v in state_dict.items() if k.startswith("depth_model.encoder")}
+        decoder_state_dict = {k.replace("depth_model.decoder.", ""): v for k, v in state_dict.items() if k.startswith("depth_model.decoder")}
+
+        self.encoder.load_state_dict(encoder_state_dict)
+        self.decoder.load_state_dict(decoder_state_dict)
+
+        self.encoder = self.encoder.to('cuda')
+        self.decoder = self.decoder.to('cuda')
 
         # 冻结 depth_anything 模型的所有参数
-        for param in self.depth_anything.parameters():
+        for param in self.encoder.parameters():
             param.requires_grad = False
-    
-    # def _init_weights(self):
-    #     for m in self.modules():
-    #         if isinstance(m, nn.Conv2d):
-    #             nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-    #         elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
-    #             if m.weight is not None:
-    #                 nn.init.constant_(m.weight, 1)
-    #             if m.bias is not None:
-    #                 nn.init.constant_(m.bias, 0)
+        for param in self.decoder.parameters():
+            param.requires_grad = False
 
-    def _make_layer(self, dim, stride=1):
-        layer1 = ResidualBlock(self.in_planes, dim, self.norm_fn, stride=stride)
-        layer2 = ResidualBlock(dim, dim, self.norm_fn, stride=1)
-        layers = (layer1, layer2)
-
-        self.in_planes = dim
-        return nn.Sequential(*layers)
-    
-    def forward(self, image, dual_inp=False, num_layers=3):
-        # resize image
-        B, _, H, W = image.shape
-        img = resize_tensor(image, target_size=518, ratio=14)
         
-        # normalization
-        img = ((img+1)/2 - self.mean) / self.std
-
-        # DepthAnything
-        with torch.no_grad():
-            # out_depth: [1, 1, 518, 756]
-            # out_fea: [1, 128, 296, 432]
-            depth, depth_fea = self.depth_anything(img)
-
-        # resize image
-        # [1, 128, H//4, W//4]
-        depth = resize_to_quarter(depth, (H,W), 2**self.downsample)
-        x = resize_to_quarter(depth_fea, (H,W), 2**self.downsample)
-
-        if self.args is not None and hasattr(self.args, "vis_inter") and self.args.vis_inter:
-            sv_intermediate_results(x, "depthAnything_features", self.args.sv_root)
-
-        x = self.layer1(x)
-        outputs08 = [f(x) for f in self.outputs08]
-        if num_layers == 1:
-            return (outputs08, v) if dual_inp else (outputs08,)
-
-        # [1, 128, H//8, W//8]
-        y = self.layer2(x)
-        outputs16 = [f(y) for f in self.outputs16]
-        if num_layers == 2:
-            return (outputs08, outputs16, v) if dual_inp else (outputs08, outputs16)
-
-        # [1, 128, H//16, W//16]
-        z = self.layer3(y)
-        outputs32 = [f(z) for f in self.outputs32]
-
-        return (outputs08, outputs16, outputs32), depth
-
-
-
-
-class DepthMatchExtractor(nn.Module):
-    def __init__(self, model_dir, output_dim=256, norm_fn='batch', downsample=2):
-        super(DepthMatchExtractor, self).__init__()
-        self.norm_fn = norm_fn
-        self.downsample = downsample
-
-        self.layer1 = nn.Sequential(
-            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(inplace=True),
-        )
-
-        self.in_planes = 128
-        self.layer2 = self._make_layer(128, stride=1)
-        self.conv = nn.Conv2d(128, output_dim, kernel_size=1)
-
-        # self._init_weights()
-
-        model_configs = {
-            'vits': {'encoder': 'vits', 'features': 64, 'out_channels': [48, 96, 192, 384]},
-            'vitb': {'encoder': 'vitb', 'features': 128, 'out_channels': [96, 192, 384, 768]},
-            'vitl': {'encoder': 'vitl', 'features': 256, 'out_channels': [256, 512, 1024, 1024]},
-            'vitg': {'encoder': 'vitg', 'features': 384, 'out_channels': [1536, 1536, 1536, 1536]}
-        }
-        
-        encoder = "vitl"
-        depth_anything = DepthAnythingV2(**model_configs[encoder])
-        depth_anything.load_state_dict(torch.load(os.path.join(model_dir, f'depth_anything_v2_{encoder}.pth'), 
-                                                  map_location='cpu'))
-        self.depth_anything = depth_anything.to('cuda')
-
-        mean = [0.485, 0.456, 0.406]
-        std = [0.229, 0.224, 0.225]
+        mean = [123.675, 116.28, 103.53]
+        std  = [58.395,   57.12, 57.375]
         self.mean = torch.tensor(mean).view(1, 3, 1, 1).cuda()
         self.std = torch.tensor(std).view(1, 3, 1, 1).cuda()
+        self.pad_val = torch.tensor(mean).view(1, 3, 1, 1).cuda()
 
-        # 冻结 depth_anything 模型的所有参数
-        for param in self.depth_anything.parameters():
-            param.requires_grad = False
-    
-    # def _init_weights(self):
-    #     for m in self.modules():
-    #         if isinstance(m, nn.Conv2d):
-    #             nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-    #         elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
-    #             if m.weight is not None:
-    #                 nn.init.constant_(m.weight, 1)
-    #             if m.bias is not None:
-    #                 nn.init.constant_(m.bias, 0)
 
-    def _make_layer(self, dim, stride=1):
-        layer1 = ResidualBlock(self.in_planes, dim, self.norm_fn, stride=stride)
-        layer2 = ResidualBlock(dim, dim, self.norm_fn, stride=1)
-        layers = (layer1, layer2)
+    def forward(self, rgb, intrinsic, B=1):
+        focal_length   = (intrinsic[:, 0] + intrinsic[:, 1]) / 2
+        rgb_input, _, pad, label_scale_factor, (ori_h, ori_w) = self.aug_data(rgb, intrinsic)
 
-        self.in_planes = dim
-        return nn.Sequential(*layers)
-    
-    def forward(self, x, dual_inp=False, num_layers=3):
-        # if input is list, combine batch dimension
-        is_list = isinstance(x, tuple) or isinstance(x, list)
-        if is_list:
-            batch_dim = x[0].shape[0]
-            x = torch.cat(x, dim=0)
-
-        # resize image
-        B, _, H, W = x.shape
-        x = resize_tensor(x, target_size=518, ratio=14)
-        
-        # normalization
-        x = ((x+1)/2 - self.mean) / self.std
-
-        # DepthAnything
         with torch.no_grad():
-            # out_depth: [1, 1, 518, 756]
-            # out_fea: [1, 128, 296, 432]
-            depth, depth_fea = self.depth_anything(x)
+            # [f_32, f_16, f_8, f_4]
+            features = self.encoder(rgb_input)
+            output = self.decoder(features, cam_model=None)
 
-        # resize image
-        # [1, 128, H//4, W//4]
-        x = resize_to_quarter(depth_fea, (H,W), 2**self.downsample)
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.conv(x)
+        pred_depth, confidence = output['prediction'], output['confidence']
+        net_list, inp_list = output['net_list'], output['inp_list']
+        # outputs=dict(
+        #     prediction=flow_predictions[-1],
+        #     predictions_list=flow_predictions,
+        #     confidence=conf_predictions[-1],
+        #     confidence_list=conf_predictions,
+        #     pred_logit=None,
+        #     # samples_pred_list=samples_pred_list,
+        #     # coord_list=coord_list,
+        #     prediction_normal=norma`l_outs[-1],
+        #     normal_out_list=normal_outs,
+        #     low_resolution_init=low_resolution_init,
+        #     net_list = net_list,
+        #     inp_list = inp_list,
+        # )
 
-        if is_list:
-            x = x.split(split_size=batch_dim, dim=0)
+        
+        # with autocast(enabled=self.args.mixed_precision):
+        net_list = [F.interpolate(x, size=(ori_h//(2**(self.cfg.model.decode_head.n_downsample+i)), 
+                                            ori_w//(2**(self.cfg.model.decode_head.n_downsample+i))), 
+                                    mode='bilinear', align_corners=False) for i, x in enumerate(net_list)]
+        inp_list = [F.interpolate(torch.cat(x,dim=1), 
+                                    size=(ori_h//(2**(self.cfg.model.decode_head.n_downsample+i)), 
+                                            ori_w//(2**(self.cfg.model.decode_head.n_downsample+i))), 
+                                    mode='bilinear', align_corners=False) for i, x in enumerate(inp_list)]
+        # Update the hidden states and context features
+        net_list = [conv(x) for x, conv in zip(net_list, self.net_convs)]
+        inp_list = [list( conv(x).chunk(3, dim=1) ) for x, conv in zip(inp_list, self.inp_convs)]
+        
+        
+        B, C, H_new, W_new = pred_depth.shape
+        normalize_scale = self.cfg.data_basic.depth_range[1]
+        pred_depth = pred_depth[:, :, pad[0] : H_new - pad[1], pad[2] : W_new - pad[3]]
+        pred_depth = F.interpolate(pred_depth, [ori_h, ori_w], mode='bilinear') # to original size
+        pred_depth = pred_depth * normalize_scale / label_scale_factor.unsqueeze(1).unsqueeze(1).unsqueeze(1)
 
-        return x
+        pred_disp      = (B * focal_length).unsqueeze(1).unsqueeze(1).unsqueeze(1) / pred_depth
+        pred_disp_down = F.interpolate(pred_disp, scale_factor=1/2**self.cfg.model.decode_head.n_downsample, mode='bilinear')
+        # print("*"*30, rgb.shape, rgb_input.shape, pred_depth.shape, confidence.shape)
+
+        return net_list, inp_list, pred_disp_down
+
+
+    def aug_data(self, rgb, intrinsic):
+        B, C, ori_h, ori_w = rgb.shape
+        ori_focal = (intrinsic[:,0] + intrinsic[:,1]) / 2
+        canonical_focal = self.cfg.data_basic['canonical_space']['focal_length']
+        cano_label_scale_ratio = canonical_focal / ori_focal   # Shape: (B,)
+
+        canonical_intrinsic = torch.stack([
+            intrinsic[:,0] * cano_label_scale_ratio,
+            intrinsic[:,1] * cano_label_scale_ratio,
+            intrinsic[:,2],
+            intrinsic[:,3],
+        ], dim=1)
+
+        # resize
+        rgb, cam_model, pad, resize_label_scale_ratio = resize_for_input(rgb, self.cfg.data_basic.crop_size, canonical_intrinsic, [ori_h, ori_w], 1.0, self.pad_val)
+
+        # label scale factor
+        label_scale_factor = cano_label_scale_ratio * resize_label_scale_ratio     # Shape: (B,)
+
+        rgb = torch.div(((rgb+1)/2*255 - self.mean), self.std)
+        
+        cam_model = cam_model.permute((0, 3, 1, 2)).float()
+        cam_model = cam_model.cuda()
+        cam_model_stacks = [
+            torch.nn.functional.interpolate(cam_model, size=(cam_model.shape[2]//i, cam_model.shape[3]//i), mode='bilinear', align_corners=False)
+            for i in [2, 4, 8, 16, 32]
+        ]
+
+        return rgb, cam_model_stacks, pad, label_scale_factor, (ori_h, ori_w)
+
+
+def resize_for_input(image, output_shape, intrinsic, canonical_shape, to_canonical_ratio, pad_values):
+    """
+    Resize the input using PyTorch tensors.
+    """
+    h, w = image.shape[-2:]
+    
+    resize_ratio_h = output_shape[0] / canonical_shape[0]
+    resize_ratio_w = output_shape[1] / canonical_shape[1]
+    to_scale_ratio = min(resize_ratio_h, resize_ratio_w)
+    
+    resize_ratio = to_canonical_ratio * to_scale_ratio
+    
+    reshape_h = int(resize_ratio * h)
+    reshape_w = int(resize_ratio * w)
+    
+    pad_h = max(output_shape[0] - reshape_h, 0)
+    pad_w = max(output_shape[1] - reshape_w, 0)
+    pad_h_half = pad_h // 2
+    pad_w_half = pad_w // 2
+    
+    # Resize image
+    image = F.interpolate(image, size=(reshape_h, reshape_w), mode='bilinear', align_corners=False)
+    
+    # Padding
+    # image = F.pad(image, (pad_w_half, pad_w - pad_w_half, pad_h_half, pad_h - pad_h_half), value=pad_values)
+    image = pad_with_channel_values(image, (pad_w_half, pad_w - pad_w_half, pad_h_half, pad_h - pad_h_half), pad_values)
+    
+    # Adjust intrinsic parameters
+    intrinsic[:, 2] *= to_scale_ratio  # fx
+    intrinsic[:, 3] *= to_scale_ratio  # fy
+    
+    # Build camera model (dummy implementation, replace with actual function)
+    cam_model = build_camera_model(reshape_h, reshape_w, intrinsic)
+    cam_model = F.pad(cam_model, (pad_w_half, pad_w - pad_w_half, pad_h_half, pad_h - pad_h_half), value=-1)
+    
+    pad = [pad_h_half, pad_h - pad_h_half, pad_w_half, pad_w - pad_w_half]
+    label_scale_factor = 1 / to_scale_ratio
+    
+    return image, cam_model, pad, label_scale_factor
+
+def pad_with_channel_values(input_tensor, padding, pad_values):
+    if isinstance(padding, int):
+        pad_left = pad_right = pad_top = pad_bottom = padding
+    else:
+        pad_left, pad_right, pad_top, pad_bottom = padding
+
+    B, C, H, W = input_tensor.shape
+    new_H = H + pad_top + pad_bottom
+    new_W = W + pad_left + pad_right
+
+    pad_values = pad_values.view(1, C, 1, 1)
+
+    padded_tensor = pad_values.expand(B, C, new_H, new_W).clone()
+
+    # 计算中间区域并复制数据
+    h_start, h_end = pad_top, new_H - pad_bottom
+    w_start, w_end = pad_left, new_W - pad_right
+    padded_tensor[:, :, h_start:h_end, w_start:w_end] = input_tensor
+
+    return padded_tensor
+
+
+def build_camera_model(H: int, W: int, intrinsics: torch.Tensor) -> torch.Tensor:
+    """
+    Encode the camera intrinsic parameters (focal length and principle point) to a 4-channel map.
+    Args:
+        H (int): Image height
+        W (int): Image width
+        intrinsics (torch.Tensor): Tensor of shape (B, 4) containing fx, fy, u0, v0
+    Returns:
+        torch.Tensor: Camera model tensor of shape (B, H, W, 4)
+    """
+    B = intrinsics.shape[0]
+    fx, fy, u0, v0 = intrinsics[:, 0:1], intrinsics[:, 1:2], intrinsics[:, 2:3], intrinsics[:, 3:4]
+    f = (fx + fy) / 2.0   # Shape: (B,1)
+    
+    # Generate normalized coordinate grids
+    x_row = torch.arange(W, dtype=torch.float32, device=intrinsics.device).view(1, W)
+    y_col = torch.arange(H, dtype=torch.float32, device=intrinsics.device).view(1, H)
+    
+    # Normalize based on principal point
+    x_center = (x_row - u0) / W  # Shape: (B, W)
+    y_center = (y_col - v0) / H  # Shape: (B, H)
+    
+    # Expand dimensions for batch processing
+    x_center = x_center.unsqueeze(1).expand(B, H, W)  # Shape: (B, H, W)
+    y_center = y_center.unsqueeze(2).expand(B, H, W)  # Shape: (B, H, W)
+    
+    # Compute FoV angles
+    fov_x = torch.atan(x_center / (f.unsqueeze(1) / W))  # Shape: (B, H, W)
+    fov_y = torch.atan(y_center / (f.unsqueeze(1) / H))  # Shape: (B, H, W)
+    
+    # Stack channels
+    cam_model = torch.stack([x_center, y_center, fov_x, fov_y], dim=-1)  # Shape: (B, H, W, 4)
+    
+    return cam_model
+

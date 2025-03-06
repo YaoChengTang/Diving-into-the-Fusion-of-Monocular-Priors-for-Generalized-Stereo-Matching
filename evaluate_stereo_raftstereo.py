@@ -24,6 +24,7 @@ from core.raft_stereo_depthbeta_nolbp import RAFTStereoDepthBetaNoLBP
 from core.raft_stereo_depthmatch import RAFTStereoDepthMatch
 from core.raft_stereo_depthbeta_refine import RAFTStereoDepthBetaRefine
 from core.raft_stereo_depth_postfusion import RAFTStereoDepthPostFusion
+from core.raft_stereo_metric3d import RAFTStereoMetric3D
 
 import stereo_datasets as datasets
 from core.utils.utils import InputPadder, LoggerCommon
@@ -59,7 +60,7 @@ def validate_booster(model, iters=32, root="", mixed_prec=False):
     notrans_bad1, notrans_bad2, notrans_bad3, notrans_bad5, notrans_sum = 0,0,0,0,0
 
     for val_id in range(len(val_dataset)):
-        (imageL_file, _, _), image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+        (imageL_file, _, _), image1, image2, flow_gt, valid_gt, intrinsic = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 
@@ -167,7 +168,7 @@ def validate_eth3d(model, iters=32, root="", mixed_prec=False):
 
     out_list, epe_list = [], []
     for val_id in range(len(val_dataset)):
-        (imageL_file, _, _), image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+        (imageL_file, _, _), image1, image2, flow_gt, valid_gt, intrinsic = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 
@@ -211,7 +212,7 @@ def validate_kitti(model, iters=32, root="", mixed_prec=False):
 
     out_list, epe_list, elapsed_list = [], [], []
     for val_id in range(len(val_dataset)):
-        _, image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+        _, image1, image2, flow_gt, valid_gt, intrinsic = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 
@@ -264,7 +265,7 @@ def validate_kitti2012(model, iters=32, root="", mixed_prec=False):
 
     out_list, epe_list, elapsed_list = [], [], []
     for val_id in range(len(val_dataset)):
-        _, image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+        _, image1, image2, flow_gt, valid_gt, intrinsic = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 
@@ -317,15 +318,17 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=
     out_list_2, out_list_3 = [], []
     tqdm_disable = args is not None and (args.silence or args.local_rank>0 or int(NODE_RANK)>0)
     for val_id in tqdm(range(len(val_dataset)), disable=tqdm_disable):
-        paths, image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+        paths, image1, image2, flow_gt, valid_gt, intrinsic = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
+        intrinsic = intrinsic[None].cuda()
 
         padder = InputPadder(image1.shape, divis_by=32)
         image1, image2 = padder.pad(image1, image2)
+        intrinsic = padder.pad_intrinsics(intrinsic)
 
         with autocast(enabled=mixed_prec):
-            _, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+            _, flow_pr = model(image1, image2, iters=iters, test_mode=True, intrinsic=intrinsic)
         flow_pr = padder.unpad(flow_pr).cpu().squeeze(0)
         assert flow_pr.shape == flow_gt.shape, (flow_pr.shape, flow_gt.shape)
         epe = torch.sum((flow_pr - flow_gt)**2, dim=0).sqrt()
@@ -390,7 +393,7 @@ def validate_middlebury(model, iters=32, split='F', root="", mixed_prec=False):
     out_nocc_list, epe_nocc_list = [], []
     out_mask_list, epe_mask_list = [], []
     for val_id in range(len(val_dataset)):
-        (imageL_file, _, _), image1, image2, flow_gt, valid_gt = val_dataset[val_id]
+        (imageL_file, _, _), image1, image2, flow_gt, valid_gt, intrinsic = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 
@@ -516,6 +519,8 @@ if __name__ == '__main__':
         model = RAFTStereoDepthBetaRefine(args)
     elif args.model_name.lower() == "RAFTStereoDepthPostFusion".lower():
         model = RAFTStereoDepthPostFusion(args)
+    elif args.model_name.lower() == "RAFTStereoMetric3D".lower():
+        model = RAFTStereoMetric3D(args)
     else :
         raise Exception("No such model: {}".format(args.model_name))
     model = torch.nn.DataParallel(model, device_ids=[0])

@@ -51,7 +51,7 @@ class StereoDataset(data.Dataset):
         self.flow_list = []
         self.disparity_list = []
         self.image_list = []
-        self.extra_info = []
+        self.extra_info = {}
 
     def __getitem__(self, index):
 
@@ -75,6 +75,7 @@ class StereoDataset(data.Dataset):
 
         try:
             index = index % len(self.image_list)
+            intrinsic = self.extra_info["intrinsics"][index] if "intrinsics" in self.extra_info else None
             disp = self.disparity_reader(self.disparity_list[index])
             if isinstance(disp, tuple):
                 disp, valid = disp
@@ -105,14 +106,15 @@ class StereoDataset(data.Dataset):
 
         if self.augmentor is not None:
             if self.sparse:
-                img1, img2, flow, valid = self.augmentor(img1, img2, flow, valid)
+                img1, img2, flow, valid, intrinsic = self.augmentor(img1, img2, flow, valid, intrinsic)
             else:
-                img1, img2, flow = self.augmentor(img1, img2, flow)
+                img1, img2, flow, intrinsic = self.augmentor(img1, img2, flow, intrinsic)
 
         try:
             img1 = torch.from_numpy(img1).permute(2, 0, 1).float()
             img2 = torch.from_numpy(img2).permute(2, 0, 1).float()
             flow = torch.from_numpy(flow).permute(2, 0, 1).float()
+            intrinsic = torch.from_numpy(np.array(intrinsic)).float() if intrinsic is not None else None
         except Exception as err:
             raise Exception(err, "{}, {}, {}".format(self.image_list[index][0], 
                                                      self.image_list[index][1], 
@@ -132,7 +134,7 @@ class StereoDataset(data.Dataset):
         flow = flow[:1]
 
         return self.image_list[index] + [self.disparity_list[index]], \
-               img1, img2, flow, valid.float()
+               img1, img2, flow, valid.float(), intrinsic
 
 
     def __mul__(self, v):
@@ -140,7 +142,10 @@ class StereoDataset(data.Dataset):
         copy_of_self.flow_list = v * copy_of_self.flow_list
         copy_of_self.image_list = v * copy_of_self.image_list
         copy_of_self.disparity_list = v * copy_of_self.disparity_list
-        copy_of_self.extra_info = v * copy_of_self.extra_info
+        if isinstance(copy_of_self.extra_info, list):
+            copy_of_self.extra_info = v * copy_of_self.extra_info
+        else:
+            copy_of_self.extra_info = {key: val*v for key, val in copy_of_self.extra_info.items()}
         return copy_of_self
         
     def __len__(self):
@@ -155,6 +160,7 @@ class SceneFlowDatasets(StereoDataset):
         self.root = root if len(root)>0 else DATASET_ROOT
         self.dstype = dstype
         self.caching = caching
+        self.extra_info["intrinsics"] = []
         assert os.path.exists(self.root), "check the existence: {}".format(self.root)
 
         if things_test:
@@ -200,6 +206,8 @@ class SceneFlowDatasets(StereoDataset):
             if (split == 'TEST' and idx in val_idxs) or split == 'TRAIN':
                 self.image_list += [ [img1, img2] ]
                 self.disparity_list += [ disp ]
+                self.extra_info["intrinsics"] += [ [1050, 1050, 479.5, 269.5] ]
+        
         logging.info(f"Added {len(self.disparity_list) - original_length} from FlyingThings {self.dstype}")
 
     def _add_monkaa(self):
@@ -214,6 +222,7 @@ class SceneFlowDatasets(StereoDataset):
         for img1, img2, disp in zip(left_images, right_images, disparity_images):
             self.image_list += [ [img1, img2] ]
             self.disparity_list += [ disp ]
+            self.extra_info["intrinsics"] += [ [1050, 1050, 479.5, 269.5] ]
         logging.info(f"Added {len(self.disparity_list) - original_length} from Monkaa {self.dstype}")
 
 
@@ -229,6 +238,12 @@ class SceneFlowDatasets(StereoDataset):
         for img1, img2, disp in zip(left_images, right_images, disparity_images):
             self.image_list += [ [img1, img2] ]
             self.disparity_list += [ disp ]
+            if img1.find("15mm_focallength") != -1:
+                self.extra_info["intrinsics"] += [ [450, 450, 479.5, 269.5] ]
+            elif img1.find("35mm_focallength") != -1:
+                self.extra_info["intrinsics"] += [ [1050, 1050, 479.5, 269.5] ]
+            else:
+                raise Exception(f"Unknown intrinsics: {im1}")
         logging.info(f"Added {len(self.disparity_list) - original_length} from Driving {self.dstype}")
 
 

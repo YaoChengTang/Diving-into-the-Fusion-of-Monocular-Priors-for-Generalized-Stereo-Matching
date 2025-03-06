@@ -994,6 +994,8 @@ class RAFTDepthNormalDPT5(nn.Module):
             prediction_normal=normal_outs[-1],
             normal_out_list=normal_outs,
             low_resolution_init=low_resolution_init,
+            net_list = net_list,
+            inp_list = inp_list,
         )
 
         return outputs
