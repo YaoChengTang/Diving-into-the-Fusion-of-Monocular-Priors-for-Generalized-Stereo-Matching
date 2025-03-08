@@ -152,31 +152,44 @@ class Metric3DExtractor(nn.Module):
         self.pad_val = torch.tensor(mean).view(1, 3, 1, 1).cuda()
 
 
-    def forward(self, rgb, intrinsic, B=1):
-        focal_length   = (intrinsic[:, 0] + intrinsic[:, 1]) / 2
-        rgb_input, _, pad, label_scale_factor, (ori_h, ori_w) = self.aug_data(rgb, intrinsic)
+    def forward(self, rgb, intrinsic, baseline=1):
 
         with torch.no_grad():
+            focal_length   = (intrinsic[:, 0] + intrinsic[:, 1]) / 2
+            rgb_input, cam_model_stacks, pad, label_scale_factor, (ori_h, ori_w) = self.aug_data(rgb, intrinsic)
+
             # [f_32, f_16, f_8, f_4]
             features = self.encoder(rgb_input)
-            output = self.decoder(features, cam_model=None)
+            output = self.decoder(features, cam_model=cam_model_stacks)
 
-        pred_depth, confidence = output['prediction'], output['confidence']
-        net_list, inp_list = output['net_list'], output['inp_list']
-        # outputs=dict(
-        #     prediction=flow_predictions[-1],
-        #     predictions_list=flow_predictions,
-        #     confidence=conf_predictions[-1],
-        #     confidence_list=conf_predictions,
-        #     pred_logit=None,
-        #     # samples_pred_list=samples_pred_list,
-        #     # coord_list=coord_list,
-        #     prediction_normal=norma`l_outs[-1],
-        #     normal_out_list=normal_outs,
-        #     low_resolution_init=low_resolution_init,
-        #     net_list = net_list,
-        #     inp_list = inp_list,
-        # )
+            # outputs=dict(
+            #     prediction=flow_predictions[-1],
+            #     predictions_list=flow_predictions,
+            #     confidence=conf_predictions[-1],
+            #     confidence_list=conf_predictions,
+            #     pred_logit=None,
+            #     # samples_pred_list=samples_pred_list,
+            #     # coord_list=coord_list,
+            #     prediction_normal=norma`l_outs[-1],
+            #     normal_out_list=normal_outs,
+            #     low_resolution_init=low_resolution_init,
+            #     net_list = net_list,
+            #     inp_list = inp_list,
+            # )
+            pred_depth, confidence = output['prediction'], output['confidence']
+            net_list, inp_list = output['net_list'], output['inp_list']
+
+            B, C, H_new, W_new = pred_depth.shape
+            normalize_scale = self.cfg.data_basic.depth_range[1]
+            pred_depth = pred_depth[:, :, pad[0] : H_new - pad[1], pad[2] : W_new - pad[3]]
+            pred_depth = F.interpolate(pred_depth, [ori_h, ori_w], mode='bilinear') # to original size
+            # print("-"*10, f"pred_depth: {pred_depth.shape}, confidence: {confidence.shape}", pred_depth.max(), pred_depth.min())
+            pred_depth = pred_depth * normalize_scale / label_scale_factor.unsqueeze(1).unsqueeze(1).unsqueeze(1)
+            # print("-"*10, pred_depth.max(), pred_depth.min(), normalize_scale, label_scale_factor, baseline, focal_length)
+
+            pred_disp      = (baseline * focal_length).unsqueeze(1).unsqueeze(1).unsqueeze(1) / pred_depth
+            pred_disp_down = F.interpolate(pred_disp, scale_factor=1/2**self.cfg.model.decode_head.n_downsample, mode='bilinear') * (1/2**self.cfg.model.decode_head.n_downsample)
+            # print("*"*30, rgb.shape, rgb_input.shape, pred_depth.shape, confidence.shape, pred_disp_down.max(), pred_disp_down.min())
 
         
         # with autocast(enabled=self.args.mixed_precision):
@@ -190,17 +203,6 @@ class Metric3DExtractor(nn.Module):
         # Update the hidden states and context features
         net_list = [conv(x) for x, conv in zip(net_list, self.net_convs)]
         inp_list = [list( conv(x).chunk(3, dim=1) ) for x, conv in zip(inp_list, self.inp_convs)]
-        
-        
-        B, C, H_new, W_new = pred_depth.shape
-        normalize_scale = self.cfg.data_basic.depth_range[1]
-        pred_depth = pred_depth[:, :, pad[0] : H_new - pad[1], pad[2] : W_new - pad[3]]
-        pred_depth = F.interpolate(pred_depth, [ori_h, ori_w], mode='bilinear') # to original size
-        pred_depth = pred_depth * normalize_scale / label_scale_factor.unsqueeze(1).unsqueeze(1).unsqueeze(1)
-
-        pred_disp      = (B * focal_length).unsqueeze(1).unsqueeze(1).unsqueeze(1) / pred_depth
-        pred_disp_down = F.interpolate(pred_disp, scale_factor=1/2**self.cfg.model.decode_head.n_downsample, mode='bilinear')
-        # print("*"*30, rgb.shape, rgb_input.shape, pred_depth.shape, confidence.shape)
 
         return net_list, inp_list, pred_disp_down
 

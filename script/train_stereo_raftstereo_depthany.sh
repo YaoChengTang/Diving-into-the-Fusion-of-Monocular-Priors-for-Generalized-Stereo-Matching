@@ -23,8 +23,9 @@ export NCCL_P2P_DISABLE=1
 # export MASTER_ADDR=127.0.0.1
 # export MASTER_PORT=29501
 # export CUDA_VISIBLE_DEVICES=0,1,2,3
-export CUDA_VISIBLE_DEVICES=2,3,4,5,6,7
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 # export CUDA_VISIBLE_DEVICES=0,6
+# export CUDA_VISIBLE_DEVICES=0
 
 export DATASET_ROOT="/data6/sceneflow/sceneflow"
 
@@ -94,4 +95,4 @@ echo "CKPOINT_ROOT is set to: $CKPOINT_ROOT"
 
 # torchrun --nnode 1 --nproc_per_node 2 --master_port 29301 train_stereo_raftstereo.py --batch_size 8 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision --model_name "RAFTStereoMetric3D" --lr 0.0002 --exp_name "RAFTStereoMetric3D"
 
-torchrun --nnode 1 --nproc_per_node 6 --master_port 29301 train_stereo_raftstereo.py --batch_size 8 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision --model_name "RAFTStereoMetric3D" --lr 0.0001 --restore_ckpt "/data5/yao/runs/ckpoint/RAFTStereoMetric3D_20250305_043320/20000_RAFTStereoMetric3D.pth" --exp_name "RAFTStereoMetric3D_ConfLoss_Lr0001"
+torchrun --nnode 1 --nproc_per_node 8 --master_port 29301 train_stereo_raftstereo.py --batch_size 6 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision --model_name "RAFTStereoMetric3D" --lr 0.0001 --restore_ckpt "/data5/yao/runs/ckpoint/RAFTStereoMetric3D_20250305_043320/20000_RAFTStereoMetric3D.pth" --exp_name "RAFTStereoMetric3D_ConfLoss_Lr0001"
