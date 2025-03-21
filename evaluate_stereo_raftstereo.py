@@ -308,11 +308,16 @@ def validate_kitti2012(model, iters=32, root="", mixed_prec=False):
     return {'kitti-epe': round(epe,4), 'kitti-d1': round(d1,4)}
 
 @torch.no_grad()
-def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=False, info=""):
+def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=False, dataset="sceneflow", info=""):
     """ Peform validation using the FlyingThings3D (TEST) split """
     eval = args.eval if args is not None else eval
     model.eval()
-    val_dataset = datasets.SceneFlowDatasets(dstype='frames_finalpass', root=root, things_test=True, eval=True)
+    if dataset.lower() == "sceneflow":
+        val_dataset = datasets.SceneFlowDatasets(dstype='frames_finalpass', root=root, things_test=True, eval=True)
+    elif dataset.lower() == "trans":
+        val_dataset = datasets.Trans(root=root, things_test=True)
+    else:
+        raise Exception(f"{dataset} is not supported")
 
     out_list_1, epe_list = [], []
     out_list_2, out_list_3 = [], []
@@ -334,7 +339,7 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=
         epe = torch.sum((flow_pr - flow_gt)**2, dim=0).sqrt()
 
         epe = epe.flatten()
-        val = (valid_gt.flatten() >= -0.5) & (flow_gt.abs().flatten() < 192)
+        val = valid_gt.flatten() >= -0.5
         # val_nocc = (valid_gt.flatten() >= 0.5) & (flow_gt.abs().flatten() < 192)
 
         out_1 = (epe > 1.0)
@@ -358,7 +363,7 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=
         # if not eval and val_id>10:
         #     break
         
-        logger.info(f"FlyingThings Iter {val_id+1} out of {len(val_dataset)}. " + \
+        logger.info(f"{dataset} Iter {val_id+1} out of {len(val_dataset)}. " + \
                      f"EPE {round(image_epe,4)}, BAD1 {round(image_out_1,4)}, " +\
                      f"BAD2 {round(image_out_2,4)}, BAD3 {round(image_out_3,4)} ")
         
@@ -373,13 +378,13 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=
     bad2 = 100 * np.mean(out_list_2)
     bad3 = 100 * np.mean(out_list_3)
 
-    logger.info("Validation FlyingThings: %f, %f, %f, %f" % (round(epe,4), round(bad1), round(bad2), round(bad3)))
+    logger.info(f"Validation {dataset}: {round(epe,4)}, {round(bad1)}, {round(bad2)}, {round(bad3)}")
     logger.info("\r\n"*3)
     
-    return {info+'things-epe': round(epe), 
-            info+'things-bad1': round(bad1), 
-            info+'things-bad2': round(bad2), 
-            info+'things-bad3': round(bad3)}
+    return {info+'epe': round(epe), 
+            info+'bad1': round(bad1), 
+            info+'bad2': round(bad2), 
+            info+'bad3': round(bad3)}
 
 
 @torch.no_grad()

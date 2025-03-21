@@ -54,10 +54,16 @@ class RAFTStereoDepthBetaRefine(nn.Module):
         else:
             self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', downsample=args.n_downsample)
         
-        # 冻结 除refinement以外 模块的所有参数
-        if not hasattr(self.args, 'finetune') or not self.args.finetune :
+        if not hasattr(self.args, "fintune_info") or "tune_refine" in self.args.fintune_info.lower().split(" ") :
+            # 冻结 除refinement以外 模块的所有参数
             for module in [self.cnet, self.update_block, self.lbp_encoder, 
-                        self.modulater, self.context_zqr_convs, self.fnet]:
+                           self.modulater, self.context_zqr_convs, self.fnet]:
+                for param in module.parameters():
+                    param.requires_grad = False
+
+        elif "tune_raft" in self.args.fintune_info.lower().split(" ") :
+            # 冻结 refinement 模块的所有参数
+            for module in [self.refinement]:
                 for param in module.parameters():
                     param.requires_grad = False
 
@@ -91,7 +97,7 @@ class RAFTStereoDepthBetaRefine(nn.Module):
 
     
 
-    def forward(self, image1, image2, iters=12, disp_init=None, test_mode=False, vis_mode=False):
+    def forward(self, image1, image2, iters=12, disp_init=None, test_mode=False, vis_mode=False, intrinsic=None):
         """ Estimate optical flow between pair of frames """
 
         image1 = (2 * (image1 / 255.0) - 1.0).contiguous()
@@ -193,20 +199,22 @@ class RAFTStereoDepthBetaRefine(nn.Module):
             if hasattr(self.args, "vis_inter") and self.args.vis_inter:
                 sv_intermediate_results(disp_up, f"disp_up-itr{itr+1}", self.args.sv_root)
 
-        # refinement
-        corr = corr_fn(hor_coords1)
-        disp = -hor_coords1 + hor_coords0
-        disp_refine, up_mask, depth_registered, conf = self.refinement(disp, depth, net_list[0], corr, distribution)
+        conf, depth_registered_up, depth_registered = None, None, None
+        if not hasattr(self.args, "fintune_info") or "tune_refine" in self.args.fintune_info.lower().split(" ") :
+            # refinement
+            corr = corr_fn(hor_coords1)
+            disp = -hor_coords1 + hor_coords0
+            disp_refine, up_mask, depth_registered, conf = self.refinement(disp, depth, net_list[0], corr, distribution)
 
-        disp_up = self.upsample_disp(-disp_refine, up_mask)
-        depth_registered_up = self.upsample_disp(-depth_registered, up_mask)
-        disp_predictions.append(depth_registered_up)
-        if not hasattr(self.args, 'train_refine_mono') or not self.args.train_refine_mono:
-            disp_predictions.append(disp_up)
+            disp_up = self.upsample_disp(-disp_refine, up_mask)
+            depth_registered_up = self.upsample_disp(-depth_registered, up_mask)
+            disp_predictions.append(depth_registered_up)
+            if not hasattr(self.args, 'train_refine_mono') or not self.args.train_refine_mono:
+                disp_predictions.append(disp_up)
 
-        if hasattr(self.args, "vis_inter") and self.args.vis_inter:
-            sv_intermediate_results(disp_up, f"disp_refine_up", self.args.sv_root)
-            sv_intermediate_results(depth_registered_up, f"depth_registered_up", self.args.sv_root)
+            if hasattr(self.args, "vis_inter") and self.args.vis_inter:
+                sv_intermediate_results(disp_up, f"disp_refine_up", self.args.sv_root)
+                sv_intermediate_results(depth_registered_up, f"depth_registered_up", self.args.sv_root)
 
         if test_mode:
             if hasattr(self.args, 'train_refine_mono') and self.args.train_refine_mono:

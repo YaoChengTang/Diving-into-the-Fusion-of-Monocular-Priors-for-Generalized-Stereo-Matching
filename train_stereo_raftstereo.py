@@ -74,7 +74,12 @@ def train(args):
     if not args.stop_freeze_bn:
         model.module.freeze_bn() # We keep BatchNorm frozen
 
-    validation_frequency = 10000
+    if len(train_loader)<300:
+        validation_frequency = 300
+    elif len(train_loader)<1000:
+        validation_frequency = len(train_loader)
+    else:
+        validation_frequency = 10000
 
     scaler = GradScaler(enabled=args.mixed_precision)
 
@@ -85,7 +90,7 @@ def train(args):
 
     while should_keep_training:
         
-        for i_batch, (_, *data_blob) in enumerate(tqdm(train_loader, disable=tqdm_disable)):
+        for i_batch, (paths, *data_blob) in enumerate(tqdm(train_loader, disable=tqdm_disable)):
             optimizer.zero_grad()
             image1, image2, flow, valid, intrinsic = [x.cuda() for x in data_blob]
 
@@ -100,6 +105,9 @@ def train(args):
                 if not torch.isnan(flow_predictions[i]).any() and not torch.isinf(flow_predictions[i]).any():
                     corrupted = False
             if corrupted:
+                logger.info(f"Corrputed data in {paths[0]}, " + \
+                            f"image1: {image1.shape}, flow: {flow.shape}, valid: {valid.shape}, " + \
+                            f"flow_predictions: {len(flow_predictions)}, {flow_predictions[0].shape}, ")
                 continue
 
             loss, metrics = sequence_loss(flow_predictions, flow, valid)
@@ -128,7 +136,7 @@ def train(args):
                     torch.save(model.state_dict(), save_path)
 
                 # results = validate_things(model.module, iters=args.valid_iters, root="./datasets/sceneflow")
-                results = validate_things(model.module, iters=args.valid_iters, root=DATASET_ROOT)
+                results = validate_things(model.module, iters=args.valid_iters, root=DATASET_ROOT, dataset=args.train_datasets[0])
                 if args.local_rank==0 and int(NODE_RANK)==0:
                     logger.write_dict(results)
 
@@ -171,7 +179,8 @@ if __name__ == '__main__':
     parser.add_argument('--train_iters', type=int, default=16, help="number of updates to the disparity field in each forward pass.")
     parser.add_argument('--wdecay', type=float, default=.00001, help="Weight decay in optimizer.")
     parser.add_argument('--train_refine_mono', action='store_true', help='register mono without supervision on stereo')
-    parser.add_argument('--finetune', action='store_true', help='fintune model with large data')
+    # parser.add_argument('--finetune', action='store_true', help='fintune model with large data')
+    parser.add_argument("--fintune_info", default="tune_refine", help="specific finetuning action")
     
     # Validation parameters
     parser.add_argument('--valid_iters', type=int, default=32, help='number of flow-field updates during validation forward pass')

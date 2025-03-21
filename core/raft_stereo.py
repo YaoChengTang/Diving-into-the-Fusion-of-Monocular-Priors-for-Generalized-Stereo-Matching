@@ -67,7 +67,7 @@ class RAFTStereo(nn.Module):
         return up_flow.reshape(N, D, factor*H, factor*W)
 
 
-    def forward(self, image1, image2, iters=12, flow_init=None, test_mode=False, vis_mode=False):
+    def forward(self, image1, image2, iters=12, flow_init=None, test_mode=False, vis_mode=False, intrinsic=None):
         """ Estimate optical flow between pair of frames """
 
         image1 = (2 * (image1 / 255.0) - 1.0).contiguous()

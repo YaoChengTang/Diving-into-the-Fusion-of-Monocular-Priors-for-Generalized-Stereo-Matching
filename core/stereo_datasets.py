@@ -114,7 +114,7 @@ class StereoDataset(data.Dataset):
             img1 = torch.from_numpy(img1).permute(2, 0, 1).float()
             img2 = torch.from_numpy(img2).permute(2, 0, 1).float()
             flow = torch.from_numpy(flow).permute(2, 0, 1).float()
-            intrinsic = torch.from_numpy(np.array(intrinsic)).float() if intrinsic is not None else None
+            intrinsic = torch.from_numpy(np.array(intrinsic)).float() if intrinsic is not None else torch.from_numpy(np.eye(3)).float()
         except Exception as err:
             raise Exception(err, "{}, {}, {}".format(self.image_list[index][0], 
                                                      self.image_list[index][1], 
@@ -433,6 +433,212 @@ class CREStereoDataset(StereoDataset):
             self.image_list += [ [img1, img2] ]
             self.disparity_list += [ disp ]
 
+class Trans(StereoDataset):
+    def __init__(self, aug_params=None, root='./datasets/Trans', things_test=False, args=None):
+        super(Trans, self).__init__(aug_params)
+        self.root = root if len(root)>0 else DATASET_ROOT
+        self.args = args
+        self.extra_info["intrinsics"] = []
+        
+        if things_test:
+            self._add_things("TEST")
+        else:
+            self._add_things("TRAIN")
+
+    def _add_things(self, split='TRAIN'):
+        original_length = len(self.disparity_list)
+
+        left_images = sorted(glob(osp.join(self.root, split, '*/*/left/img/*.jpg')) )
+        assert len(left_images)>0, f"Loaded 0 images from {self.root}"
+
+        right_images = [ im.replace('left', 'right') for im in left_images ]
+        disparity_images = [ im.replace('img', 'disparity').replace('.jpg', '.pfm') for im in left_images ]
+        disparity_images_noTran = [im.replace('img', 'disparity_without_trans').replace('.jpg', '.pfm') for im in left_images ]
+
+        for idx, (img1, img2, disp, disp_noTran) in enumerate(zip(left_images, right_images, disparity_images, disparity_images_noTran)):
+            self.image_list += [ [img1, img2] ]
+            self.disparity_list += [ disp ]
+            # self.multi_label.append([disp, disp_noTran])
+            self.extra_info["intrinsics"] += [ [933.3333333333334, 787.5, 480.0, 270.0] ]
+        logging.info("-"*10 + f"Added {len(self.disparity_list) - original_length} from Trans")
+
+class Fooling3DDataset(StereoDataset):
+    def __init__(self, aug_params=None, root='datasets/Fooling3D', image_set='training', args=None):
+        super(Fooling3DDataset, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispFooling3D)
+        assert os.path.exists(root)
+        self.root = root
+        self.image_set = image_set
+        self.video_frames_info = {}
+        
+        self._add_mono()
+        self._build_video_frames_info()
+
+    def _add_mono(self):
+        origin_length = len(self.disparity_list)
+        print(f"using {self.image_set} in fooling3D")
+        
+        if self.image_set=="training":
+            df = pd.read_csv(os.path.join(self.root, 'meta_data/scale_factors.csv'), header=None)
+
+            # df.columns = ['path', 'scale']
+            # video_name = "Service_Cars_1_deleted_scene_3d_remake_Servio_Comunitrio"
+            # df = df[df['path'].str.contains(video_name, case=False, na=False)]
+
+            self.scale_factor = dict(zip(
+                df.iloc[:, 0].apply(lambda x: x.replace('/data2', './datasets')),
+                df.iloc[:, 1]
+            ))
+            # right_images = sorted(glob(os.path.join(self.root, 'video_frame_sequence_right/*/*/*.png')))
+            right_images = df.iloc[:, 0].apply(lambda x: x.replace('/data2', './datasets')).tolist()
+            disp_list =  [ im.replace('video_frame_sequence_right', 'depth_rect') for im in right_images ]
+            left_images = [ im.replace('video_frame_sequence_right', 'video_frame_sequence') for im in right_images ]
+
+            assert len(left_images) == len(right_images) == len(disp_list) > 0, [len(left_images), len(right_images), len(disp_list)]
+            for img1, img2, disp in zip(left_images, right_images, disp_list):
+                self.image_list += [ [img1, img2] ]
+                self.disparity_list += [ disp ]
+        
+        elif self.image_set=="testing":
+            with open(os.path.join(self.root, 'meta_data/testing_enter.pkl'), 'rb') as f:
+                data = pickle.load(f)
+            
+            self.extra_info["mask"] = []
+            for key, frame_dict in data.items():
+                left_image_path  = os.path.join(self.root, "real_data/testing", frame_dict["left"])
+                right_image_path = os.path.join(self.root, "real_data/testing", frame_dict["right"])
+                disp_image_path  = os.path.join(self.root, "real_data/testing", frame_dict["disp"])
+                mask_image_path  = os.path.join(self.root, "real_data/testing", frame_dict["mask"])
+
+                self.image_list += [ [left_image_path, right_image_path] ]
+                self.disparity_list += [ disp_image_path ]
+                self.extra_info["mask"] += [ mask_image_path ]
+
+            assert len(self.image_list) == len(self.disparity_list) == len(self.extra_info["mask"]) > 0, \
+                   [len(self.image_list), len(self.disparity_list), len(self.extra_info["mask"])]
+
+        else:
+            raise Exception(f"{self.image_set} is not in ['training', 'testing']")
+        
+        logging.info(f"Added {len(self.disparity_list) - origin_length} from Fooling3D Mono")
+    
+    def _build_video_frames_info(self):
+        for idx, img_path in enumerate(self.disparity_list):
+            parts = img_path.split('/')
+            video_name = parts[-2]
+            frame_name = parts[-1]
+
+            if video_name not in self.video_frames_info:
+                self.video_frames_info[video_name] = []
+
+            self.video_frames_info[video_name].append(idx)
+        self.video_frames_info = list(self.video_frames_info.values())
+
+
+
+
+class Fooling3DBatchSampler(data.Sampler):
+    def __init__(self, dataset, batch_size):
+        """
+        Args:
+            dataset (Dataset): The dataset to sample from.
+            batch_size (int): The size of each batch (how many frames from the same video).
+        """
+        self.dataset = dataset
+        self.batch_size = batch_size
+
+    def __iter__(self):
+        """
+        This will return indices of frames in a single video folder, ensuring batch contains only frames from that video.
+        """
+        for video_idx in range(len(self.dataset.video_frames_info)):
+            frames_info = self.dataset.video_frames_info[video_idx]
+            num_frames = len(frames_info)
+            frame_idx_list = list(np.arange(num_frames))
+
+            # # Shuffle the frame indices if shuffle is True
+            # if self.shuffle:
+            #     np.random.shuffle(frame_idx_list)
+
+            # If frames count is not divisible by batch size, repeat the last frame
+            if num_frames % self.batch_size != 0:
+                num_repeat = self.batch_size - (num_frames % self.batch_size)
+                frame_idx_list += [frame_idx_list[-1]] * num_repeat  # Add last frame to fill up batch
+
+            # Yield frames in batches of batch_size
+            for i in range(0, len(frame_idx_list), self.batch_size):
+                batch_info = [frames_info[frame_idx] for frame_idx in frame_idx_list[i:i + self.batch_size]]
+                yield batch_info
+
+    def __len__(self):
+        """
+        The length of the sampler is the number of total batches in all videos.
+        """
+        total_batches = 0
+        for frames_info in self.dataset.video_frames_info:
+            total_batches += len(frames_info) // self.batch_size + (1 if len(frames_info) % self.batch_size != 0 else 0)
+        return total_batches
+
+
+from torch.utils.data.distributed import DistributedSampler
+class DistributedFooling3DBatchSampler(DistributedSampler):
+    def __init__(self, dataset, batch_size, num_replicas=None, rank=None):
+        """
+        Args:
+            dataset (Dataset): The dataset to sample from.
+            batch_size (int): The size of each batch (how many frames from the same video).
+            num_replicas (int): Total number of processes (GPUs) across all nodes.
+            rank (int): Rank of the current process (GPU) in the group of workers.
+        """
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.num_replicas = num_replicas if num_replicas is not None else torch.distributed.get_world_size()
+        self.rank = rank if rank is not None else torch.distributed.get_rank()
+
+    def __iter__(self):
+        """
+        This will return indices of frames in a single video folder, ensuring batch contains only frames from that video.
+        Distributes the frames across different processes.
+        """
+        for video_idx in range(len(self.dataset.video_frames_info)):
+            frames_info = self.dataset.video_frames_info[video_idx]
+            num_frames = len(frames_info)
+            frame_idx_list = list(np.arange(num_frames))
+
+            # # Shuffle the frame indices if shuffle is True
+            # if self.shuffle:
+            #     np.random.shuffle(frame_idx_list)
+
+            # If frames count is not divisible by batch size, repeat the last frame
+            if num_frames % self.batch_size != 0:
+                num_repeat = self.batch_size - (num_frames % self.batch_size)
+                frame_idx_list += [frame_idx_list[-1]] * num_repeat  # Add last frame to fill up batch
+
+            # Total number of batches across all replicas
+            num_batches = len(frame_idx_list) // self.batch_size + (1 if len(frame_idx_list) % self.batch_size != 0 else 0)
+            
+            # Divide the dataset into chunks and ensure each rank gets its share
+            # Find out how many batches each rank should process
+            chunks_per_rank = num_batches // self.num_replicas
+            remainder = num_batches % self.num_replicas
+            start_idx = self.rank * chunks_per_rank + min(self.rank, remainder)
+            end_idx = (self.rank + 1) * chunks_per_rank + min(self.rank + 1, remainder)
+            
+            # Generate the frames indices for the current process's portion of the data
+            for i in range(start_idx, end_idx):
+                batch_info = [frames_info[frame_idx] for frame_idx in frame_idx_list[i * self.batch_size:(i + 1) * self.batch_size]]
+                yield batch_info
+
+    def __len__(self):
+        """
+        The length of the sampler is the total number of batches divided across all processes.
+        """
+        total_batches = 0
+        for frames_info in self.dataset.video_frames_info:
+            total_batches += len(frames_info) // self.batch_size + (1 if len(frames_info) % self.batch_size != 0 else 0)
+        
+        # Divide the total batches by the number of processes
+        return total_batches // self.num_replicas + (1 if total_batches % self.num_replicas > self.rank else 0)
+
   
 def fetch_dataloader(args):
     """ Create the data loader for the corresponding trainign set """
@@ -473,6 +679,17 @@ def fetch_dataloader(args):
         elif 'crestereo' in dataset_name:
             new_dataset = CREStereoDataset(aug_params, args=args, txt_root='./datasets/CREStereo_dataset/../')
             logging.info(f"Adding {len(new_dataset)} samples from CREStereoDataset")
+        elif dataset_name == 'Trans':
+            new_dataset = Trans(aug_params, args=args)
+            logging.info(f"Adding {len(new_dataset)} samples from Trans")
+        elif dataset_name.lower() == 'fooling3d':
+            new_dataset = Fooling3DDataset(aug_params, args=args, root='./datasets/Fooling3D')
+            # print("+"*10, hasattr(args, 'enable_sampler') and args.enable_sampler)
+            if hasattr(args, 'enable_sampler') and args.enable_sampler:
+                # sampler = Fooling3DBatchSampler(new_dataset, args.batch_size)
+                sampler = DistributedFooling3DBatchSampler(new_dataset, args.batch_size)
+            logging.info(f"Adding {len(new_dataset)} samples from Fooling3DDataset")
+            # TODO: Add Fooling3D dataset with only one sampler may cause conflict with other datasets
         train_dataset = new_dataset if train_dataset is None else train_dataset + new_dataset
 
     # train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size, 

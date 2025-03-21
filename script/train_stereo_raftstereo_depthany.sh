@@ -23,11 +23,13 @@ export NCCL_P2P_DISABLE=1
 # export MASTER_ADDR=127.0.0.1
 # export MASTER_PORT=29501
 # export CUDA_VISIBLE_DEVICES=0,1,2,3
-export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+# export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 # export CUDA_VISIBLE_DEVICES=0,6
 # export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=2,3,4,5,6,7
 
-export DATASET_ROOT="/data6/sceneflow/sceneflow"
+# export DATASET_ROOT="/data6/sceneflow/sceneflow"
+export DATASET_ROOT="./datasets/Trans"
 
 export LOG_ROOT="/data5/yao/runs/log/${FOLDER_NAME}"
 export TB_ROOT="/data5/yao/runs/tboard/${FOLDER_NAME}"
@@ -38,6 +40,8 @@ echo "LOG_ROOT is set to: $LOG_ROOT"
 echo "TB_ROOT is set to: $TB_ROOT"
 echo "CKPOINT_ROOT is set to: $CKPOINT_ROOT"
 
+
+nproc_per_node=$(echo $CUDA_VISIBLE_DEVICES | tr ',' '\n' | wc -l)  # Count the number of GPUs
 
 
 # torchrun --nnode 1 --nproc_per_node 4 --master_port 29501 train_stereo_raftstereo.py --batch_size 8 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision --model_name "RAFTStereoDepthAny" --depthany_model_dir "/data5/yao/pretrained" --exp_name "$EXP_NAME"
@@ -93,6 +97,15 @@ echo "CKPOINT_ROOT is set to: $CKPOINT_ROOT"
 
 # torchrun --nnode 1 --nproc_per_node 4 --master_port 29301 train_stereo_raftstereo.py --batch_size 48 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision --model_name "RAFTStereoDepthBetaRefine" --depthany_model_dir "/data5/yao/pretrained" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --refine_unet --restore_ckpt "/data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch32Unet_20241114_125423/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch32Unet.pth" --lr 0.0003 --train_refine_mono --exp_name "$EXP_NAME"
 
+
+
 # torchrun --nnode 1 --nproc_per_node 2 --master_port 29301 train_stereo_raftstereo.py --batch_size 8 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision --model_name "RAFTStereoMetric3D" --lr 0.0002 --exp_name "RAFTStereoMetric3D"
 
-torchrun --nnode 1 --nproc_per_node 8 --master_port 29301 train_stereo_raftstereo.py --batch_size 6 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision --model_name "RAFTStereoMetric3D" --lr 0.0001 --restore_ckpt "/data5/yao/runs/ckpoint/RAFTStereoMetric3D_20250305_043320/20000_RAFTStereoMetric3D.pth" --exp_name "RAFTStereoMetric3D_ConfLoss_Lr0001"
+# torchrun --nnode 1 --nproc_per_node 8 --master_port 29301 train_stereo_raftstereo.py --batch_size 6 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision --model_name "RAFTStereoMetric3D" --lr 0.0001 --restore_ckpt "/data5/yao/runs/ckpoint/RAFTStereoMetric3D_20250305_043320/20000_RAFTStereoMetric3D.pth" --exp_name "RAFTStereoMetric3D_ConfLoss_Lr0001"
+
+
+
+
+
+# On Trans dataset
+torchrun --nnode 1 --nproc_per_node $nproc_per_node --master_port 29501 train_stereo_raftstereo.py --batch_size 8 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 10000 --mixed_precision --model_name "RAFTStereoDepthBetaRefine" --depthany_model_dir "/data5/yao/pretrained" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --restore_ckpt "/data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim_20241102_014050/50000_RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim.pth" --lr 0.0005 --fintune_info "tune_raft" --train_datasets "Trans" --exp_name "Trans_RAFTStereoDepthBetaRefine"
