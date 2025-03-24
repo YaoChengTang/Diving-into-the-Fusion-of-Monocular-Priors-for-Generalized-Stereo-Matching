@@ -68,7 +68,7 @@ def validate_booster(model, iters=32, root="", mixed_prec=False):
         image2 = F.interpolate(image2, scale_factor=(0.25, 0.25), mode='bilinear', align_corners=True)
         flow_gt = F.interpolate(flow_gt.unsqueeze(0), scale_factor=(0.25, 0.25), mode='bilinear', align_corners=True).squeeze(0)
         flow_gt /= 4
-        trans_mask = (valid_gt == 3).float()   # get transparent surfaces
+        trans_mask = (valid_gt == 0).float()   # get transparent surfaces
         trans_mask = F.interpolate(trans_mask.unsqueeze(0).unsqueeze(0), scale_factor=(0.25, 0.25), mode='bilinear', align_corners=True).squeeze(0).squeeze(0)
         
         padder = InputPadder(image1.shape, divis_by=32)

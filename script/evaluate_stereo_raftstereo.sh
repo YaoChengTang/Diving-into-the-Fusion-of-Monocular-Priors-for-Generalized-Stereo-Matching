@@ -221,4 +221,11 @@ export CUDA_VISIBLE_DEVICES=4
 
 # python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/fintune_NerfStereo_20241108_225550/70000_fintune_NerfStereo.pth --depthany_model_dir "/data5/yao/pretrained" --dataset middlebury_H --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --test_exp_name "middlebury_H - 70000itr_NerfStereo"
 
+
+
+python3 evaluate_stereo_raftstereo.py --restore_ckpt ./clouds/ckpoint/Trans_RAFTStereoDepthBetaRefine_tuneRefine_20250322_093723/Trans_RAFTStereoDepthBetaRefine_tuneRefine.pth --depthany_model_dir "/data5/yao/pretrained" --dataset booster --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --test_exp_name "Trans_RAFTStereoDepthBetaRefine_tuneRefine"
+
+
+
+
 # python3 merge_sheet.py
