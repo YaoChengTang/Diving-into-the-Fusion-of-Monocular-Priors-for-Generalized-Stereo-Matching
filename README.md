@@ -1,7 +1,7 @@
-# Generalized Stereo Matching with Fusion of Monocular Priors
+# Diving into the Fusion of Monocular Priors for Generalized Stereo Matching
 
-> ⚠️ **Warning**: It is highly recommended to view this markdown in a preview format！
-> ⚠️ **Warning**: We strongly recommend researchers retrain the model on GPUs other than A40 for better results.
+<!-- > ⚠️ **Warning**: It is highly recommended to view this markdown in a preview format！ -->
+<!-- > ⚠️ **Warning**: We strongly recommend researchers retrain the model on GPUs other than A40 for better results. -->
 
 
 ## Requirements
