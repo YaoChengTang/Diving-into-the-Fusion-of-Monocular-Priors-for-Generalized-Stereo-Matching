@@ -64,12 +64,13 @@ def validate_booster(model, iters=32, root="", mixed_prec=False):
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
 
-        image1 = F.interpolate(image1, scale_factor=(0.25, 0.25), mode='bilinear', align_corners=True)
-        image2 = F.interpolate(image2, scale_factor=(0.25, 0.25), mode='bilinear', align_corners=True)
-        flow_gt = F.interpolate(flow_gt.unsqueeze(0), scale_factor=(0.25, 0.25), mode='bilinear', align_corners=True).squeeze(0)
-        flow_gt /= 4
-        trans_mask = (valid_gt == 0).float()   # get transparent surfaces
-        trans_mask = F.interpolate(trans_mask.unsqueeze(0).unsqueeze(0), scale_factor=(0.25, 0.25), mode='bilinear', align_corners=True).squeeze(0).squeeze(0)
+        scale = 0.25
+        image1 = F.interpolate(image1, scale_factor=(scale, scale), mode='bilinear', align_corners=True)
+        image2 = F.interpolate(image2, scale_factor=(scale, scale), mode='bilinear', align_corners=True)
+        flow_gt = F.interpolate(flow_gt.unsqueeze(0), scale_factor=(scale, scale), mode='bilinear', align_corners=True).squeeze(0)
+        flow_gt *= scale
+        trans_mask = (valid_gt == 3).float()   # get transparent surfaces
+        trans_mask = F.interpolate(trans_mask.unsqueeze(0).unsqueeze(0), scale_factor=(scale, scale), mode='bilinear', align_corners=True).squeeze(0).squeeze(0)
         
         padder = InputPadder(image1.shape, divis_by=32)
         image1, image2 = padder.pad(image1, image2)

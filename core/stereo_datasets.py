@@ -370,7 +370,7 @@ class Middlebury(StereoDataset):
 class Booster(StereoDataset):
     def __init__(self, aug_params=None, root='datasets/booster/train/balanced', image_set='train', args=None):
         super(Booster, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispBooster)
-        assert os.path.exists(root)
+        assert os.path.exists(root), print(root)
         # image1_list = sorted(glob(os.path.join(root, image_set, "**/camera_00/im*.png"), recursive=True))
         image2_list = sorted(glob(os.path.join(root, image_set, "**/camera_02/im*.png"), recursive=True))
         image1_list = [img.replace("camera_02", "camera_00") for img in image2_list]

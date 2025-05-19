@@ -190,6 +190,8 @@ class Visualizer:
             frame_utils.write_gen(sv_path, flow_pr)
         elif self.dataset.lower()=="booster" :
             frame_utils.writeDispBooster(sv_path, flow_pr)
+        elif self.dataset.lower()=="common":
+            frame_utils.writeDispKITTI(sv_path, flow_pr)
         else:
             raise Exception("such daatset is not supported: {}".format(dataset))
         return True
