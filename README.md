@@ -156,3 +156,204 @@ Since we modified `dpt.py` to get intermediate features and depth output, please
 - ### Visualization  
     We visualize the error map via [script/gen_sample_stereo_raftstereo.sh](script/gen_sample_stereo_raftstereo.sh) and intermediate results via [script/vis_inter_stereo_raftstereo.sh](script/vis_inter_stereo_raftstereo.sh).
     We provide an easy-to-use visualization toolbox to fully understand each module.
+
+
+## More Results
+The results after using our custom synthetic data [Trans Dataset](https://github.com/BFZD233/TransStereo), which is built for multi-label transparent scenes.
+
+<table>
+  <thead>
+    <tr>
+      <th rowspan="3">Method</th>
+      <th colspan="21">Booster</th>
+    </tr>
+    <tr>
+      <th colspan="7">ALL</th>
+      <th colspan="7">Trans</th>
+      <th colspan="7">No_Trans</th>
+    </tr>
+    <tr>
+      <th>EPE</th>
+      <th>RMSE</th>
+      <th>2px</th>
+      <th>3px</th>
+      <th>5px</th>
+      <th>6px</th>
+      <th>8px</th>
+      <th>EPE</th>
+      <th>RMSE</th>
+      <th>2px</th>
+      <th>3px</th>
+      <th>5px</th>
+      <th>6px</th>
+      <th>8px</th>
+      <th>EPE</th>
+      <th>RMSE</th>
+      <th>2px</th>
+      <th>3px</th>
+      <th>5px</th>
+      <th>6px</th>
+      <th>8px</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Ours</td>
+      <td>2.26</td>
+      <td>5.60</td>
+      <td>11.02</td>
+      <td>8.59</td>
+      <td>6.60</td>
+      <td>6.00</td>
+      <td>5.35</td>
+      <td>7.93</td>
+      <td>11.03</td>
+      <td>59.83</td>
+      <td>50.36</td>
+      <td>38.44</td>
+      <td>33.87</td>
+      <td>27.56</td>
+      <td>1.52</td>
+      <td>3.93</td>
+      <td>6.98</td>
+      <td>4.97</td>
+      <td>3.64</td>
+      <td>3.27</td>
+      <td>2.89</td>
+    </tr>
+    <tr>
+      <td>Ours+Trans</td>
+      <td>1.24</td>
+      <td>4.19</td>
+      <td>7.91</td>
+      <td>5.97</td>
+      <td>4.52</td>
+      <td>4.08</td>
+      <td>3.44</td>
+      <td>5.67</td>
+      <td>8.42</td>
+      <td>46.78</td>
+      <td>38.55</td>
+      <td>28.65</td>
+      <td>25.41</td>
+      <td>21.30</td>
+      <td>0.75</td>
+      <td>3.07</td>
+      <td>4.77</td>
+      <td>3.23</td>
+      <td>2.29</td>
+      <td>2.01</td>
+      <td>1.59</td>
+    </tr>
+  </tbody>
+</table>
+
+<table>
+  <thead>
+    <tr>
+      <th rowspan="3">Method</th>
+      <th colspan="28">Booster</th>
+    </tr>
+    <tr>
+      <th colspan="7">Class 0</th>
+      <th colspan="7">Class 1</th>
+      <th colspan="7">Class 2</th>
+      <th colspan="7">Class 3</th>
+    </tr>
+    <tr>
+      <th>EPE</th>
+      <th>RMSE</th>
+      <th>2px</th>
+      <th>3px</th>
+      <th>5px</th>
+      <th>6px</th>
+      <th>8px</th>
+      <th>EPE</th>
+      <th>RMSE</th>
+      <th>2px</th>
+      <th>3px</th>
+      <th>5px</th>
+      <th>6px</th>
+      <th>8px</th>
+      <th>EPE</th>
+      <th>RMSE</th>
+      <th>2px</th>
+      <th>3px</th>
+      <th>5px</th>
+      <th>6px</th>
+      <th>8px</th>
+      <th>EPE</th>
+      <th>RMSE</th>
+      <th>2px</th>
+      <th>3px</th>
+      <th>5px</th>
+      <th>6px</th>
+      <th>8px</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Ours</td>
+      <td>0.79</td>
+      <td>3.02</td>
+      <td>5.90</td>
+      <td>4.57</td>
+      <td>3.17</td>
+      <td>2.58</td>
+      <td>1.45</td>
+      <td>1.53</td>
+      <td>4.70</td>
+      <td>12.67</td>
+      <td>7.80</td>
+      <td>4.88</td>
+      <td>3.96</td>
+      <td>3.14</td>
+      <td>5.32</td>
+      <td>6.39</td>
+      <td>23.34</td>
+      <td>17.62</td>
+      <td>13.50</td>
+      <td>12.80</td>
+      <td>12.15</td>
+      <td>7.93</td>
+      <td>11.03</td>
+      <td>59.83</td>
+      <td>50.36</td>
+      <td>38.44</td>
+      <td>33.87</td>
+      <td>27.56</td>
+    </tr>
+    <tr>
+      <td>Ours+Trans</td>
+      <td>0.75</td>
+      <td>2.99</td>
+      <td>5.15</td>
+      <td>4.08</td>
+      <td>3.00</td>
+      <td>2.59</td>
+      <td>1.73</td>
+      <td>1.40</td>
+      <td>4.74</td>
+      <td>9.17</td>
+      <td>5.63</td>
+      <td>3.80</td>
+      <td>3.37</td>
+      <td>2.86</td>
+      <td>1.62</td>
+      <td>2.26</td>
+      <td>13.51</td>
+      <td>10.23</td>
+      <td>7.40</td>
+      <td>6.50</td>
+      <td>4.93</td>
+      <td>5.67</td>
+      <td>8.42</td>
+      <td>46.78</td>
+      <td>38.55</td>
+      <td>28.65</td>
+      <td>25.41</td>
+      <td>21.30</td>
+    </tr>
+  </tbody>
+</table>
+
