@@ -1,5 +1,8 @@
 # Diving into the Fusion of Monocular Priors for Generalized Stereo Matching
 
+![本地图片](./flicker.png)
+Detailed images can be found at [Google Driver](https://drive.google.com/file/d/1u2u_-AgxkdtnkQENEf1d2JjtutwrtCPb/view?usp=sharing)
+
 <!-- > ⚠️ **Warning**: It is highly recommended to view this markdown in a preview format！ -->
 <!-- > ⚠️ **Warning**: We strongly recommend researchers retrain the model on GPUs other than A40 for better results. -->
 
