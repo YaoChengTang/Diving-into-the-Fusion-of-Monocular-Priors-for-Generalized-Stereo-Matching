@@ -108,7 +108,7 @@ Since we modified `dpt.py` to get intermediate features and depth output, please
     |-----------------|-------------------------|
     | `RaftStereo`          | Original RaftStereo model       |
     | `RaftStereoDisp`      | The output of GRU is a single channel for disparity instead of two channels for optical flow, `Baseline` in Table 3 of the main text.      |
-    | `RAFTStereoMast3r`    | The pre-trained MASt3R is used as the backbone and its features are used for cost volume construction, `RaftStereo + backbone Mast3r` in supplemental text.       |
+    | `RAFTStereoMast3r`    | The pre-trained MASt3R is used as the backbone, and its features are used for cost volume construction, `RaftStereo + backbone Mast3r` in supplemental text.       |
     | `RaftStereoNoCTX`     | RaftStereo model without context network, `Baseline w/o mono feature` in Table 3 of the main text.   |
     | `RAFTStereoDepthAny`  | RaftStereo model with our monocular encoder, `Baseline + ME` in Table 3 of the main text.       |
     | `RAFTStereoDepthFusion`  | RaftStereo model with our monocular encoder, `Baseline + ME + IDF` in Table 3 of the main text.       |
@@ -123,15 +123,15 @@ Since we modified `dpt.py` to get intermediate features and depth output, please
     |--------------------------|-------------------------|
     | `--lbp_neighbor_offsets` | control `LBP Kernel` used in Table 4 of the main text.   |
     | `--modulation_ratio`     | control `r` amplitude parameter used in Table 4 of the main text. |
-    | `--conf_from_fea`        | `Cost` or `Hybrid` for `COnfidence` used in Table 4 of the main text. |
-    | `--refine_pool`          | learning regitration paramters via pooling in the supplemental text. |
+    | `--conf_from_fea`        | `Cost` or `Hybrid` for `Confidence` used in Table 4 of the main text. |
+    | `--refine_pool`          | learning registration parameters via pooling in the supplemental text. |
 
 
-    The training is launched by follows
+    The training is launched by following
     ```Shell
     bash ./script/train_stereo_raftstereo_depthany.sh EXP_NAME
     ```
-    `EXP_NAME` specifiy the experiment name, we use this name to save each log file, tensorboard data, and checkpoint for different experiments. The corresponding file structure is like follows
+    `EXP_NAME` specifies the experiment name. We use this name to save each log file, tensorboard data, and checkpoint for different experiments. The corresponding file structure is as follows
     ```Shell
     ├── runs
         ├── ckpoint
@@ -147,18 +147,22 @@ Since we modified `dpt.py` to get intermediate features and depth output, please
             ├── RaftStereoMast3r
             └── RaftStereoNoCTX
     ```
-    > ⚠️ **Warning**: **Please follow the training process mentioned in our main text.** We first train the model without the global fusion module. Then, we train the monocular registration of the global fusion module while keeping the other modules frozen with well-trained model from first stage. Finally, we train the entire global fusion module while keeping the other modules frozen with well-trained model from second stage.
+    > ⚠️ **Warning**: **Please follow the training process mentioned in our main text.** We first train the model without the global fusion module. Then, we train the monocular registration of the global fusion module while keeping the other modules frozen with a well-trained model from the first stage. Finally, we train the entire global fusion module while keeping the other modules frozen with a well-trained model from the second stage.
 
 - ### Evaluation  
-    Evaluation script is presented in [script/evaluate_stereo_raftstereo.sh](script/evaluate_stereo_raftstereo.sh).
-    We use `--test_exp_name` to specifiy the evaluation experiment name.
-    The results of each experiment are restored in `LOG_ROOT/eval.xlsx`. We also merge all experiments' result in `LOG_ROOT/merged_eval.xlsx` through `python3 merge_sheet.py`.
+    The evaluation script is presented in [script/evaluate_stereo_raftstereo.sh](script/evaluate_stereo_raftstereo.sh).
+    We use `--test_exp_name` to specify the evaluation experiment name.
+    The results of each experiment are restored in `LOG_ROOT/eval.xlsx`. We also merge all experiments' results in `LOG_ROOT/merged_eval.xlsx` through `python3 merge_sheet.py`.
     The evaluation metrics remain the same for different methods.
     The `mean ± std` is computed via [tools/get_statistics.py](tools/get_statistics.py).
 
 - ### Visualization  
     We visualize the error map via [script/gen_sample_stereo_raftstereo.sh](script/gen_sample_stereo_raftstereo.sh) and intermediate results via [script/vis_inter_stereo_raftstereo.sh](script/vis_inter_stereo_raftstereo.sh).
     We provide an easy-to-use visualization toolbox to fully understand each module.
+
+- ### Demo
+    The model weights, pre-trained on SceneFlow, can be downloaded from [Google Drive](https://drive.google.com/file/d/1T1o7soh3p4C_tHzmUd0ZCtnQbVczPmXz/view?usp=sharing).
+    The demo used to infer disparity maps from custom image pairs is presented in `infer_stereo_raftstereo.py'.
 
 
 ## More Results
