@@ -166,7 +166,7 @@ Since we modified `dpt.py` to get intermediate features and depth output, please
 
 
 ## More Results
-The results after using our custom synthetic data [Trans Dataset](https://github.com/BFZD233/TransStereo), which is built for multi-label transparent scenes.
+The results after using our custom synthetic data [Trans Dataset](https://github.com/BFZD233/TranScene), which is built for multi-label transparent scenes.
 
 <table>
   <thead>
