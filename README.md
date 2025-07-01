@@ -162,7 +162,7 @@ Since we modified `dpt.py` to get intermediate features and depth output, please
 
 - ### Demo
     The model weights, pre-trained on SceneFlow, can be downloaded from [Google Drive](https://drive.google.com/file/d/1T1o7soh3p4C_tHzmUd0ZCtnQbVczPmXz/view?usp=sharing).
-    The demo used to infer disparity maps from custom image pairs is presented in `infer_stereo_raftstereo.py'.
+    The demo used to infer disparity maps from custom image pairs is presented in `infer_stereo_raftstereo.py`. For specific usage, please refer to `script/infer_stereo_raftstereo.sh`.
 
 
 ## More Results
