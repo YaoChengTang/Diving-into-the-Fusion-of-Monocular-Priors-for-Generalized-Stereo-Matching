@@ -1,4 +1,4 @@
-# Diving into the Fusion of Monocular Priors for Generalized Stereo Matching
+# [ICCV25] Diving into the Fusion of Monocular Priors for Generalized Stereo Matching
 
 ![本地图片](./flicker.png)
 Detailed images can be found at [Google Driver](https://drive.google.com/file/d/1u2u_-AgxkdtnkQENEf1d2JjtutwrtCPb/view?usp=sharing)
