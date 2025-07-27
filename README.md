@@ -1,18 +1,13 @@
 <h1 align="center" style="border-bottom: 0;"> [ICCV25 Oral] Diving into the Fusion of Monocular Priors for Generalized Stereo Matching </h1> 
 
 <p align="center">
-  <a href="https://huggingface.co/spaces/AdamYao/Diving-into-the-Fusion-of-Monocular-Priors-for-Generalized-Stereo-Matching">
-    <img src="https://img.shields.io/badge/HuggingFace-Demo-blue?logo=huggingface" alt="Hugging Face Demo">
-  </a>
+  <a href="https://huggingface.co/spaces/AdamYao/Diving-into-the-Fusion-of-Monocular-Priors-for-Generalized-Stereo-Matching"><img src="https://img.shields.io/badge/HuggingFace-Demo-blue?logo=huggingface" alt="Hugging Face Demo"></a>
   &nbsp;
-  <a href="https://arxiv.org/abs/2505.14414">
-    <img src="https://img.shields.io/badge/ArXiv-Paper-red?logo=arxiv" alt="ArXiv Paper">
-  </a>
+  <a href="https://arxiv.org/abs/2505.14414"><img src="https://img.shields.io/badge/ArXiv-Paper-red?logo=arxiv" alt="ArXiv Paper"></a>
   &nbsp;
-  <a href="https://drive.google.com/file/d/1T1o7soh3p4C_tHzmUd0ZCtnQbVczPmXz/view?usp=sharing">
-    <img src="https://img.shields.io/badge/Model%20Weights-Download-success?logo=google-drive" alt="Model Weights">
-  </a>
+  <a href="https://drive.google.com/file/d/1T1o7soh3p4C_tHzmUd0ZCtnQbVczPmXz/view?usp=sharing"><img src="https://img.shields.io/badge/Model%20Weights-Download-success?logo=google-drive" alt="Model Weights"></a>
 </p>
+
 
 
 ![本地图片](./flicker.png)
@@ -181,7 +176,8 @@ Since we modified `dpt.py` to get intermediate features and depth output, please
 
 
 ## More Results
-The results after using our custom synthetic data [Trans Dataset](https://github.com/BFZD233/TranScene), which is built for multi-label transparent scenes.
+The results were obtained by training on our custom synthetic dataset, [Trans Dataset](https://github.com/BFZD233/TranScene), specifically designed for multi-label transparent scenes. The model was trained end-to-end using weights pretrained on the SceneFlow dataset.
+
 
 <table>
   <thead>
