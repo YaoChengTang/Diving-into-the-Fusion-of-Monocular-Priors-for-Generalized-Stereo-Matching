@@ -9,8 +9,11 @@ import torch.nn.functional as F
 import torchvision.transforms as T
 
 from core.extractor import ResidualBlock
-from mast3r.model import AsymmetricMASt3R
 
+try:
+    from mast3r.model import AsymmetricMASt3R
+except :
+    print("Please install mast3r: pip install git+https://github.com/naver/mast3r.git")
 
 
 # def resize_and_pad_tensor(tensor, target_size=512):

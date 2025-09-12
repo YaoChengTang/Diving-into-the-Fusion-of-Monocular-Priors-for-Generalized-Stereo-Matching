@@ -145,6 +145,26 @@ def visualize(atom_dict,
     return 
 
 
+
+max_w, max_h = 1500, 1000  # maximum allowed resolution (width, height)
+def load_and_resize(img_path):
+    # Open the image and convert to RGB
+    img = Image.open(img_path).convert('RGB')
+    w, h = img.size
+
+    # If resolution is larger than the limit, resize while keeping aspect ratio
+    scale = 1.0
+    if w > max_w or h > max_h:
+        scale = min(max_w / w, max_h / h)   # choose the smaller scale factor
+        new_w, new_h = int(w * scale), int(h * scale)
+        img = img.resize((new_w, new_h), Image.BICUBIC)
+
+    # Convert to numpy array, then to PyTorch tensor
+    img = np.array(img, dtype=np.float32)
+    tensor = torch.from_numpy(img).permute(2, 0, 1).float().unsqueeze(0).cuda()
+    return tensor, scale
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--img_path_txt', help="txt saving image paths", default=None)
@@ -269,11 +289,9 @@ if __name__ == '__main__':
             raise Exception("Please provide valid path for img_path_txt")
             
     for left_img_path, right_img_path in tqdm(zip(left_img_path_list,right_img_path_list), total=len(left_img_path_list), desc="Processing Data"):
-        image1 = np.array(Image.open(left_img_path).convert('RGB'), dtype=np.float32)
-        image2 = np.array(Image.open(right_img_path).convert('RGB'), dtype=np.float32)
-
-        image1 = torch.from_numpy(image1).permute(2, 0, 1).float().unsqueeze(0).cuda()
-        image2 = torch.from_numpy(image2).permute(2, 0, 1).float().unsqueeze(0).cuda()
+        image1, scale1 = load_and_resize(left_img_path)
+        image2, scale2 = load_and_resize(right_img_path)
+        assert abs(scale1-scale2)<1e-5, "The two images should be resized with the same scale factor"
 
         # image1 = F.interpolate(image1, scale_factor=(0.25, 0.25), mode='bilinear', align_corners=True)
         # image2 = F.interpolate(image2, scale_factor=(0.25, 0.25), mode='bilinear', align_corners=True)

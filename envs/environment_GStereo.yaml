@@ -307,3 +307,4 @@ dependencies:
       - uvicorn
       - wcwidth
       - websockets
+      - attrdict

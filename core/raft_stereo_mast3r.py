@@ -13,7 +13,7 @@ from core.corr import CorrBlock1D, PytorchAlternateCorrBlock1D, CorrBlockFast1D,
 from core.corr import AbsCorrBlock1D, PytorchAlternateAbsCorrBlock1D
 from core.utils.utils import hor_coords_grid
 
-from mast3r.model import AsymmetricMASt3R
+# from mast3r.model import AsymmetricMASt3R
 
 try:
     autocast = torch.cuda.amp.autocast
