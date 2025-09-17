@@ -316,8 +316,8 @@ class SparseFlowAugmentor:
 
         margin_y = 20
         margin_x = 50
-
-        img1, img2, flow, valid, intrinsic = self.pad_images(img1, img2, flow, valid, intrinsic)
+        
+        (img1, img2, flow, valid), intrinsic = self.pad_images(img1, img2, flow, valid, intrinsic)
         # img1_raw_shape = img1.shape
         # valid_raw_shape = valid.shape
 

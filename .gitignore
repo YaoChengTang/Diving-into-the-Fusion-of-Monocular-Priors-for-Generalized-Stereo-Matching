@@ -1,6 +1,7 @@
 pretrained
 commits.bundle
 runs/
+runs
 checkpoints/
 logs/
 logs-raw/

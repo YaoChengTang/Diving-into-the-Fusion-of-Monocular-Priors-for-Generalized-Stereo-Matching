@@ -433,6 +433,31 @@ class CREStereoDataset(StereoDataset):
             self.image_list += [ [img1, img2] ]
             self.disparity_list += [ disp ]
 
+
+
+class FSDDataset(StereoDataset):
+    def __init__(self, aug_params=None, root='datasets/FSD', image_set='training', args=None, txt_root=None):
+        super(FSDDataset, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispFSD, args=args)
+        root = root if len(root)>0 else DATASET_ROOT
+        assert os.path.exists(root), "check the existence: {}".format(root)
+
+        if txt_root is None:
+            image1_list = sorted(glob(os.path.join(root, "**/left/rgb/*.jpg"), recursive=True))
+            image2_list = [img.replace("left/rgb", "right/rgb") for img in image1_list]
+            disp_list   = [img.replace("left/rgb", "left/disparity").replace(".jpg", ".png") for img in image1_list]
+
+        else:
+            # 65000
+            image1_list = [os.path.join(root, p) for p in np.load(os.path.join(txt_root, 'image1_list.npy'))]
+            image2_list = [os.path.join(root, p) for p in np.load(os.path.join(txt_root, 'image2_list.npy'))]
+            disp_list   = [os.path.join(root, p) for p in np.load(os.path.join(txt_root, 'disp_list.npy'))]
+
+        for idx, (img1, img2, disp) in enumerate(zip(image1_list, image2_list, disp_list)):
+            self.image_list += [ [img1, img2] ]
+            self.disparity_list += [ disp ]
+    
+
+
 class Trans(StereoDataset):
     def __init__(self, aug_params=None, root='./datasets/Trans', things_test=False, args=None):
         super(Trans, self).__init__(aug_params)
@@ -653,33 +678,36 @@ def fetch_dataloader(args):
 
     train_dataset = None
     for dataset_name in args.train_datasets:
-        if dataset_name.startswith("middlebury_"):
+        if dataset_name.lower().startswith("middlebury_"):
             new_dataset = Middlebury(aug_params, split=dataset_name.replace('middlebury_',''), args=args)
             logging.info(f"Adding {len(new_dataset)} samples from Middlebury")
-        elif dataset_name == 'sceneflow':
+        elif dataset_name.lower() == 'sceneflow':
             clean_dataset = SceneFlowDatasets(aug_params, dstype='frames_cleanpass', args=args)
             final_dataset = SceneFlowDatasets(aug_params, dstype='frames_finalpass', args=args)
             new_dataset = (clean_dataset*4) + (final_dataset*4)
             logging.info(f"Adding {len(new_dataset)} samples from SceneFlow")
-        elif 'kitti' in dataset_name:
+        elif 'kitti' in dataset_name.lower():
             new_dataset = KITTI(aug_params, split=dataset_name, args=args)
             logging.info(f"Adding {len(new_dataset)} samples from KITTI")
-        elif dataset_name == 'sintel_stereo':
+        elif dataset_name.lower() == 'sintel_stereo':
             new_dataset = SintelStereo(aug_params, args=args)*140
             logging.info(f"Adding {len(new_dataset)} samples from Sintel Stereo")
-        elif dataset_name == 'falling_things':
+        elif dataset_name.lower() == 'falling_things':
             new_dataset = FallingThings(aug_params, args=args)*5
             logging.info(f"Adding {len(new_dataset)} samples from FallingThings")
-        elif dataset_name.startswith('tartan_air'):
+        elif dataset_name.lower().startswith('tartan_air'):
             new_dataset = TartanAir(aug_params, keywords=dataset_name.split('_')[2:])
             logging.info(f"Adding {len(new_dataset)} samples from Tartain Air")
-        elif 'nerfstereo' in dataset_name:
+        elif 'nerfstereo' in dataset_name.lower():
             new_dataset = NerfStereoDataset(aug_params, args=args, root='./datasets/NerfStereo', txt_root='./datasets/NerfStereo/../')
             logging.info(f"Adding {len(new_dataset)} samples from NerfStereoDataset")
-        elif 'crestereo' in dataset_name:
+        elif 'crestereo' in dataset_name.lower():
             new_dataset = CREStereoDataset(aug_params, args=args, txt_root='./datasets/CREStereo_dataset/../')
             logging.info(f"Adding {len(new_dataset)} samples from CREStereoDataset")
-        elif dataset_name == 'Trans':
+        elif dataset_name.lower() == 'fsd':
+            new_dataset = FSDDataset(aug_params, args=args, txt_root='./datasets/FSD/')
+            logging.info(f"Adding {len(new_dataset)} samples from FSDDataset")
+        elif dataset_name.lower() == 'trans':
             new_dataset = Trans(aug_params, args=args)
             logging.info(f"Adding {len(new_dataset)} samples from Trans")
         elif dataset_name.lower() == 'fooling3d':
@@ -690,6 +718,8 @@ def fetch_dataloader(args):
                 sampler = DistributedFooling3DBatchSampler(new_dataset, args.batch_size)
             logging.info(f"Adding {len(new_dataset)} samples from Fooling3DDataset")
             # TODO: Add Fooling3D dataset with only one sampler may cause conflict with other datasets
+        else:
+            raise Exception(f"Dataset {dataset_name} is not defined")
         train_dataset = new_dataset if train_dataset is None else train_dataset + new_dataset
 
     # train_loader = data.DataLoader(train_dataset, batch_size=args.batch_size, 

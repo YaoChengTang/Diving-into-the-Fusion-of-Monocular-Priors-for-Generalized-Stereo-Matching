@@ -26,19 +26,25 @@ export NCCL_P2P_DISABLE=1
 # export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 # export CUDA_VISIBLE_DEVICES=0,6
 # export CUDA_VISIBLE_DEVICES=0
-export CUDA_VISIBLE_DEVICES=2,3,4,5,6,7
+# export CUDA_VISIBLE_DEVICES=2,3,4,5,6,7
 
 # export DATASET_ROOT="/data6/sceneflow/sceneflow"
-export DATASET_ROOT="./datasets/Trans"
+# export DATASET_ROOT="./datasets/Trans"
+export DATASET_ROOT="./datasets/FSD"
 
-export LOG_ROOT="/data5/yao/runs/log/${FOLDER_NAME}"
-export TB_ROOT="/data5/yao/runs/tboard/${FOLDER_NAME}"
-export CKPOINT_ROOT="/data5/yao/runs/ckpoint/${FOLDER_NAME}"
+export LOG_ROOT="./runs/log/${FOLDER_NAME}"
+export TB_ROOT="./runs/tboard/${FOLDER_NAME}"
+export CKPOINT_ROOT="./runs/ckpoint/${FOLDER_NAME}"
+
+export PRETRAINED_ROOT="./pretrained"
 
 # 输出新的路径，确认设置正确
 echo "LOG_ROOT is set to: $LOG_ROOT"
 echo "TB_ROOT is set to: $TB_ROOT"
 echo "CKPOINT_ROOT is set to: $CKPOINT_ROOT"
+
+echo "DATASET_ROOT is set to: $DATASET_ROOT"
+echo "PRETRAINED_ROOT is set to: $PRETRAINED_ROOT"
 
 
 nproc_per_node=$(echo $CUDA_VISIBLE_DEVICES | tr ',' '\n' | wc -l)  # Count the number of GPUs
@@ -110,4 +116,9 @@ nproc_per_node=$(echo $CUDA_VISIBLE_DEVICES | tr ',' '\n' | wc -l)  # Count the 
 # On Trans dataset
 # torchrun --nnode 1 --nproc_per_node $nproc_per_node --master_port 29501 train_stereo_raftstereo.py --batch_size 8 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 10000 --mixed_precision --model_name "RAFTStereoDepthBetaRefine" --depthany_model_dir "/data5/yao/pretrained" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --restore_ckpt "/data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim_20241102_014050/50000_RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim.pth" --lr 0.0005 --fintune_info "tune_raft" --train_datasets "Trans" --exp_name "Trans_RAFTStereoDepthBetaRefine"
 
-torchrun --nnode 1 --nproc_per_node $nproc_per_node --master_port 29501 train_stereo_raftstereo.py --batch_size 32 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 10000 --mixed_precision --model_name "RAFTStereoDepthBetaRefine" --depthany_model_dir "/data5/yao/pretrained" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --restore_ckpt "/home/yao/Document/GeneralizedStereoMatching/clouds/ckpoint/Trans_RAFTStereoDepthBetaRefine_20250321_180351/Trans_RAFTStereoDepthBetaRefine.pth" --lr 0.0005 --fintune_info "tune_refine" --train_datasets "Trans" --exp_name "Trans_RAFTStereoDepthBetaRefine_tuneRefine"
+# torchrun --nnode 1 --nproc_per_node $nproc_per_node --master_port 29501 train_stereo_raftstereo.py --batch_size 32 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 10000 --mixed_precision --model_name "RAFTStereoDepthBetaRefine" --depthany_model_dir "/data5/yao/pretrained" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --restore_ckpt "/home/yao/Document/GeneralizedStereoMatching/clouds/ckpoint/Trans_RAFTStereoDepthBetaRefine_20250321_180351/Trans_RAFTStereoDepthBetaRefine.pth" --lr 0.0005 --fintune_info "tune_refine" --train_datasets "Trans" --exp_name "Trans_RAFTStereoDepthBetaRefine_tuneRefine"
+
+
+
+# On FSD dataset
+torchrun --nnode 1 --nproc_per_node $nproc_per_node --master_port 29501 train_stereo_raftstereo.py --batch_size 16 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 100000 --mixed_precision --model_name "RAFTStereoDepthBetaRefine" --depthany_model_dir "$PRETRAINED_ROOT" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --restore_ckpt "$PRETRAINED_ROOT/MGStereo.pth" --lr 0.0005 --fintune_info "tune_raft" --train_datasets "FSD" --exp_name "FSD_RAFTStereoDepthBetaRefine"

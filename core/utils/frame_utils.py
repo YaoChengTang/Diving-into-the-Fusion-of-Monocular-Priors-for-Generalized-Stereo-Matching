@@ -229,7 +229,23 @@ def writeFlowKITTI(filename, uv):
     valid = np.ones([uv.shape[0], uv.shape[1], 1])
     uv = np.concatenate([uv, valid], axis=-1).astype(np.uint16)
     cv2.imwrite(filename, uv[..., ::-1])
-    
+
+
+def readDispFSD(file_name, scale=1000):
+    depth_uint8 = cv2.cvtColor(cv2.imread(file_name), cv2.COLOR_BGR2RGB)
+    depth_uint8 = depth_uint8.astype(float)
+    out   = depth_uint8[...,0]*255*255 + depth_uint8[...,1]*255 + depth_uint8[...,2]
+    disp  = out / float(scale)
+    valid = disp > 0.0
+    return disp, valid
+
+def writeDispFSD(file_name, disp, scale=1000):
+    disp = np.clip(disp * scale, 0, 16777215).astype(np.uint32)
+    r = (disp // (255*255)).astype(np.uint8)
+    g = ((disp - r*255*255) // 255).astype(np.uint8)
+    b = (disp - r*255*255 - g*255).astype(np.uint8)
+    img = np.stack([r, g, b], axis=-1)
+    cv2.imwrite(file_name, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
 
 def read_gen(file_name, pil=False):
     ext = splitext(file_name)[-1]
