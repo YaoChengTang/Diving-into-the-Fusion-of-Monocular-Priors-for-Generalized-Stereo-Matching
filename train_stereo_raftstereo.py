@@ -110,9 +110,11 @@ def train(args, logger):
 
             loss, metrics = sequence_loss(flow_predictions, flow, valid)
             if args.local_rank==0 and int(NODE_RANK)==0:
+                metrics['loss'] = loss.item()
+                metrics['lr'] = optimizer.param_groups[0]['lr']
                 logger.push(metrics)
-                logger.add_scalar("live_loss", loss.item(), global_batch_num)
-                logger.add_scalar(f'learning_rate', optimizer.param_groups[0]['lr'], global_batch_num)
+                # logger.add_scalar("live_loss", loss.item(), global_batch_num)
+                # logger.add_scalar(f'learning_rate', optimizer.param_groups[0]['lr'], global_batch_num)
             
             global_batch_num += 1
             scaler.scale(loss).backward()

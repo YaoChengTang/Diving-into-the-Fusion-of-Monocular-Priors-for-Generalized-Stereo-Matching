@@ -349,7 +349,7 @@ class LoggerTraining(LoggerCommon):
                         for k in sorted(self.running_loss.keys())}
 
         training_str = "[{:6d}, {:10.7f}]".format(self.total_steps + 1, self.scheduler.get_last_lr()[0])
-        metrics_str = " | ".join([f"{k}: {v:10.4f}" for k, v in metrics_data.items()])
+        metrics_str = " | ".join([f"{k}: {v:10.4f}" for k, v in metrics_data.items() if k != "lr"])
         
         # Print keys and values
         self.info(f"Training Metrics {training_str}: {metrics_str}")
