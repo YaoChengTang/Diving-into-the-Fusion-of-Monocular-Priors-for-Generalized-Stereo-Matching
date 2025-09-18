@@ -249,14 +249,21 @@ class LoggerCommon:
 
 from torch.utils.tensorboard import SummaryWriter
 
+try:
+    import wandb
+    _WANDB_AVAILABLE = True
+except ImportError:
+    _WANDB_AVAILABLE = False
+
+
 class LoggerTraining(LoggerCommon):
 
     SUM_FREQ = 100
 
-    def __init__(self, name, model=None, scheduler=None):
-        super(LoggerTraining, self).__init__(name)
+    def __init__(self, logging_name, model=None, scheduler=None, use_wandb=False, exp_name="default", project_name="BD"):
+        super(LoggerTraining, self).__init__(logging_name)
 
-        if int(LOCAL_RANK)==0 and int(NODE_RANK)==0:
+        if int(LOCAL_RANK) == 0 and int(NODE_RANK) == 0:
             os.makedirs(TB_ROOT, exist_ok=True)
 
         self.model = model
@@ -264,26 +271,42 @@ class LoggerTraining(LoggerCommon):
         self.silence = False
         self.total_steps = 0
         self.running_loss = {}
-        self.writer = SummaryWriter(log_dir=TB_ROOT)
+
+        # 判断用 wandb 还是 tensorboard
+        self.use_wandb = use_wandb and _WANDB_AVAILABLE
+        if self.use_wandb:
+            if wandb.run is None:  # 如果还没初始化
+                wandb.init(project=project_name, name=exp_name, dir=TB_ROOT)
+            self.writer = None
+            self.info(f"Using wandb with project name: {project_name}, run name: {exp_name}.")
+        else:
+            self.writer = SummaryWriter(log_dir=TB_ROOT)
+            self.info(f"Using TensorBoard with log dir {TB_ROOT}.")
     
     def set_training(self, model, scheduler):
         self.model = model
         self.scheduler = scheduler
     
     def _print_training_status(self):
-        metrics_data = [self.running_loss[k]/LoggerTraining.SUM_FREQ for k in sorted(self.running_loss.keys())]
-        training_str = "[{:6d}, {:10.7f}] ".format(self.total_steps+1, self.scheduler.get_last_lr()[0])
-        metrics_str = ("{:10.4f}, "*len(metrics_data)).format(*metrics_data)
+        metrics_data = {k: self.running_loss[k]/LoggerTraining.SUM_FREQ 
+                        for k in sorted(self.running_loss.keys())}
+
+        training_str = "[{:6d}, {:10.7f}]".format(self.total_steps+1, self.scheduler.get_last_lr()[0])
+        metrics_str = " | ".join([f"{k}: {v:10.4f}" for k, v in metrics_data.items()])
         
-        # print the training status
-        self.info(f"Training Metrics ({self.total_steps}): {training_str + metrics_str}")
+        # 打印 key 和 val
+        self.info(f"Training Metrics {training_str}: {metrics_str}")
 
-        if self.writer is None:
-            self.writer = SummaryWriter(log_dir=TB_ROOT)
+        if self.use_wandb:
+            wandb.log(metrics_data, step=self.total_steps)
+        else:
+            if self.writer is None:
+                self.writer = SummaryWriter(log_dir=TB_ROOT)
+            for k, v in metrics_data.items():
+                self.writer.add_scalar(k, v, self.total_steps)
 
-        for k in self.running_loss:
-            self.writer.add_scalar(k, self.running_loss[k]/LoggerTraining.SUM_FREQ, self.total_steps)
-            self.running_loss[k] = 0.0
+        # 清零
+        self.running_loss = {}
 
     def push(self, metrics):
         self.total_steps += 1
@@ -291,22 +314,33 @@ class LoggerTraining(LoggerCommon):
         for key in metrics:
             if key not in self.running_loss:
                 self.running_loss[key] = 0.0
-
             self.running_loss[key] += metrics[key]
 
         if self.total_steps % LoggerTraining.SUM_FREQ == LoggerTraining.SUM_FREQ-1:
             self._print_training_status()
-            self.running_loss = {}
+    
+    def add_scalar(self, key, value, step=None):
+        if self.use_wandb:
+            wandb.log({key: value}, step=step)
+        else:
+            if self.writer is None:
+                self.writer = SummaryWriter(log_dir=TB_ROOT)
+            self.writer.add_scalar(key, value, step)
 
     def write_dict(self, results):
-        if self.writer is None:
-            self.writer = SummaryWriter(log_dir=TB_ROOT)
-
-        for key in results:
-            self.writer.add_scalar(key, results[key], self.total_steps)
+        if self.use_wandb:
+            wandb.log(results, step=self.total_steps)
+        else:
+            if self.writer is None:
+                self.writer = SummaryWriter(log_dir=TB_ROOT)
+            for key in results:
+                self.writer.add_scalar(key, results[key], self.total_steps)
 
     def close(self):
-        self.writer.close()
+        if self.use_wandb:
+            wandb.finish()
+        elif self.writer:
+            self.writer.close()
 
 
 

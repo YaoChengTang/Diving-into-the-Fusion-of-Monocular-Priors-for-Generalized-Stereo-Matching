@@ -308,3 +308,4 @@ dependencies:
       - wcwidth
       - websockets
       - attrdict
+      - wandb

@@ -30,8 +30,6 @@ from core.utils.ddp import ddp_init, ddp_close, get_model_ddp
 from core.utils.utils import LoggerTraining, init_directories, delete_directories_if_static
 from evaluate_stereo_raftstereo import *
 
-logger = LoggerTraining("TRAIN", None, None)
-
 try:
     from torch.cuda.amp import GradScaler
 except:
@@ -60,7 +58,7 @@ def fetch_optimizer(args, model):
     return optimizer, scheduler
 
 
-def train(args):
+def train(args, logger):
     model = get_model_ddp(args)
 
     train_loader = fetch_dataloader(args)
@@ -113,8 +111,8 @@ def train(args):
             loss, metrics = sequence_loss(flow_predictions, flow, valid)
             if args.local_rank==0 and int(NODE_RANK)==0:
                 logger.push(metrics)
-                logger.writer.add_scalar("live_loss", loss.item(), global_batch_num)
-                logger.writer.add_scalar(f'learning_rate', optimizer.param_groups[0]['lr'], global_batch_num)
+                logger.add_scalar("live_loss", loss.item(), global_batch_num)
+                logger.add_scalar(f'learning_rate', optimizer.param_groups[0]['lr'], global_batch_num)
             
             global_batch_num += 1
             scaler.scale(loss).backward()
@@ -123,8 +121,8 @@ def train(args):
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
             scaler.step(optimizer)
-            scheduler.step()
             scaler.update()
+            scheduler.step()
 
 
 
@@ -168,6 +166,7 @@ if __name__ == '__main__':
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--eval', action='store_true', help='evaluation mode')
     parser.add_argument('--silence', action='store_true', help='no output of training/eval process')
+    parser.add_argument('--use_wandb', action='store_true', help='use wandb for logging')
 
     # Training parameters
     parser.add_argument('--batch_size', type=int, default=6, help="batch size used during training.")
@@ -219,6 +218,8 @@ if __name__ == '__main__':
     parser.add_argument('--world_size', type=int, default=os.getenv("WORLD_SIZE"))
 
     args = parser.parse_args()
+
+    logger = LoggerTraining("TRAIN", None, None, args.use_wandb, args.exp_name)
     logger.print_args(args)
     
     torch.manual_seed(1234)
@@ -227,7 +228,7 @@ if __name__ == '__main__':
     ddp_init(args)
     init_directories([LOG_ROOT, TB_ROOT, CKPOINT_ROOT])
 
-    train(args)
+    train(args, logger)
 
     # try:
     #     train(args)
