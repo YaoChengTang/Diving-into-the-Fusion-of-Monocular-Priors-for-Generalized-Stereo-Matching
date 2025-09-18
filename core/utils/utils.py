@@ -208,74 +208,100 @@ LOG_ROOT     = os.getenv('LOG_ROOT', default="logs")
 TB_ROOT      = os.getenv('TB_ROOT', default="runs")
 
 class LoggerCommon:
-    def __init__(self, name):
-        self.name = name
-        self.log_name = '{}-{}.log'.format(name, datetime.now().strftime("%y%m%d_%H%M%S"))
-        self.log_path = os.path.join(LOG_ROOT, self.log_name)
-        if int(LOCAL_RANK) == 0 and int(NODE_RANK) == 0:
-            os.makedirs(LOG_ROOT, exist_ok=True)
-            logging.basicConfig(level=logging.INFO,
-                                format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
-                                handlers=[logging.FileHandler(self.log_path),
-                                          logging.StreamHandler()]
-                                )
-            self.logger = logging.getLogger(name)
-            self.logger.addHandler(logging.FileHandler(self.log_path))
-    
-    def _set_handlers(self):
-        # Clear all previous handlers
-        self.logger.handlers.clear()
+    def __init__(self, name, log_root='', local_rank=0, node_rank=0):
+        """
+        Initialize a logger.
         
-        # Set file and console handlers
-        file_handler = logging.FileHandler(self.log_path)
-        console_handler = logging.StreamHandler()
+        Args:
+            name (str): Logger name.
+            log_root (str): Directory to save log files.
+            local_rank (int): Local process rank in distributed training.
+            node_rank (int): Node rank in distributed training.
+        """
+        self.name = name
+        self.log_root = log_root if log_root else LOG_ROOT
+        self.local_rank = int(local_rank)
+        self.node_rank = int(node_rank)
+        self.log_name = f"{self.name}-{datetime.now().strftime('%y%m%d_%H%M%S')}.log"
+        self.log_path = os.path.join(self.log_root, self.log_name)
+        self.logger = logging.getLogger(name)
+        self.logger.propagate = False  # Prevent logs from going to root
+        
+        # Only add handlers for rank 0 to avoid duplicate logs
+        if self.local_rank == 0 and self.node_rank == 0:
+            if len(self.logger.handlers) == 0:  # Avoid adding handlers multiple times
+                os.makedirs(self.log_root, exist_ok=True)
+                self._set_handlers()
+                print("Handlers set for logger:", self.name)
+        print("-"*30, self.name, "Logger initialized. Log path:", self.log_path)
 
-        # Set handler format
-        formatter = logging.Formatter('%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
+    def _set_handlers(self):
+        """Clear old handlers and add new file and console handlers."""
+        self.logger.handlers.clear()
+        self.logger.setLevel(logging.INFO)
+
+        # Log message format
+        formatter = logging.Formatter(
+            '%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
+        )
+
+        # File handler
+        file_handler = logging.FileHandler(self.log_path)
         file_handler.setFormatter(formatter)
+
+        # Console handler
+        console_handler = logging.StreamHandler()
         console_handler.setFormatter(formatter)
 
-        # Add handlers
         self.logger.addHandler(file_handler)
         self.logger.addHandler(console_handler)
 
-    def set_log_path(self, new_log_path, name=None):
-        # Delete old log file if it exists
-        if os.path.exists(self.log_path):
-            os.remove(self.log_path)
-        
-        # Update path and reset handlers
-        if name is not None:
+    def set_log_path(self, new_log_root, name=None):
+        """
+        Change the log directory and reset handlers.
+
+        Args:
+            new_log_root (str): New directory to save logs.
+            name (str, optional): New logger name.
+        """
+        if name:
             self.name = name
-        self.log_name = '{}-{}.log'.format(self.name, datetime.now().strftime("%y%m%d_%H%M%S"))
-        self.log_path = os.path.join(new_log_path, self.log_name)
-        os.makedirs(new_log_path, exist_ok=True)
-        self._set_handlers()
-    
+        self.log_root = new_log_root
+        self.log_name = f"{self.name}-{datetime.now().strftime('%y%m%d_%H%M%S')}.log"
+        self.log_path = os.path.join(self.log_root, self.log_name)
+        os.makedirs(self.log_root, exist_ok=True)
+        if self.local_rank == 0 and self.node_rank == 0:
+            self._set_handlers()
+
+    # Logging interfaces
     def info(self, message):
-        if int(LOCAL_RANK) == 0 and int(NODE_RANK) == 0:
+        if self.local_rank == 0 and self.node_rank == 0:
             self.logger.info(message)
-    
+
     def warning(self, message):
-        if int(LOCAL_RANK) == 0 and int(NODE_RANK) == 0:
+        if self.local_rank == 0 and self.node_rank == 0:
             self.logger.warning(message)
-    
+
     def error(self, message):
-        if int(LOCAL_RANK) == 0 and int(NODE_RANK) == 0:
+        if self.local_rank == 0 and self.node_rank == 0:
             self.logger.error(message)
-    
+
     def exception(self, message):
-        if int(LOCAL_RANK) == 0 and int(NODE_RANK) == 0:
+        if self.local_rank == 0 and self.node_rank == 0:
             self.logger.exception(message)
-    
+
     def print_args(self, args):
-        msg = ""
+        """
+        Print the arguments in a neat formatted way.
+
+        Args:
+            args: Object with attributes (e.g., argparse.Namespace)
+        """
         args_dict = vars(args)
-        max_arg_length = max(len(arg_name) for arg_name in args_dict.keys())
-        for arg_name, arg_value in args_dict.items():
-            arg_name_padded = arg_name.ljust(max_arg_length)
-            msg += f"{arg_name_padded}: {arg_value}\r\n"
+        max_len = max(len(k) for k in args_dict)
+        msg = "\n".join(f"{k.ljust(max_len)}: {v}" for k, v in args_dict.items())
         self.info(msg)
+
         
 
 from torch.utils.tensorboard import SummaryWriter
