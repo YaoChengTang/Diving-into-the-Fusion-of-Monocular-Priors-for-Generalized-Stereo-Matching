@@ -20,3 +20,7 @@ datasets/
 
 submit_job
 submit_job/
+
+amlt
+amlt/
+.amltconfig
