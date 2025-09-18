@@ -232,8 +232,8 @@ class LoggerCommon:
             if len(self.logger.handlers) == 0:  # Avoid adding handlers multiple times
                 os.makedirs(self.log_root, exist_ok=True)
                 self._set_handlers()
-                print("Handlers set for logger:", self.name)
-        print("-"*30, self.name, "Logger initialized. Log path:", self.log_path)
+                # print("Handlers set for logger:", self.name)
+        # print("-"*30, self.name, "Logger initialized. Log path:", self.log_path)
 
     def _set_handlers(self):
         """Clear old handlers and add new file and console handlers."""
