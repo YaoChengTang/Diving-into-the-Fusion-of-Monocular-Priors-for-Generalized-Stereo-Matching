@@ -13,6 +13,39 @@ import torch.nn.functional as F
 
 
 
+def resize_tensor(tensor, target_size=512, ratio=16):
+    # Get the input tensor shape (B, C, H, W)
+    _, _, H, W = tensor.shape
+    
+    # Calculate the longer side between H and W
+    if H > W:
+        new_H = target_size
+        new_W = int(W * (target_size / H))
+    else:
+        new_W = target_size
+        new_H = int(H * (target_size / W))
+    
+    # Round up new_W and new_H to be divisible by ratio
+    new_W = (np.ceil(new_W / ratio) * ratio).astype(int)
+    new_H = (np.ceil(new_H / ratio) * ratio).astype(int)
+
+    # Resize using interpolate
+    resized_tensor = F.interpolate(tensor, size=(new_H, new_W), mode='bicubic', align_corners=False)
+    
+    return resized_tensor
+
+
+def resize_to_quarter(tensor, original_size, ratio):
+    # Scale down to 1/ratio of the original size
+    quarter_H = original_size[0] // ratio
+    quarter_W = original_size[1] // ratio
+    
+    # Resize using interpolate
+    resized_tensor = F.interpolate(tensor, size=(quarter_H, quarter_W), mode='bilinear', align_corners=False)
+    
+    return resized_tensor
+
+
 class InputPadder:
     """ Pads images such that dimensions are divisible by 8 """
     def __init__(self, dims, mode='sintel', divis_by=8):
@@ -179,61 +212,60 @@ class LoggerCommon:
         self.name = name
         self.log_name = '{}-{}.log'.format(name, datetime.now().strftime("%y%m%d_%H%M%S"))
         self.log_path = os.path.join(LOG_ROOT, self.log_name)
-        if int(LOCAL_RANK)==0 and int(NODE_RANK)==0:
+        if int(LOCAL_RANK) == 0 and int(NODE_RANK) == 0:
             os.makedirs(LOG_ROOT, exist_ok=True)
             logging.basicConfig(level=logging.INFO,
                                 format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
-                                handlers = [logging.FileHandler(self.log_path), 
-                                            logging.StreamHandler()]
-                            )
+                                handlers=[logging.FileHandler(self.log_path),
+                                          logging.StreamHandler()]
+                                )
             self.logger = logging.getLogger(name)
             self.logger.addHandler(logging.FileHandler(self.log_path))
     
     def _set_handlers(self):
-        # 清除之前的所有处理器
+        # Clear all previous handlers
         self.logger.handlers.clear()
         
-        # 设置文件和控制台处理器
+        # Set file and console handlers
         file_handler = logging.FileHandler(self.log_path)
         console_handler = logging.StreamHandler()
 
-        # 设置处理器格式
+        # Set handler format
         formatter = logging.Formatter('%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
         file_handler.setFormatter(formatter)
         console_handler.setFormatter(formatter)
 
-        # 添加处理器
+        # Add handlers
         self.logger.addHandler(file_handler)
         self.logger.addHandler(console_handler)
 
     def set_log_path(self, new_log_path, name=None):
-        # 删除旧日志文件（如果存在）
+        # Delete old log file if it exists
         if os.path.exists(self.log_path):
             os.remove(self.log_path)
         
-        # 更新路径并重设处理器
+        # Update path and reset handlers
         if name is not None:
             self.name = name
         self.log_name = '{}-{}.log'.format(self.name, datetime.now().strftime("%y%m%d_%H%M%S"))
         self.log_path = os.path.join(new_log_path, self.log_name)
         os.makedirs(new_log_path, exist_ok=True)
         self._set_handlers()
-
     
     def info(self, message):
-        if int(LOCAL_RANK)==0 and int(NODE_RANK)==0:
+        if int(LOCAL_RANK) == 0 and int(NODE_RANK) == 0:
             self.logger.info(message)
     
     def warning(self, message):
-        if int(LOCAL_RANK)==0 and int(NODE_RANK)==0:
+        if int(LOCAL_RANK) == 0 and int(NODE_RANK) == 0:
             self.logger.warning(message)
     
     def error(self, message):
-        if int(LOCAL_RANK)==0 and int(NODE_RANK)==0:
+        if int(LOCAL_RANK) == 0 and int(NODE_RANK) == 0:
             self.logger.error(message)
     
     def exception(self, message):
-        if int(LOCAL_RANK)==0 and int(NODE_RANK)==0:
+        if int(LOCAL_RANK) == 0 and int(NODE_RANK) == 0:
             self.logger.exception(message)
     
     def print_args(self, args):
@@ -245,7 +277,6 @@ class LoggerCommon:
             msg += f"{arg_name_padded}: {arg_value}\r\n"
         self.info(msg)
         
-
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -272,10 +303,10 @@ class LoggerTraining(LoggerCommon):
         self.total_steps = 0
         self.running_loss = {}
 
-        # 判断用 wandb 还是 tensorboard
+        # Decide whether to use wandb or tensorboard
         self.use_wandb = use_wandb and _WANDB_AVAILABLE
         if self.use_wandb:
-            if wandb.run is None:  # 如果还没初始化
+            if wandb.run is None:  # Initialize if not already done
                 wandb.init(project=project_name, name=exp_name, dir=TB_ROOT)
             self.writer = None
             self.info(f"Using wandb with project name: {project_name}, run name: {exp_name}.")
@@ -288,13 +319,13 @@ class LoggerTraining(LoggerCommon):
         self.scheduler = scheduler
     
     def _print_training_status(self):
-        metrics_data = {k: self.running_loss[k]/LoggerTraining.SUM_FREQ 
+        metrics_data = {k: self.running_loss[k] / LoggerTraining.SUM_FREQ
                         for k in sorted(self.running_loss.keys())}
 
-        training_str = "[{:6d}, {:10.7f}]".format(self.total_steps+1, self.scheduler.get_last_lr()[0])
+        training_str = "[{:6d}, {:10.7f}]".format(self.total_steps + 1, self.scheduler.get_last_lr()[0])
         metrics_str = " | ".join([f"{k}: {v:10.4f}" for k, v in metrics_data.items()])
         
-        # 打印 key 和 val
+        # Print keys and values
         self.info(f"Training Metrics {training_str}: {metrics_str}")
 
         if self.use_wandb:
@@ -305,7 +336,7 @@ class LoggerTraining(LoggerCommon):
             for k, v in metrics_data.items():
                 self.writer.add_scalar(k, v, self.total_steps)
 
-        # 清零
+        # Reset
         self.running_loss = {}
 
     def push(self, metrics):
@@ -316,7 +347,7 @@ class LoggerTraining(LoggerCommon):
                 self.running_loss[key] = 0.0
             self.running_loss[key] += metrics[key]
 
-        if self.total_steps % LoggerTraining.SUM_FREQ == LoggerTraining.SUM_FREQ-1:
+        if self.total_steps % LoggerTraining.SUM_FREQ == LoggerTraining.SUM_FREQ - 1:
             self._print_training_status()
     
     def add_scalar(self, key, value, step=None):
@@ -343,28 +374,29 @@ class LoggerTraining(LoggerCommon):
             self.writer.close()
 
 
-
 def init_directories(directories):
-    if int(LOCAL_RANK)==0 and int(NODE_RANK)==0 :
+    if int(LOCAL_RANK) == 0 and int(NODE_RANK) == 0:
         for directory in directories:
             os.makedirs(directory, exist_ok=True)
     
+
 def delete_directories_if_static(directories):
-    if int(LOCAL_RANK)==0 and int(NODE_RANK)==0 :
-        # 如果检测到文件大小有变化，终止删除操作
+    if int(LOCAL_RANK) == 0 and int(NODE_RANK) == 0:
+        # If file sizes are changing, stop the deletion process
         if not is_any_folder_static(directories):
-            print("File sizes are changing in one of the directories {}.".format(directories) + \
+            print("File sizes are changing in one of the directories {}.".format(directories) +
                   "No directories will be deleted.")
             return
         
-        # 如果所有文件都静止，删除目录
+        # If all files are static, delete directories
         for directory in directories:
             if os.path.exists(directory):
                 shutil.rmtree(directory)
                 print(f"Directory {directory} deleted")
 
+
 def get_file_sizes(directories):
-    """返回多个目录中所有文件的大小字典"""
+    """Return a dictionary of all file sizes in multiple directories"""
     file_sizes = {}
     for directory in directories:
         if os.path.exists(directory):
@@ -374,12 +406,13 @@ def get_file_sizes(directories):
                     file_sizes[filepath] = os.path.getsize(filepath)
     return file_sizes
 
+
 def is_any_folder_static(directories, check_interval=2):
-    """检测所有文件是否静止（没有变化）"""
-    # 获取所有文件初始大小
+    """Check whether all files are static (no changes)"""
+    # Get initial sizes of all files
     initial_sizes = get_file_sizes(directories)
-    time.sleep(check_interval)  # 等待一段时间，观察文件变化
+    time.sleep(check_interval)  # Wait a while to observe file changes
     final_sizes = {filepath: os.path.getsize(filepath) for filepath in initial_sizes if os.path.exists(filepath)}
     
-    # 如果文件大小一致，则所有文件静止
+    # Return True if file sizes are the same, i.e., all files are static
     return initial_sizes == final_sizes

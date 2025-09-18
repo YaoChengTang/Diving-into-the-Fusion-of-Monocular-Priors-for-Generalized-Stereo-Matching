@@ -136,7 +136,7 @@ class PytorchAlternateAbsCorrBlock1D:
         return corr / torch.sqrt(torch.tensor(C).float())
 
     def __call__(self, coords):
-        print(f"当前显存消耗量: {torch.distributed.get_rank()} {torch.cuda.memory_allocated() / 1024 / 1024:.2f} MB")
+        print(f"Memory consumption: {torch.distributed.get_rank()} {torch.cuda.memory_allocated() / 1024 / 1024:.2f} MB")
 
         # in case of only disparity used in coordinates 
         B, D, H, W = coords.shape
@@ -272,8 +272,8 @@ class AbsCorrBlock1D:
         corr_matrix = (fmap1.unsqueeze(-1) - fmap2.unsqueeze(-2)).abs_().sum(dim=1)  # shape (B, H, W1, W2)
         # corr_matrix = fmap1.sum(dim=1).unsqueeze(-1) - fmap2.sum(dim=1).unsqueeze(-2) # shape (B, H, W1, W2)
         print("-"*10, " AbsCorrBlock1D: {} ".format(corr_matrix.shape), "-"*10)
-        print(f"当前显存消耗量: {torch.distributed.get_rank()} {torch.cuda.memory_allocated() / 1024 / 1024:.2f} MB")
-        
+        print(f"Memory consumption: {torch.distributed.get_rank()} {torch.cuda.memory_allocated() / 1024 / 1024:.2f} MB")
+
         corr_matrix = corr_matrix.reshape(B, H, W1, 1, W2).contiguous()
         return corr_matrix / torch.sqrt(torch.tensor(D).float())
 

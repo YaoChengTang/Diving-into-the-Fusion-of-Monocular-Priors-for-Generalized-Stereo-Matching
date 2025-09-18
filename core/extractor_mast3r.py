@@ -9,68 +9,13 @@ import torch.nn.functional as F
 import torchvision.transforms as T
 
 from core.extractor import ResidualBlock
+from core.utils.utils import resize_tensor, resize_to_quarter
 
 try:
     from mast3r.model import AsymmetricMASt3R
 except :
-    print("Please install mast3r: pip install git+https://github.com/naver/mast3r.git")
+    print("Please install mast3r if requiring it: pip install git+https://github.com/naver/mast3r.git")
 
-
-# def resize_and_pad_tensor(tensor, target_size=512):
-#     # 获取输入 tensor 的尺寸 (B, C, H, W)
-#     _, _, H, W = tensor.shape
-    
-#     # 计算 H 和 W 中较长的一边
-#     if H > W:
-#         new_H = target_size
-#         new_W = int(W * (target_size / H))
-#     else:
-#         new_W = target_size
-#         new_H = int(H * (target_size / W))
-    
-#     # 使用 interpolate 进行缩放
-#     resized_tensor = F.interpolate(tensor, size=(new_H, new_W), mode='bilinear', align_corners=False)
-    
-#     # 计算是否需要填充，使得尺寸可以被16整除
-#     pad_H = (16 - new_H % 16) if new_H % 16 != 0 else 0
-#     pad_W = (16 - new_W % 16) if new_W % 16 != 0 else 0
-    
-#     # 进行填充，确保两边可以被16整除
-#     padding = (0, pad_W, 0, pad_H)  # (left, right, top, bottom)
-#     padded_tensor = F.pad(resized_tensor, padding)
-    
-#     return padded_tensor
-
-def resize_tensor(tensor, target_size=512, ratio=16):
-    # 获取输入 tensor 的尺寸 (B, C, H, W)
-    _, _, H, W = tensor.shape
-    
-    # 计算 H 和 W 中较长的一边
-    if H > W:
-        new_H = target_size
-        new_W = int(W * (target_size / H))
-    else:
-        new_W = target_size
-        new_H = int(H * (target_size / W))
-    
-    new_W = (np.ceil(new_W / ratio) * ratio).astype(int)
-    new_H = (np.ceil(new_H / ratio) * ratio).astype(int)
-
-    # 使用 interpolate 进行缩放
-    resized_tensor = F.interpolate(tensor, size=(new_H, new_W), mode='bicubic', align_corners=False)
-    
-    return resized_tensor
-
-
-def resize_to_quarter(tensor, original_size, ratio):
-    # 将尺寸缩小为原始尺寸的 1/4
-    quarter_H = original_size[0] // ratio
-    quarter_W = original_size[1] // ratio
-    
-    # 使用 interpolate 进行缩小
-    resized_tensor = F.interpolate(tensor, size=(quarter_H, quarter_W), mode='bilinear', align_corners=False)
-    
-    return resized_tensor
 
 
 class Mast3rExtractor(nn.Module):
@@ -113,7 +58,7 @@ class Mast3rExtractor(nn.Module):
 
         self.mast3r = AsymmetricMASt3R.from_pretrained(model_name).to('cuda')
 
-        # 冻结 Mast3r 模型的所有参数
+        # freeze Mast3r
         for param in self.mast3r.parameters():
             param.requires_grad = False
     

@@ -12,40 +12,7 @@ from attrdict import AttrDict
 
 from core.extractor import ResidualBlock
 from depth_anything_v2.dpt import DepthAnythingV2
-from core.utils.utils import sv_intermediate_results
-
-
-
-def resize_tensor(tensor, target_size=512, ratio=16):
-    # 获取输入 tensor 的尺寸 (B, C, H, W)
-    _, _, H, W = tensor.shape
-    
-    # 计算 H 和 W 中较长的一边
-    if H > W:
-        new_H = target_size
-        new_W = int(W * (target_size / H))
-    else:
-        new_W = target_size
-        new_H = int(H * (target_size / W))
-    
-    new_W = (np.ceil(new_W / ratio) * ratio).astype(int)
-    new_H = (np.ceil(new_H / ratio) * ratio).astype(int)
-
-    # 使用 interpolate 进行缩放
-    resized_tensor = F.interpolate(tensor, size=(new_H, new_W), mode='bicubic', align_corners=False)
-    
-    return resized_tensor
-
-
-def resize_to_quarter(tensor, original_size, ratio):
-    # 将尺寸缩小为原始尺寸的 1/4
-    quarter_H = original_size[0] // ratio
-    quarter_W = original_size[1] // ratio
-    
-    # 使用 interpolate 进行缩小
-    resized_tensor = F.interpolate(tensor, size=(quarter_H, quarter_W), mode='bilinear', align_corners=False)
-    
-    return resized_tensor
+from core.utils.utils import sv_intermediate_results, resize_tensor, resize_to_quarter
 
 
 
