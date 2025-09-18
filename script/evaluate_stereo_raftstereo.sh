@@ -1,10 +1,11 @@
 # /usr/bin/bash
 
-export LOG_ROOT="/data5/yao/runs/log"
-export TB_ROOT="/data5/yao/runs/tboard"
-export CKPOINT_ROOT="/data5/yao/runs/ckpoint"
+export LOG_ROOT="./runs/log"
+export TB_ROOT="./runs/tboard"
+export CKPOINT_ROOT="./runs/ckpoint"
+export PRETRAINED_ROOT="./pretrained"
 
-export CUDA_VISIBLE_DEVICES=3
+# export CUDA_VISIBLE_DEVICES=3
 
 # python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/raftstereo_20240821_142156/raftstereo.pth --dataset middlebury_H --model_name "RaftStereo" --test_exp_name "final"
 # python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/raftstereo_20240821_142156/90000_raftstereo.pth --dataset middlebury_H --model_name "RaftStereo" --test_exp_name "90000itr"
@@ -225,9 +226,22 @@ export CUDA_VISIBLE_DEVICES=3
 
 # python3 evaluate_stereo_raftstereo.py --restore_ckpt ./clouds/ckpoint/Trans_RAFTStereoDepthBetaRefine_tuneRefine_20250322_093723/Trans_RAFTStereoDepthBetaRefine_tuneRefine.pth --depthany_model_dir "/data5/yao/pretrained" --dataset booster --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --test_exp_name "Trans_RAFTStereoDepthBetaRefine_tuneRefine"
 
-python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim_20241102_014050/50000_RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim.pth --depthany_model_dir "/data5/yao/pretrained" --dataset booster --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --test_exp_name "boosterF-50000itr-RefineSigmoidPreMonoBatch48ConfDim"
+# python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim_20241102_014050/50000_RaftStereoDepthBetaK53DispRefineSigmoidPreMonoBatch48ConfDim.pth --depthany_model_dir "/data5/yao/pretrained" --dataset booster --model_name "RAFTStereoDepthBetaRefine" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --test_exp_name "boosterF-50000itr-RefineSigmoidPreMonoBatch48ConfDim"
 
 # python3 evaluate_stereo_raftstereo.py --restore_ckpt /data5/yao/runs/ckpoint/raftstereo_20240821_142156/raftstereo.pth --dataset booster --model_name "RaftStereo" --test_exp_name "booster_H - final-raftstereo"
+
+
+
+python3 evaluate_stereo_raftstereo.py \
+    --model_name "RAFTStereoDepthBetaRefine" \
+    --dataset booster \
+    --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" \
+    --modulation_ratio 1.0 \
+    --conf_from_fea \
+    --depthany_model_dir "$PRETRAINED_ROOT" \
+    --restore_ckpt "$PRETRAINED_ROOT/MGStereo.pth" \
+    --test_exp_name "Booster-check-MGStereo"
+
 
 
 # python3 merge_sheet.py
