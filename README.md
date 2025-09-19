@@ -18,9 +18,18 @@ Detailed images can be found at [Google Driver](https://drive.google.com/file/d/
 
 
 ## Requirements
+### 1. Build Environment
+```shell
+conda env create -n MGStereo -f envs/environment_new.yaml
+conda activate MGStereo
+```
+
+### 2. Prepare Paths
+Create symbolic links for the running data, pretrained models, and datasets:
 ```Shell
-conda env create -f envs/environment_GStereo.yaml
-conda activate raftstereo
+ln -s ~/mount/xxx/Runs ./runs
+ln -s ~/mount/xxx/Pretrained ./pretrained
+ln -s ~/mount/xxx/Depth/Binocular ./datasets
 ```
 
 
