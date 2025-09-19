@@ -27,6 +27,7 @@ export NCCL_P2P_DISABLE=1
 # export CUDA_VISIBLE_DEVICES=0,6
 # export CUDA_VISIBLE_DEVICES=0
 # export CUDA_VISIBLE_DEVICES=2,3,4,5,6,7
+export CUDA_VISIBLE_DEVICES=0,1
 
 # export DATASET_ROOT="/data6/sceneflow/sceneflow"
 # export DATASET_ROOT="./datasets/Trans"
@@ -130,7 +131,7 @@ train_stereo_raftstereo.py \
     --depthany_model_dir "$PRETRAINED_ROOT" \
     --restore_ckpt "$PRETRAINED_ROOT/MGStereo.pth" \
     --spatial_scale -0.2 0.4 --saturation_range 0 1.4 \
-    --lr 0.0005 --batch_size 16 --num_steps 100000 --mixed_precision \
+    --lr 0.0005 --batch_size 8 --num_steps 100000 --mixed_precision \
     --fintune_info "tune_raft" --train_datasets "FSD" --use_wandb \
     --exp_name "$EXP_NAME"
 
