@@ -62,8 +62,8 @@ class InputPadder:
         return [F.pad(x, self._pad, mode='replicate') for x in inputs]
     
     def pad_intrinsics(self, intrinsic):
-        intrinsic[:, 2] += self._pad[0]
-        intrinsic[:, 3] += self._pad[2]
+        intrinsic[..., 2] += self._pad[0]
+        intrinsic[..., 3] += self._pad[2]
         return intrinsic
 
     def unpad(self, x):

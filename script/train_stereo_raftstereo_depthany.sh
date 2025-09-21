@@ -27,7 +27,7 @@ export NCCL_P2P_DISABLE=1
 # export CUDA_VISIBLE_DEVICES=0,6
 # export CUDA_VISIBLE_DEVICES=0
 # export CUDA_VISIBLE_DEVICES=2,3,4,5,6,7
-export CUDA_VISIBLE_DEVICES=0,1
+# export CUDA_VISIBLE_DEVICES=0,1
 
 # export DATASET_ROOT="/data6/sceneflow/sceneflow"
 # export DATASET_ROOT="./datasets/Trans"
@@ -120,6 +120,7 @@ nproc_per_node=$(echo $CUDA_VISIBLE_DEVICES | tr ',' '\n' | wc -l)  # Count the 
 # torchrun --nnode 1 --nproc_per_node $nproc_per_node --master_port 29501 train_stereo_raftstereo.py --batch_size 32 --train_iters 22 --valid_iters 32 --spatial_scale -0.2 0.4 --saturation_range 0 1.4 --n_downsample 2 --num_steps 10000 --mixed_precision --model_name "RAFTStereoDepthBetaRefine" --depthany_model_dir "/data5/yao/pretrained" --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" --modulation_ratio 1.0 --conf_from_fea --restore_ckpt "/home/yao/Document/GeneralizedStereoMatching/clouds/ckpoint/Trans_RAFTStereoDepthBetaRefine_20250321_180351/Trans_RAFTStereoDepthBetaRefine.pth" --lr 0.0005 --fintune_info "tune_refine" --train_datasets "Trans" --exp_name "Trans_RAFTStereoDepthBetaRefine_tuneRefine"
 
 
+export CUDA_LAUNCH_BLOCKING=1
 
 # On FSD dataset
 torchrun --nnode 1 --nproc_per_node $nproc_per_node --master_port 29501 \
@@ -132,6 +133,6 @@ train_stereo_raftstereo.py \
     --restore_ckpt "$PRETRAINED_ROOT/MGStereo.pth" \
     --spatial_scale -0.2 0.4 --saturation_range 0 1.4 \
     --lr 0.0005 --batch_size 8 --num_steps 100000 --mixed_precision \
-    --fintune_info "tune_raft" --train_datasets "FSD" --use_wandb \
+    --fintune_info "tune_raft" --train_datasets "FSD" \
     --exp_name "$EXP_NAME"
 

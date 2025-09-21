@@ -309,12 +309,14 @@ def validate_kitti2012(model, iters=32, root="", mixed_prec=False):
     return {'kitti-epe': round(epe,4), 'kitti-d1': round(d1,4)}
 
 @torch.no_grad()
-def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=False, dataset="sceneflow", info=""):
+def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=False, dataset="sceneflow", info="", txt_root=""):
     """ Peform validation using the FlyingThings3D (TEST) split """
     eval = args.eval if args is not None else eval
     model.eval()
     if dataset.lower() == "sceneflow":
         val_dataset = datasets.SceneFlowDatasets(dstype='frames_finalpass', root=root, things_test=True, eval=True)
+    elif dataset.lower() == "fsd":
+        val_dataset = datasets.FSDDataset(root=root, args=args, txt_root='./datasets/FSD/', eval=True)
     elif dataset.lower() == "trans":
         val_dataset = datasets.Trans(root=root, things_test=True)
     else:
@@ -327,11 +329,13 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=
         paths, image1, image2, flow_gt, valid_gt, intrinsic = val_dataset[val_id]
         image1 = image1[None].cuda()
         image2 = image2[None].cuda()
-        intrinsic = intrinsic[None].cuda()
+        intrinsic = intrinsic[None].cuda() \
+            if intrinsic is not None else None
 
         padder = InputPadder(image1.shape, divis_by=32)
         image1, image2 = padder.pad(image1, image2)
-        intrinsic = padder.pad_intrinsics(intrinsic)
+        intrinsic = padder.pad_intrinsics(intrinsic) \
+            if intrinsic is not None else None
 
         with autocast(enabled=mixed_prec):
             _, flow_pr = model(image1, image2, iters=iters, test_mode=True, intrinsic=intrinsic)
@@ -367,6 +371,9 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=
         logger.info(f"{dataset} Iter {val_id+1} out of {len(val_dataset)}. " + \
                      f"EPE {round(image_epe,4)}, BAD1 {round(image_out_1,4)}, " +\
                      f"BAD2 {round(image_out_2,4)}, BAD3 {round(image_out_3,4)} ")
+
+        # if val_id>10:
+        #     break
         
 
     epe_list = np.array(epe_list)
@@ -386,6 +393,7 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=
             info+'bad1': round(bad1), 
             info+'bad2': round(bad2), 
             info+'bad3': round(bad3)}
+
 
 
 @torch.no_grad()

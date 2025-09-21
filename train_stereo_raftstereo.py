@@ -78,6 +78,7 @@ def train(args, logger):
         validation_frequency = len(train_loader)
     else:
         validation_frequency = 10000
+    # validation_frequency=1
 
     scaler = GradScaler(enabled=args.mixed_precision)
 

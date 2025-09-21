@@ -114,7 +114,8 @@ class StereoDataset(data.Dataset):
             img1 = torch.from_numpy(img1).permute(2, 0, 1).float()
             img2 = torch.from_numpy(img2).permute(2, 0, 1).float()
             flow = torch.from_numpy(flow).permute(2, 0, 1).float()
-            intrinsic = torch.from_numpy(np.array(intrinsic)).float() if intrinsic is not None else torch.from_numpy(np.eye(3)).float()
+            intrinsic = torch.from_numpy(np.array(intrinsic)).float() \
+                if intrinsic is not None else torch.from_numpy(np.array([1, 1, 1, 1])).float()
         except Exception as err:
             raise Exception(err, "{}, {}, {}".format(self.image_list[index][0], 
                                                      self.image_list[index][1], 
@@ -436,7 +437,7 @@ class CREStereoDataset(StereoDataset):
 
 
 class FSDDataset(StereoDataset):
-    def __init__(self, aug_params=None, root='datasets/FSD', image_set='training', args=None, txt_root=None):
+    def __init__(self, aug_params=None, root='datasets/FSD', image_set='training', args=None, txt_root=None, eval=False):
         super(FSDDataset, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispFSD, args=args)
         root = root if len(root)>0 else DATASET_ROOT
         assert os.path.exists(root), "check the existence: {}".format(root)
@@ -455,6 +456,11 @@ class FSDDataset(StereoDataset):
         for idx, (img1, img2, disp) in enumerate(zip(image1_list, image2_list, disp_list)):
             self.image_list += [ [img1, img2] ]
             self.disparity_list += [ disp ]
+        
+        if eval:
+            logging.info(f"Eval FSD, only use 2000 samples for quick validation")
+            self.image_list = self.image_list[:2000]
+            self.disparity_list = self.disparity_list[:2000]
     
 
 
