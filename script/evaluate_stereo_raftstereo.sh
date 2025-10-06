@@ -242,6 +242,16 @@ python3 evaluate_stereo_raftstereo.py \
     --restore_ckpt "$PRETRAINED_ROOT/MGStereo.pth" \
     --test_exp_name "Booster-check-MGStereo"
 
+python3 evaluate_stereo_raftstereo.py \
+    --model_name "RAFTStereoDepthBetaRefine" \
+    --dataset middlebury_H \
+    --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" \
+    --modulation_ratio 1.0 \
+    --conf_from_fea \
+    --depthany_model_dir "$PRETRAINED_ROOT" \
+    --restore_ckpt "$PRETRAINED_ROOT/MGStereo.pth" \
+    --test_exp_name "middlebury_H-check-MGStereo"
+
 
 
 # python3 merge_sheet.py

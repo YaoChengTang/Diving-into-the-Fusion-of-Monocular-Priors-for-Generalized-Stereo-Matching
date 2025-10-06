@@ -104,7 +104,7 @@ class RAFTStereoDepthBetaRefine(nn.Module):
         image2 = (2 * (image2 / 255.0) - 1.0).contiguous()
 
         # run the context network
-        with autocast(enabled=self.args.mixed_precision):
+        with autocast(enabled=self.args.mixed_precision, dtype=torch.bfloat16 if self.args.mixed_precision_dtype=='bfloat16' else torch.float16):
             if self.args.shared_backbone:
                 *cnet_list, x = self.cnet(torch.cat((image1, image2), dim=0), dual_inp=True, num_layers=self.args.n_gru_layers)
                 fmap1, fmap2 = self.conv2(x).split(dim=0, split_size=x.shape[0]//2)
@@ -158,9 +158,21 @@ class RAFTStereoDepthBetaRefine(nn.Module):
             corr = corr_fn(hor_coords1) # index correlation volume
             disp = hor_coords1 - hor_coords0
 
-            with autocast(enabled=self.args.mixed_precision):
+            with autocast(enabled=self.args.mixed_precision, dtype=torch.bfloat16 if self.args.mixed_precision_dtype=='bfloat16' else torch.float16):
                 disp_lbp = self.lbp_encoder(disp)
-                modulation, distribution = self.modulater(disp_lbp, depth_lbp, out_distribution=True)
+                try:
+                    modulation, distribution = self.modulater(disp_lbp, depth_lbp, out_distribution=True)
+                except Exception as err:
+                    # ---- NaN 检查 ----
+                    for name, tensor in [("disp_lbp", disp_lbp), 
+                                         ("depth_lbp", depth_lbp), 
+                                         ("disp", disp), 
+                                         ("hor_coords1", hor_coords1),
+                                        ]:
+                        if torch.isnan(tensor).any():
+                            print(f"[NaN DETECTED] {name} at {itr} has NaNs! shape={tensor.shape}")
+                    # ------------------
+                    raise Exception(err)
                 if vis_mode:
                     modulation_predictions.append(modulation)
 
@@ -179,6 +191,13 @@ class RAFTStereoDepthBetaRefine(nn.Module):
                 modulation_weight = rescale_modulation(itr, iters, 
                                                        self.args.modulation_alg, 
                                                        self.args.modulation_ratio)
+                # for name, tensor in [("delta_disp", delta_disp), 
+                #                      ("modulation", modulation), 
+                #                      ("modulation * modulation_weight", modulation * modulation_weight), 
+                #                      ("corr", corr),
+                #                     ]:
+                #     if torch.isnan(tensor).any():
+                #         print(f"[NaN DETECTED] {name} at {itr} has NaNs! shape={tensor.shape}")
                 delta_disp = delta_disp * (1 + modulation * modulation_weight) 
 
                 if hasattr(self.args, "vis_inter") and self.args.vis_inter:

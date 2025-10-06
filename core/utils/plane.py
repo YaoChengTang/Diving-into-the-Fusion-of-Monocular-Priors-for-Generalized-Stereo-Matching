@@ -8,8 +8,12 @@ from torch import nn
 from torch.nn import functional as F
 from PIL import Image
 
-import frame_utils
-import vis
+try:
+    import frame_utils
+    import vis
+except:
+    from core.utils import frame_utils
+    from core.utils import vis
 
 
 def get_pos(H,W,disp=None,slant="slant",slant_norm=False,patch_size=None,device=None):

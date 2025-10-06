@@ -126,14 +126,39 @@ class DispBasicMultiUpdateBlock(nn.Module):
     def forward(self, net, inp, corr=None, disp=None, iter08=True, iter16=True, iter32=True, update=True):
 
         if iter32:
+            # for name, tensor in [("net[2]", net[2]), 
+            #                      ("inp[2][0]", inp[2][0]), 
+            #                      ("inp[2][1]", inp[2][1]), 
+            #                      ("inp[2][2]", inp[2][2]), 
+            #                      ("net[1]", net[1])
+            #                     ]:
+            #     if torch.isnan(tensor).any():
+            #         print(f"[NaN DETECTED] {name} at iter32 has NaNs! shape={tensor.shape}")
             net[2] = self.gru32(net[2], *(inp[2]), pool2x(net[1]))
         if iter16:
+            # for name, tensor in [("net[1]", net[1]), 
+            #                      ("inp[1][0]", inp[1][0]), 
+            #                      ("inp[1][1]", inp[1][1]), 
+            #                      ("inp[1][2]", inp[1][2]),
+            #                      ("net[2]", net[2])
+            #                     ]:
+            #     if torch.isnan(tensor).any():
+            #         print(f"[NaN DETECTED] {name} at iter16 has NaNs! shape={tensor.shape}")
             if self.args.n_gru_layers > 2:
                 net[1] = self.gru16(net[1], *(inp[1]), pool2x(net[0]), interp(net[2], net[1]))
             else:
                 net[1] = self.gru16(net[1], *(inp[1]), pool2x(net[0]))
         if iter08:
             motion_features = self.encoder(disp, corr)
+            # for name, tensor in [("net[0]", net[0]), 
+            #                      ("inp[0][0]", inp[0][0]), 
+            #                      ("inp[0][1]", inp[0][1]), 
+            #                      ("inp[0][2]", inp[0][2]),
+            #                      ("net[1]", net[1]),
+            #                      ("motion_features", motion_features)
+            #                     ]:
+            #     if torch.isnan(tensor).any():
+            #         print(f"[NaN DETECTED] {name} at iter08 has NaNs! shape={tensor.shape}")
             if self.args.n_gru_layers > 1:
                 net[0] = self.gru08(net[0], *(inp[0]), motion_features, interp(net[1], net[0]))
             else:
@@ -143,6 +168,12 @@ class DispBasicMultiUpdateBlock(nn.Module):
             return net
 
         delta_disp = self.disp_head(net[0])
+
+        # for name, tensor in [("net[0]", net[0]), 
+        #                      ("delta_disp", delta_disp)
+        #                     ]:
+        #     if torch.isnan(tensor).any():
+        #         print(f"[NaN DETECTED] {name} at update has NaNs! shape={tensor.shape}")
 
         # scale mask to balence gradients
         mask = .25 * self.mask(net[0])

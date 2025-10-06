@@ -72,7 +72,7 @@ def readPFM(file):
 def writePFM(file, array):
     import os
     assert type(file) is str and type(array) is np.ndarray and \
-           os.path.splitext(file)[1] == ".pfm"
+           os.path.splitext(file)[1] == ".pfm", f"{type(file)}, {type(array)}, {os.path.splitext(file)[1]}"
     with open(file, 'wb') as f:
         H, W = array.shape
         headers = ["Pf\n", f"{W} {H}\n", "-1\n"]

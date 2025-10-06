@@ -12,6 +12,8 @@ from datetime import datetime
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torchvision.utils as vutils
+import matplotlib.pyplot as plt
 
 sys.path.insert(0,'core')
 sys.path.insert(0,'core/utils')
@@ -57,6 +59,82 @@ def fetch_optimizer(args, model):
 
     return optimizer, scheduler
 
+def check_model_params(model, logger=None):
+    has_nan = False
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue
+
+        if torch.isnan(param).any() or torch.isinf(param).any():
+            msg = f"❌ NaN/Inf detected in weights: {name}, " \
+                  f"min={param.min().item()}, max={param.max().item()}"
+            print(msg) if logger is None else logger.error(msg)
+            has_nan = True
+
+        if param.grad is not None:
+            if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
+                msg = f"❌ NaN/Inf detected in gradients: {name}, " \
+                      f"grad_min={param.grad.min().item()}, grad_max={param.grad.max().item()}"
+                print(msg) if logger is None else logger.error(msg)
+                has_nan = True
+
+    if not has_nan:
+        msg = "✅ No NaN/Inf found in model parameters or gradients."
+        print(msg) if logger is None else logger.info(msg)
+
+def save_batch_debug(save_dir, image1, image2, flow, valid, prefix="", global_rank=0):
+    """
+    Save the current batch for debugging, including:
+      - image1 / image2 (PNG)
+      - disparity (tensor .pt + PNG visualization)
+      - valid mask (tensor .pt + PNG)
+
+    Args:
+        save_dir (str): Directory where results will be saved
+        image1 (Tensor): (N, C, H, W) input image 1
+        image2 (Tensor): (N, C, H, W) input image 2
+        flow (Tensor): (N, 1, H, W) disparity tensor
+        valid (Tensor): (N, 1, H, W) mask tensor
+        prefix (str): Optional prefix for filenames (e.g., "step100_")
+        global_rank (int): Rank ID in distributed training, used to separate outputs
+    """
+    # Add rank-specific subfolder to avoid overwrite
+    rank_dir = os.path.join(save_dir, f"rank{global_rank}")
+    os.makedirs(rank_dir, exist_ok=True)
+
+    batch_size = image1.shape[0]
+
+    for i in range(batch_size):
+        # Save image1 / image2
+        vutils.save_image(
+            image1[i],
+            os.path.join(rank_dir, f"{prefix}image_{i}_left.png"),
+            normalize=True,
+        )
+        vutils.save_image(
+            image2[i],
+            os.path.join(rank_dir, f"{prefix}image_{i}_right.png"),
+            normalize=True,
+        )
+
+        # Save disparity visualization as PNG (normalized to [0,1])
+        disp = -flow[i, 0].detach().cpu().numpy()
+        disp_min, disp_max = disp.min(), disp.max()
+        if disp_max > disp_min:
+            disp_norm = (disp - disp_min) / (disp_max - disp_min)
+        else:
+            disp_norm = disp
+        plt.imsave(
+            os.path.join(rank_dir, f"{prefix}image_{i}_disp.png"), disp_norm, cmap="jet"
+        )
+
+        # Save valid mask (tensor + PNG)
+        torch.save(valid[i].cpu(), os.path.join(rank_dir, f"{prefix}valid_{i}.pt"))
+        vutils.save_image(
+            valid[i].float(),
+            os.path.join(rank_dir, f"{prefix}image_{i}_valid.png"),
+            normalize=False,
+        )
 
 def train(args, logger):
     model = get_model_ddp(args)
@@ -93,8 +171,19 @@ def train(args, logger):
             optimizer.zero_grad()
             image1, image2, flow, valid, intrinsic = [x.cuda() for x in data_blob]
 
+            # save_batch_debug(LOG_ROOT, image1/255, image2/255, flow, valid, prefix="err_", global_rank=int(os.getenv("RANK", 0)))
+            # print(paths)
+            # sys.exit(0)
+
             assert model.training
-            res = model(image1, image2, iters=args.train_iters, intrinsic=intrinsic)
+            try:
+                res = model(image1, image2, iters=args.train_iters, intrinsic=intrinsic)
+            except Exception as err:
+                check_model_params(model, logger)
+                logger.info(f"Exception {err} in {paths[0]}, " + \
+                            f"image1: {image1.shape}, flow: {flow.shape}, valid: {valid.shape}")
+                save_batch_debug(LOG_ROOT, image1/255, image2/255, flow, valid, prefix="err_", global_rank=int(os.getenv("RANK", 0)))
+                raise Exception(err)
             flow_predictions = res["disp_predictions"]
             assert model.training
 
@@ -110,6 +199,14 @@ def train(args, logger):
                 continue
 
             loss, metrics = sequence_loss(flow_predictions, flow, valid)
+            if torch.isnan(loss) or torch.isinf(loss):
+                logger.info(f"Corrputed loss in {paths[0]}, " + \
+                            f"image1: {image1.shape}, flow: {flow.shape}, valid: {valid.shape}, " + \
+                            f"flow_predictions: {len(flow_predictions)}, {flow_predictions[0].shape}, " + \
+                            f"loss: {loss}, metrics: {metrics}")
+                optimizer.zero_grad(set_to_none=True)
+                scaler.update()
+                continue
             if args.local_rank==0 and int(NODE_RANK)==0:
                 metrics['loss'] = loss.item()
                 metrics['lr'] = optimizer.param_groups[0]['lr']
@@ -167,6 +264,7 @@ if __name__ == '__main__':
     parser.add_argument('--depthany_model_dir', default='/data5/yao/pretrained', help="directory of pretrained model path for DepthAnything")
     parser.add_argument('--restore_ckpt', help="restore checkpoint")
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
+    parser.add_argument('--mixed_precision_dtype', default='float16', choices=['float16', 'bfloat16'], help='which dtype to use for mixed precision')
     parser.add_argument('--eval', action='store_true', help='evaluation mode')
     parser.add_argument('--silence', action='store_true', help='no output of training/eval process')
     parser.add_argument('--use_wandb', action='store_true', help='use wandb for logging')

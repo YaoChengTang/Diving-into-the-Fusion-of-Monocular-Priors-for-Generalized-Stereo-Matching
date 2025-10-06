@@ -120,9 +120,45 @@ class DepthAnyExtractor(nn.Module):
 
         if self.args is not None and hasattr(self.args, "vis_inter") and self.args.vis_inter:
             sv_intermediate_results(x, "depthAnything_features", self.args.sv_root)
-
+        
+        # for name, tensor in [("x", x), ("depth", depth), ("depth_fea", depth_fea)
+        #                     ]:
+        #     if torch.isnan(tensor).any():
+        #         print(f"[NaN DETECTED] {name} at resize_to_quarter has NaNs! shape={tensor.shape}")
+        # x_clone = x.clone()
         x = self.layer1(x)
+        # print(f"x_clone_min={x_clone.min()}, x_clone_max={x_clone.max()}, x_min={x.min()}, x_max={x.max()}")
+        # info = ""
+        # for idx, module in enumerate(self.outputs08):
+        #     for p_name, param in module.named_parameters():
+        #         if "weight" in p_name and param.numel():
+        #             p_min = param.detach().min().item()
+        #             p_max = param.detach().max().item()
+        #             info += f"outputs08[{idx}].{p_name}: min={p_min}, max={p_max} - "
+        # print(info, flush=True)
+        # for name, tensor in [("x", x), 
+        #                     ]:
+        #     if torch.isnan(tensor).any():
+        #         print(f"[NaN DETECTED] {name} at layer1 has NaNs! shape={tensor.shape}")
         outputs08 = [f(x) for f in self.outputs08]
+        # for name, tensor in [("outputs08[0]", outputs08[0]), 
+        #                     ]:
+        #     if torch.isnan(tensor).any():
+        #         print(f"[NaN DETECTED] {name} has NaNs! shape={tensor.shape}, "
+        #               f"x_min={x.min()}, x_max={x.max()}")
+        #         info = ""
+        #         for idx, module in enumerate(self.outputs08):
+        #             for p_name, param in module.named_parameters():
+        #                 if "weight" in p_name and param.numel():
+        #                     p_min = param.detach().min().item()
+        #                     p_max = param.detach().max().item()
+        #                     info += f"outputs08[{idx}].{p_name}: min={p_min}, max={p_max}"
+        #         print(info, flush=True)
+        #         save_root = os.getenv("LOG_ROOT", "logs")
+        #         rank = int(os.getenv("RANK", "0"))
+        #         torch.save(x.detach().cpu(), os.path.join(save_root, f"outputs08_input_{rank}.pt"))
+        #         for idx, module in enumerate(self.outputs08):
+        #             torch.save(module.state_dict(), os.path.join(save_root, f"outputs08_module_{idx}_{rank}.pth"))
         if num_layers == 1:
             return (outputs08, v) if dual_inp else (outputs08,)
 

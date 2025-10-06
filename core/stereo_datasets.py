@@ -6,6 +6,7 @@ import torch.utils.data as data
 import torch.nn.functional as F
 import logging
 import os
+import sys
 import re
 import copy
 import math
@@ -14,11 +15,25 @@ from pathlib import Path
 from glob import glob
 import os.path as osp
 
-from core.utils import plane
-from core.utils import frame_utils
-from core.utils.ddp import get_loader
-from core.utils.augmentor import FlowAugmentor, SparseFlowAugmentor
+import matplotlib.pyplot as plt
+import argparse
+from torch.utils.data.distributed import DistributedSampler
+
+# from core.utils import plane
+try:
+    from core.utils import frame_utils
+    from core.utils.ddp import get_loader
+    from core.utils.augmentor import FlowAugmentor, SparseFlowAugmentor
+except:
+    sys.path.insert(0, Path.cwd().as_posix())
+    print("sys.path: ", sys.path)
+    from core.utils import frame_utils
+    from core.utils.ddp import get_loader
+    from core.utils.augmentor import FlowAugmentor, SparseFlowAugmentor
+
+
 DATASET_ROOT = os.getenv('DATASET_ROOT')
+
 
 
 class StereoDataset(data.Dataset):
@@ -438,7 +453,7 @@ class CREStereoDataset(StereoDataset):
 
 class FSDDataset(StereoDataset):
     def __init__(self, aug_params=None, root='datasets/FSD', image_set='training', args=None, txt_root=None, eval=False):
-        super(FSDDataset, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispFSD, args=args)
+        super(FSDDataset, self).__init__(aug_params, sparse=False, reader=frame_utils.readDispFSD, args=args)
         root = root if len(root)>0 else DATASET_ROOT
         assert os.path.exists(root), "check the existence: {}".format(root)
 
@@ -610,7 +625,7 @@ class Fooling3DBatchSampler(data.Sampler):
         return total_batches
 
 
-from torch.utils.data.distributed import DistributedSampler
+
 class DistributedFooling3DBatchSampler(DistributedSampler):
     def __init__(self, dataset, batch_size, num_replicas=None, rank=None):
         """
@@ -736,3 +751,75 @@ def fetch_dataloader(args):
     logging.info('Training with %d image pairs' % len(train_dataset))
     return train_loader
 
+
+
+
+
+def _tensor_to_image(tensor: torch.Tensor) -> np.ndarray:
+    array = tensor.detach().cpu().permute(1, 2, 0).numpy()
+    return np.clip(array, 0, 255).astype(np.uint8)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="FSDDataset sample visualizer")
+    parser.add_argument("--root", default="datasets/FSD", help="Dataset root directory")
+    parser.add_argument("--txt-root", default='./datasets/FSD/', help="Optional cached file-list root")
+    parser.add_argument("--index", type=int, default=0, help="Sample index to visualize")
+
+    parser.add_argument('--image_size', type=int, nargs='+', default=[320, 736], help="size of the random image crops used during training.")
+    parser.add_argument('--img_gamma', type=float, nargs='+', default=None, help="gamma range")
+    parser.add_argument('--saturation_range', type=float, nargs='+', default=[0, 1.4], help='color saturation')
+    parser.add_argument('--do_flip', default=False, choices=['h', 'v'], help='flip the images horizontally or vertically')
+    parser.add_argument('--spatial_scale', type=float, nargs='+', default=[-0.2, 0.4], help='re-scale the images randomly')
+    parser.add_argument('--noyjitter', action='store_true', help='don\'t simulate imperfect rectification')
+
+    args = parser.parse_args()
+    print("-" * 20)
+
+    aug_params = None
+    aug_params = {
+                  'crop_size': args.image_size, 
+                  'min_scale': args.spatial_scale[0], 
+                  'max_scale': args.spatial_scale[1], 
+                  'do_flip': False, 
+                  'yjitter': not args.noyjitter,
+                #   'yjitter': False,
+                  }
+    if hasattr(args, "saturation_range") and args.saturation_range is not None:
+        aug_params["saturation_range"] = args.saturation_range
+    if hasattr(args, "img_gamma") and args.img_gamma is not None:
+        aug_params["gamma"] = args.img_gamma
+    if hasattr(args, "do_flip") and args.do_flip is not None:
+        aug_params["do_flip"] = args.do_flip
+
+    dataset = FSDDataset(aug_params=aug_params, root=args.root, txt_root=args.txt_root)
+    if len(dataset) == 0:
+        raise RuntimeError("FSDDataset contains no samples")
+
+    idx = max(0, min(args.index, len(dataset) - 1))
+    metadata, left, right, flow, valid, _ = dataset[idx]
+    print(idx, metadata)
+
+    left_img = _tensor_to_image(left)
+    right_img = _tensor_to_image(right)
+    disparity = (-flow[0]).detach().cpu().numpy()
+    mask = valid.squeeze().detach().cpu().numpy()
+    print(mask.shape, disparity.shape, np.sum(mask), mask.max(), mask.min())
+    # disparity = np.ma.masked_where(~mask, disparity)
+
+    output_dir = Path("tmp")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    base_name = f"sample_{idx}"
+    if isinstance(metadata, (list, tuple)) and metadata:
+        base_name = Path(metadata[0]).stem or base_name
+
+    plt.imsave(output_dir / f"{base_name}_left.png", left_img)
+    plt.imsave(output_dir / f"{base_name}_right.png", right_img)
+    plt.imsave(output_dir / f"{base_name}_disparity.png", np.ma.filled(disparity, np.nan), cmap="jet")
+    frame_utils.writePFM(str(output_dir / f"{base_name}_disparity.pfm"), disparity)
+    plt.imsave(output_dir / f"{base_name}_mask.png", mask, cmap="gray", vmin=0, vmax=1)
+
+
+if __name__ == "__main__":
+    main()

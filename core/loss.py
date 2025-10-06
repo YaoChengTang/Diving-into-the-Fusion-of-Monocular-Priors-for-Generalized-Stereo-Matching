@@ -128,7 +128,7 @@ class Loss(nn.Module):
             if confidence_list[i] is not None and \
                (self.args.offset_memory_last_iter<0 or \
                (self.args.offset_memory_last_iter>0 and i<=self.args.offset_memory_last_iter)):
-                with autocast(enabled=self.mixed_precision):
+                with autocast(enabled=self.mixed_precision, dtype=torch.bfloat16 if self.args.mixed_precision_dtype=='bfloat16' else torch.float16):
                     gt_error = (flow_preds[i].detach() - flow_gt).abs().detach()
                     gt_error = F.interpolate(gt_error,scale_factor=1/4,mode='bilinear')
                     # confidence_loss += i_weight * F.smooth_l1_loss(confidence_list[i], gt_error)
@@ -172,7 +172,7 @@ class Loss(nn.Module):
                 params_refine_loss += i_weight * 0.5 * i_loss.mean()
 
             if i>n_predictions//2:
-                with autocast(enabled=self.mixed_precision):
+                with autocast(enabled=self.mixed_precision, dtype=torch.bfloat16 if self.args.mixed_precision_dtype=='bfloat16' else torch.float16):
                     if self.smoothness=="gradient":
                         smooth_loss += i_weight * self.smooth_loss_computer(flow_preds[i], imgL).mean()
                     elif self.smoothness=="curvature":

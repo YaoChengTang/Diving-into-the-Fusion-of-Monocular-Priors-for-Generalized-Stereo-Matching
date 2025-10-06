@@ -123,16 +123,34 @@ nproc_per_node=$(echo $CUDA_VISIBLE_DEVICES | tr ',' '\n' | wc -l)  # Count the 
 export CUDA_LAUNCH_BLOCKING=1
 
 # On FSD dataset
-torchrun --nnode 1 --nproc_per_node $nproc_per_node --master_port 29501 \
-train_stereo_raftstereo.py \
+torchrun --nnodes 1 --nproc_per_node $nproc_per_node --master_port 27501 \
+    train_stereo_raftstereo.py \
     --model_name "RAFTStereoDepthBetaRefine" \
     --train_iters 22 --valid_iters 32 --n_downsample 2 \
-    --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" \
+    --lbp_neighbor_offsets '(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)' \
     --modulation_ratio 1.0 --conf_from_fea \
     --depthany_model_dir "$PRETRAINED_ROOT" \
     --restore_ckpt "$PRETRAINED_ROOT/MGStereo.pth" \
-    --spatial_scale -0.2 0.4 --saturation_range 0 1.4 \
-    --lr 0.0005 --batch_size 8 --num_steps 100000 --mixed_precision \
-    --fintune_info "tune_raft" --train_datasets "FSD" \
+    --spatial_scale -1 0 --saturation_range 0 1.4 \
+    --image_size 320 736 --noyjitter \
+    --lr 0.0001 --batch_size 8 --num_steps 100000 \
+    --fintune_info "tune_raft" \
+    --train_datasets "FSD" --use_wandb \
     --exp_name "$EXP_NAME"
 
+
+torchrun --nnodes 1 --nproc_per_node $nproc_per_node --master_port 27501 \
+    train_stereo_raftstereo.py \
+    --model_name "RAFTStereoDepthBetaRefine" \
+    --train_iters 22 --valid_iters 32 --n_downsample 2 \
+    --lbp_neighbor_offsets '(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)' \
+    --modulation_ratio 1.0 --conf_from_fea \
+    --depthany_model_dir "$PRETRAINED_ROOT" \
+    --restore_ckpt "$PRETRAINED_ROOT/MGStereo.pth" \
+    --spatial_scale -1 0 --saturation_range 0 1.4 \
+    --image_size 320 736 --noyjitter \
+    --lr 0.0001 --batch_size 8 --num_steps 100000 \
+    --mixed_precision --mixed_precision_dtype "bfloat16" \
+    --fintune_info "tune_raft" \
+    --train_datasets "FSD" --use_wandb \
+    --exp_name "$EXP_NAME"

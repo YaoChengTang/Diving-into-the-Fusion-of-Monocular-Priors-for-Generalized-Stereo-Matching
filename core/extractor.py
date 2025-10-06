@@ -3,6 +3,94 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+# class ResidualBlock(nn.Module):
+#     def __init__(self, in_planes, planes, norm_fn='group', stride=1):
+#         super(ResidualBlock, self).__init__()
+  
+#         self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, padding=1, stride=stride)
+#         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, padding=1)
+#         self.relu = nn.ReLU(inplace=True)
+
+#         num_groups = planes // 8
+
+#         if norm_fn == 'group':
+#             self.norm1 = nn.GroupNorm(num_groups=num_groups, num_channels=planes)
+#             self.norm2 = nn.GroupNorm(num_groups=num_groups, num_channels=planes)
+#             if not (stride == 1 and in_planes == planes):
+#                 self.norm3 = nn.GroupNorm(num_groups=num_groups, num_channels=planes)
+        
+#         elif norm_fn == 'batch':
+#             self.norm1 = nn.BatchNorm2d(planes)
+#             self.norm2 = nn.BatchNorm2d(planes)
+#             if not (stride == 1 and in_planes == planes):
+#                 self.norm3 = nn.BatchNorm2d(planes)
+        
+#         elif norm_fn == 'instance':
+#             self.norm1 = nn.InstanceNorm2d(planes)
+#             self.norm2 = nn.InstanceNorm2d(planes)
+#             if not (stride == 1 and in_planes == planes):
+#                 self.norm3 = nn.InstanceNorm2d(planes)
+
+#         elif norm_fn == 'none':
+#             self.norm1 = nn.Sequential()
+#             self.norm2 = nn.Sequential()
+#             if not (stride == 1 and in_planes == planes):
+#                 self.norm3 = nn.Sequential()
+
+#         if stride == 1 and in_planes == planes:
+#             self.downsample = None
+#         else:    
+#             self.downsample = nn.Sequential(
+#                 nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm3)
+
+#     def forward(self, x):
+#         y = x
+#         if torch.isnan(y).any() or torch.isinf(y).any():
+#             print(f"ResidualBlock y: shape={y.shape}, min={y.min().item()}, max={y.max().item()}, NaN? {torch.isnan(y).any().item()}, Inf? {torch.isinf(y).any().item()}")
+#         y = self.conv1(y)
+#         if torch.isnan(y).any() or torch.isinf(y).any():
+#             print(f"ResidualBlock conv1: shape={y.shape}, min={y.min().item()}, max={y.max().item()}, NaN? {torch.isnan(y).any().item()}, Inf? {torch.isinf(y).any().item()}")
+#             print(f"ResidualBlock conv1 weights: min={self.conv1.weight.min().item()}, max={self.conv1.weight.max().item()}, NaN? {torch.isnan(self.conv1.weight).any().item()}, Inf? {torch.isinf(self.conv1.weight).any().item()}")
+#             print(f"ResidualBlock x: shape={x.shape}, min={x.min().item()}, max={x.max().item()}, NaN? {torch.isnan(x).any().item()}, Inf? {torch.isinf(x).any().item()}")
+
+#         y_clone = y.clone()
+#         y = self.norm1(y)
+#         if torch.isnan(y).any() or torch.isinf(y).any():
+#             print(f"ResidualBlock norm1: shape={y.shape}, min={y.min().item()}, max={y.max().item()}, NaN? {torch.isnan(y).any().item()}, Inf? {torch.isinf(y).any().item()}")
+#             print(f"ResidualBlock norm1.weight (γ): min={self.norm1.weight.min().item()}, max={self.norm1.weight.max().item()}, NaN? {torch.isnan(self.norm1.weight).any().item()}, Inf? {torch.isinf(self.norm1.weight).any().item()}")
+#             print(f"ResidualBlock norm1.bias   (β): min={self.norm1.bias.min().item()}, max={self.norm1.bias.max().item()}, NaN? {torch.isnan(self.norm1.bias).any().item()}, Inf? {torch.isinf(self.norm1.bias).any().item()}")
+#             print(f"ResidualBlock norm1.running_mean: min={self.norm1.running_mean.min().item()}, max={self.norm1.running_mean.max().item()}, NaN? {torch.isnan(self.norm1.running_mean).any().item()}, Inf? {torch.isinf(self.norm1.running_mean).any().item()}")
+#             print(f"ResidualBlock norm1.running_var: min={self.norm1.running_var.min().item()}, max={self.norm1.running_var.max().item()}, NaN? {torch.isnan(self.norm1.running_var).any().item()}, Inf? {torch.isinf(self.norm1.running_var).any().item()}")
+#             print(f"ResidualBlock y_clone: shape={y_clone.shape}, min={y_clone.min().item()}, max={y_clone.max().item()}, NaN? {torch.isnan(y_clone).any().item()}, Inf? {torch.isinf(y_clone).any().item()}")
+#             batch_mean = y_clone.mean(dim=[0,2,3])
+#             batch_var  = y_clone.var(dim=[0,2,3], unbiased=False)
+#             print(f"ResidualBlock norm1 batch mean: min={batch_mean.min().item()}, max={batch_mean.max().item()}, NaN? {torch.isnan(batch_mean).any().item()}")
+#             print(f"ResidualBlock norm1 batch var : min={batch_var.min().item()}, max={batch_var.max().item()}, NaN? {torch.isnan(batch_var).any().item()}")
+#             print(f"ResidualBlock norm1.num_batches_tracked: {self.norm1.num_batches_tracked.item()}")
+
+#         y = self.relu(y)
+#         if torch.isnan(y).any() or torch.isinf(y).any():
+#             print(f"ResidualBlock relu1: shape={y.shape}, min={y.min().item()}, max={y.max().item()}, NaN? {torch.isnan(y).any().item()}, Inf? {torch.isinf(y).any().item()}")
+
+#         y = self.conv2(y)
+#         if torch.isnan(y).any() or torch.isinf(y).any():
+#             print(f"ResidualBlock conv2: shape={y.shape}, min={y.min().item()}, max={y.max().item()}, NaN? {torch.isnan(y).any().item()}, Inf? {torch.isinf(y).any().item()}")
+
+#         y = self.norm2(y)
+#         if torch.isnan(y).any() or torch.isinf(y).any():
+#             print(f"ResidualBlock norm2: shape={y.shape}, min={y.min().item()}, max={y.max().item()}, NaN? {torch.isnan(y).any().item()}, Inf? {torch.isinf(y).any().item()}")
+
+#         y = self.relu(y)
+#         if torch.isnan(y).any() or torch.isinf(y).any():
+#             print(f"ResidualBlock relu2: shape={y.shape}, min={y.min().item()}, max={y.max().item()}, NaN? {torch.isnan(y).any().item()}, Inf? {torch.isinf(y).any().item()}")
+
+#         if self.downsample is not None:
+#             x = self.downsample(x)
+#             if torch.isnan(x).any() or torch.isinf(x).any():
+#                 print(f"ResidualBlock downsample: shape={x.shape}, min={x.min().item()}, max={x.max().item()}, NaN? {torch.isnan(x).any().item()}, Inf? {torch.isinf(x).any().item()}")
+
+#         return self.relu(x+y)
+    
 class ResidualBlock(nn.Module):
     def __init__(self, in_planes, planes, norm_fn='group', stride=1):
         super(ResidualBlock, self).__init__()

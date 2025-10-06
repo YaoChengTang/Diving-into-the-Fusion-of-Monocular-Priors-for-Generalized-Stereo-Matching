@@ -5,8 +5,10 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-import frame_utils as frame_utils
-
+try:
+    import frame_utils as frame_utils
+except:
+    from core.utils import frame_utils
 
 
 def show_imgs(param, sv_img=False, save2where=None, 
