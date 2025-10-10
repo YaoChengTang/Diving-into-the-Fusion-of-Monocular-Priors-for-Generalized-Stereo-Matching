@@ -1,7 +1,7 @@
 <h1 align="center" style="border-bottom: 0;"> [ICCV25 Oral] Diving into the Fusion of Monocular Priors for Generalized Stereo Matching </h1> 
 
 <p align="center">
-  <a href="https://huggingface.co/spaces/AdamYao/Diving-into-the-Fusion-of-Monocular-Priors-for-Generalized-Stereo-Matching"><img src="https://img.shields.io/badge/HuggingFace-Demo-blue?logo=huggingface" alt="Hugging Face Demo"></a>
+  <a href="https://huggingface.co/spaces/AdamYao/Diving-into-the-Fusion-of-Monocular-Priors-for-Generalized-Stereo-Matching"><img src="https://img.shields.io/badge/HuggingFace-Data-blue?logo=huggingface" alt="Hugging Face Data"></a>
   &nbsp;
   <a href="https://arxiv.org/abs/2505.14414v2"><img src="https://img.shields.io/badge/ArXiv-Paper-red?logo=arxiv" alt="ArXiv Paper"></a>
   &nbsp;
