@@ -232,6 +232,28 @@ export PRETRAINED_ROOT="./pretrained"
 
 
 
+# python3 evaluate_stereo_raftstereo.py \
+#     --model_name "RAFTStereoDepthBetaRefine" \
+#     --dataset booster \
+#     --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" \
+#     --modulation_ratio 1.0 \
+#     --conf_from_fea \
+#     --depthany_model_dir "$PRETRAINED_ROOT" \
+#     --restore_ckpt "$PRETRAINED_ROOT/MGStereo.pth" \
+#     --test_exp_name "Booster-check-MGStereo"
+
+# python3 evaluate_stereo_raftstereo.py \
+#     --model_name "RAFTStereoDepthBetaRefine" \
+#     --dataset middlebury_H \
+#     --lbp_neighbor_offsets "(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)" \
+#     --modulation_ratio 1.0 \
+#     --conf_from_fea \
+#     --depthany_model_dir "$PRETRAINED_ROOT" \
+#     --restore_ckpt "$PRETRAINED_ROOT/MGStereo.pth" \
+#     --test_exp_name "middlebury_H-check-MGStereo"
+
+
+
 python3 evaluate_stereo_raftstereo.py \
     --model_name "RAFTStereoDepthBetaRefine" \
     --dataset booster \
@@ -239,7 +261,7 @@ python3 evaluate_stereo_raftstereo.py \
     --modulation_ratio 1.0 \
     --conf_from_fea \
     --depthany_model_dir "$PRETRAINED_ROOT" \
-    --restore_ckpt "$PRETRAINED_ROOT/MGStereo.pth" \
+    --restore_ckpt "runs/ckpoint/FSD_RAFTStereoDepthBetaRefine_F_tunerefine_20251013_033446/75000_FSD_RAFTStereoDepthBetaRefine_F_tunerefine.pth" \
     --test_exp_name "Booster-check-MGStereo"
 
 python3 evaluate_stereo_raftstereo.py \
@@ -249,7 +271,7 @@ python3 evaluate_stereo_raftstereo.py \
     --modulation_ratio 1.0 \
     --conf_from_fea \
     --depthany_model_dir "$PRETRAINED_ROOT" \
-    --restore_ckpt "$PRETRAINED_ROOT/MGStereo.pth" \
+    --restore_ckpt "runs/ckpoint/FSD_RAFTStereoDepthBetaRefine_F_tunerefine_20251013_033446/75000_FSD_RAFTStereoDepthBetaRefine_F_tunerefine.pth" \
     --test_exp_name "middlebury_H-check-MGStereo"
 
 

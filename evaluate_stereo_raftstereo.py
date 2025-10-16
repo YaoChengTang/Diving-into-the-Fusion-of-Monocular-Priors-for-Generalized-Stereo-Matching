@@ -478,6 +478,7 @@ if __name__ == '__main__':
     parser.add_argument('--restore_ckpt', help="restore checkpoint", default=None)
     parser.add_argument('--dataset', help="dataset for evaluation", required=True, choices=["eth3d", "kitti", 'kitti2012', "things", "booster"] + [f"middlebury_{s}" for s in 'FHQ'])
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
+    parser.add_argument('--mixed_precision_dtype', default='float16', choices=['float16', 'bfloat16'], help='which dtype to use for mixed precision')
     parser.add_argument('--valid_iters', type=int, default=32, help='number of flow-field updates during forward pass')
     parser.add_argument('--eval', action='store_true', help='evaluation mode')
     parser.add_argument('--silence', action='store_true', help='no output of training/eval process')

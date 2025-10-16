@@ -150,13 +150,15 @@ def train(args, logger):
     if not args.stop_freeze_bn:
         model.module.freeze_bn() # We keep BatchNorm frozen
 
-    if len(train_loader)<300:
-        validation_frequency = 300
-    elif len(train_loader)<1000:
-        validation_frequency = len(train_loader)
-    else:
-        validation_frequency = 10000
-    # validation_frequency=1
+    validation_frequency = args.validation_frequency
+    if args.validation_frequency == 0:
+        if len(train_loader)<300:
+            validation_frequency = 300
+        elif len(train_loader)<1000:
+            validation_frequency = len(train_loader)
+        else:
+            validation_frequency = 10000
+        # validation_frequency=1
 
     scaler = GradScaler(enabled=args.mixed_precision)
 
@@ -226,7 +228,7 @@ def train(args, logger):
 
 
 
-            if total_steps % validation_frequency == validation_frequency - 1:
+            if validation_frequency > 0 and total_steps % validation_frequency == validation_frequency - 1:
                 if args.local_rank==0 and int(NODE_RANK)==0:
                     save_path = os.path.join(CKPOINT_ROOT, 
                                     '%d_%s.pth' % (total_steps + 1, args.exp_name))
@@ -275,6 +277,7 @@ if __name__ == '__main__':
     parser.add_argument('--train_datasets', nargs='+', default=['sceneflow'], help="training datasets.")
     parser.add_argument('--lr', type=float, default=0.0002, help="max learning rate.")
     parser.add_argument('--num_steps', type=int, default=100000, help="length of training schedule.")
+    parser.add_argument('--validation_frequency', type=int, default=0, help="number of steps between each validation.")
     parser.add_argument('--image_size', type=int, nargs='+', default=[320, 736], help="size of the random image crops used during training.")
     parser.add_argument('--train_iters', type=int, default=16, help="number of updates to the disparity field in each forward pass.")
     parser.add_argument('--wdecay', type=float, default=.00001, help="Weight decay in optimizer.")
