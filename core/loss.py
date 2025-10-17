@@ -24,7 +24,7 @@ except:
         def __exit__(self, *args):
             pass
 
-def sequence_loss(flow_preds, flow_gt, valid, loss_gamma=0.9, max_flow=700):
+def sequence_loss(flow_preds, flow_gt, valid, loss_gamma=0.9, max_flow=700, args=None):
     """ Loss function defined over sequence of flow predictions """
 
     n_predictions = len(flow_preds)
@@ -40,6 +40,9 @@ def sequence_loss(flow_preds, flow_gt, valid, loss_gamma=0.9, max_flow=700):
     assert not torch.isinf(flow_gt[valid.bool()]).any()
 
     for i in range(n_predictions):
+        if args is not None and "tune_refine" in args.fintune_info.lower().split(" ") and i<n_predictions-1:
+            continue
+
         if not torch.isnan(flow_preds[i]).any() and not torch.isinf(flow_preds[i]).any():
             # We adjust the loss_gamma so it is consistent for any number of RAFT-Stereo iterations
             adjusted_loss_gamma = loss_gamma**(15/(n_predictions - 1))

@@ -163,9 +163,9 @@ torchrun --nnodes 1 --nproc_per_node $nproc_per_node --master_port 27501 \
     --modulation_ratio 1.0 --conf_from_fea \
     --depthany_model_dir "$PRETRAINED_ROOT" \
     --restore_ckpt "runs/ckpoint/FSD_RAFTStereoDepthBetaRefine_F_20251006_053806/FSD_RAFTStereoDepthBetaRefine_F.pth" \
-    --spatial_scale -1 0 --saturation_range 0 1.4 \
+    --spatial_scale -1 -0.5 --saturation_range 0 1.4 \
     --image_size 320 736 --noyjitter \
     --lr 0.0001 --batch_size 32 --num_steps 100000 --validation_frequency 5000\
-    --fintune_info "tune_refine" \
+    --fintune_info "tune_refine" --use_wandb \
     --train_datasets "FSD" \
     --exp_name "$EXP_NAME"

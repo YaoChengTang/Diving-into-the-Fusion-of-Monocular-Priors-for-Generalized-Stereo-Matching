@@ -247,7 +247,7 @@ class RAFTStereoDepthBetaRefine(nn.Module):
             return {"disp_predictions": disp_predictions, 
                     "depth": depth, 
                     "depth_registered": depth_registered,
-                    "depth_registered_up": -depth_registered_up,
+                    "depth_registered_up": -depth_registered_up if depth_registered_up is not None else None,
                     "conf_fusion": conf,
                     "modulation_predictions": modulation_predictions}
 

@@ -1,9 +1,13 @@
 import os
 import sys
 import time
+import random
 import shutil
 import logging
 import numpy as np
+import numpy as np
+import matplotlib.pyplot as plt
+import io
 
 from scipy import interpolate
 from datetime import datetime
@@ -11,6 +15,14 @@ from datetime import datetime
 import torch
 import torch.nn.functional as F
 
+try:
+    from .vis import Visualizer, show_imgs
+except:
+    from core.utils.vis import Visualizer, show_imgs
+
+
+import warnings
+warnings.filterwarnings("ignore", message="Clipping input data to the valid range for imshow")
 
 
 def resize_tensor(tensor, target_size=512, ratio=16):
@@ -392,6 +404,141 @@ class LoggerTraining(LoggerCommon):
                 self.writer = SummaryWriter(log_dir=TB_ROOT)
             for key in results:
                 self.writer.add_scalar(key, results[key], self.total_steps)
+    
+    def add_image(self, key, img, step=None, caption=None):
+        if self.use_wandb:
+            wandb.log({key: wandb.Image(img, caption=caption)}, step=step)
+        else:
+            if self.writer is None:
+                self.writer = SummaryWriter(log_dir=TB_ROOT)
+                
+            if isinstance(img, np.ndarray):
+                if img.ndim == 3 and img.shape[2] in [1, 3]:  # HWC -> CHW
+                    img = np.transpose(img, (2, 0, 1))
+            self.writer.add_image(key, img, step)
+
+    def add_disparity_map(self, key, disp, step=None, cmap='jet'):
+        if isinstance(disp, torch.Tensor):
+            disp = disp.detach().cpu().numpy()
+        if disp.ndim == 3:
+            disp = disp[0]
+
+        disp_min, disp_max = np.nanmin(disp), np.nanmax(disp)
+        if disp_max > disp_min:
+            disp_norm = (disp - disp_min) / (disp_max - disp_min)
+        else:
+            disp_norm = np.zeros_like(disp)
+
+        cmap_func = plt.get_cmap(cmap)
+        disp_color = (cmap_func(disp_norm)[..., :3] * 255).astype(np.uint8)  # HWC, RGB
+
+        if self.use_wandb:
+            wandb.log({key: wandb.Image(disp_color, caption=f"Disparity ({cmap})")}, step=step)
+        else:
+            if self.writer is None:
+                self.writer = SummaryWriter(log_dir=TB_ROOT)
+
+            disp_color_chw = np.transpose(disp_color, (2, 0, 1))
+            self.writer.add_image(key, disp_color_chw, step)
+    
+    def add_vis_yao(self, vis_name, vis_dict, step=None, number=3):
+        image1  = vis_dict.get("image1", None)
+        image2  = vis_dict.get("image2", None)
+        valid   = vis_dict.get("valid", None)
+        flow_gt = vis_dict.get("flow_gt", None)
+        flow_pr = vis_dict.get("flow_pr", None)
+        depth   = vis_dict.get("depth", None)
+        paths   = vis_dict.get("paths", None)
+        depth_registered = vis_dict.get("depth_registered", None)
+
+        assert paths is not None, "paths should be provided in vis_dict"
+
+        fig_vis_obj_list = []
+        # for batch_idx in range(image1.shape[0]):
+        selected_indices = random.sample(range(image1.shape[0]), number) if image1.shape[0] > number else range(image1.shape[0])
+        for batch_idx in selected_indices:
+            image1_example = image1[batch_idx].data.numpy()
+            image2_example = image2[batch_idx].data.numpy()
+            flow_gt_example = flow_gt[batch_idx].squeeze(0).data.numpy() if flow_gt is not None else None
+            flow_pr_example = flow_pr[batch_idx].squeeze(0).data.numpy() if flow_pr is not None else None
+            valid_example = valid[batch_idx].data.numpy() if valid is not None else None
+            depth_example = depth[batch_idx].squeeze(0).data.numpy() if depth is not None else None
+            depth_registered_example = depth_registered[batch_idx].data.numpy() if depth_registered is not None else None
+
+            image_path    = paths[0][batch_idx]
+            example_name  = image_path.replace(os.getenv('DATASET_ROOT', ''), '')
+
+            vmin = 0
+            flow_gt_example = np.nan_to_num(flow_gt_example, nan=0.0, posinf=0.0, neginf=0.0)
+            vmax = np.max(-flow_gt_example)
+
+            mask_binary_list, colored_mask_list = Visualizer.get_mask([valid_example], binary_thold=0.5)
+            error_map_list, colored_error_map_list = Visualizer.get_error_map([-flow_pr_example], [-flow_gt_example])
+
+            fig_data_list = [
+                {
+                    "title": f"Left Image {example_name}" , 
+                    "img": image1_example.astype(np.uint8).transpose(1,2,0), 
+                    "cmap": None
+                },
+                {
+                    "title": "Right Image", 
+                    "img": image2_example.astype(np.uint8).transpose(1,2,0), 
+                    "cmap": None
+                },
+
+                {
+                    "title": "GT Disp", 
+                    "img": -flow_gt_example, 
+                    "cmap": "jet", "vmin": vmin, "vmax": vmax
+                },
+                {
+                    "title": "Valid Mask", 
+                    "img": colored_mask_list[0].astype(np.float32), 
+                    "cmap": "gray", "vmin": 0, "vmax": 1
+                },
+
+                {
+                    "title": "Depth", 
+                    "img": depth_example.astype(np.float32) if depth_example is not None else np.zeros_like(flow_gt_example), 
+                    "cmap": "jet"
+                },
+                {
+                    "title": "Pred Disp", 
+                    "img": -flow_pr_example, 
+                    "cmap": "jet", "vmin": vmin, "vmax": vmax
+                },
+
+                {
+                    "title": "Error Map", 
+                    "img": colored_error_map_list[0], 
+                    "cmap": None
+                },
+            ]
+
+            # for fig_data in fig_data_list:
+            #     print(fig_data["title"], fig_data["img"].shape, fig_data.get("cmap", None))
+            # breakpoint()
+
+            _, H,W = image1_example.shape
+            fig_vis_obj = show_imgs(fig_data_list, 
+                                sv_img=False, save2where="", if_inter=False, 
+                                fontsize=20, szWidth=np.ceil(W/H)*5, szHeight=5, 
+                                group=4, dpi=300, return_fig=True)
+            fig_vis_obj_list.append(fig_vis_obj)
+        # print("-"*30, f"Visualization {len(fig_vis_obj_list)}", selected_indices, image1.shape[0], range(image1.shape[0]), number)
+
+        if self.use_wandb:
+            wandb.log({vis_name: [wandb.Image(img) for img in fig_vis_obj_list]}, step=step)
+        else:
+            if self.writer is None:
+                self.writer = SummaryWriter(log_dir=TB_ROOT)
+                
+            if isinstance(img, np.ndarray):
+                if img.ndim == 3 and img.shape[2] in [1, 3]:  # HWC -> CHW
+                    img = np.transpose(img, (2, 0, 1))
+            self.writer.add_image(vis_name, img, step)
+
 
     def close(self):
         if self.use_wandb:

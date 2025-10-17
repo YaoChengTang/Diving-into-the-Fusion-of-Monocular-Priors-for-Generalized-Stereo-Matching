@@ -179,7 +179,7 @@ def train(args, logger):
 
             assert model.training
             try:
-                res = model(image1, image2, iters=args.train_iters, intrinsic=intrinsic)
+                res = model(image1, image2, iters=args.train_iters, intrinsic=intrinsic, vis_mode=True)
             except Exception as err:
                 check_model_params(model, logger)
                 logger.info(f"Exception {err} in {paths[0]}, " + \
@@ -200,7 +200,7 @@ def train(args, logger):
                             f"flow_predictions: {len(flow_predictions)}, {flow_predictions[0].shape}, ")
                 continue
 
-            loss, metrics = sequence_loss(flow_predictions, flow, valid)
+            loss, metrics = sequence_loss(flow_predictions, flow, valid, args=args)
             if torch.isnan(loss) or torch.isinf(loss):
                 logger.info(f"Corrputed loss in {paths[0]}, " + \
                             f"image1: {image1.shape}, flow: {flow.shape}, valid: {valid.shape}, " + \
@@ -216,6 +216,22 @@ def train(args, logger):
                 # logger.add_scalar("live_loss", loss.item(), global_batch_num)
                 # logger.add_scalar(f'learning_rate', optimizer.param_groups[0]['lr'], global_batch_num)
             
+            if args.local_rank==0 and int(NODE_RANK)==0 and (global_batch_num % 100 == 0):
+                viz = {
+                    "image1": image1.detach().cpu(),
+                    "image2": image2.detach().cpu(),
+                    "flow_gt": flow.detach().cpu(),
+                    "flow_pr": flow_predictions[-1].detach().cpu(),
+                    "valid": valid.detach().cpu(),
+                    "depth": res.get("depth", None).detach().cpu() if res.get("depth", None) is not None else None,
+                    "depth_registered": res.get("depth_registered", None).detach().cpu() if res.get("depth_registered", None) is not None else None,
+                    "paths": paths,
+                }
+                logger.add_vis_yao('train_viz', viz, step=global_batch_num)
+                # logger.add_disparity_map('disp', -flow_predictions[-1].abs()[0], global_batch_num)
+                
+                
+
             global_batch_num += 1
             scaler.scale(loss).backward()
             # logger.info(model.module.fnet.layer1[0].weight.grad)
@@ -283,7 +299,7 @@ if __name__ == '__main__':
     parser.add_argument('--wdecay', type=float, default=.00001, help="Weight decay in optimizer.")
     parser.add_argument('--train_refine_mono', action='store_true', help='register mono without supervision on stereo')
     # parser.add_argument('--finetune', action='store_true', help='fintune model with large data')
-    parser.add_argument("--fintune_info", default="tune_refine", help="specific finetuning action")
+    parser.add_argument("--fintune_info", default="", help="specific finetuning action")
     
     # Validation parameters
     parser.add_argument('--valid_iters', type=int, default=32, help='number of flow-field updates during validation forward pass')

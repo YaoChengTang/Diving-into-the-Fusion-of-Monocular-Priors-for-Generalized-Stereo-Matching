@@ -13,7 +13,7 @@ except:
 
 def show_imgs(param, sv_img=False, save2where=None, 
               fontsize=20, szWidth=10, szHeight=5, group=3, 
-              if_inter=False, dpi=600):
+              if_inter=False, dpi=600, return_fig=False):
     """function: visualize the input data
     args:
         paras: [(img, title, colormap), ... ] or
@@ -93,7 +93,13 @@ def show_imgs(param, sv_img=False, save2where=None,
     if sv_img is True and save2where is not None :
         plt.savefig(os.path.join(save2where), dpi=dpi)
     # plt.show(block=False)
+
+    if return_fig:
+        fig_obj = plt.gcf()
+        plt.close()
+        return fig_obj
     plt.close()
+    return None
 
 
 def show_dis(param, sv_img=False, fontsize=20, szWidth=10, szHeight=5, group=3):
@@ -206,7 +212,8 @@ class Visualizer:
             return "0px_list"
         return px_keys[0]
 
-    def get_error_map(self, pr_list, gt_list, stop_idx=-1):
+    @staticmethod
+    def get_error_map(pr_list, gt_list, stop_idx=-1):
         error_map_list = []
         colored_error_map_list = []
         for idx in np.arange( len(pr_list) ):
@@ -224,7 +231,8 @@ class Visualizer:
         
         return error_map_list, colored_error_map_list
     
-    def get_imp_map(self, error_map_list, stop_idx=-1):
+    @staticmethod
+    def get_imp_map(error_map_list, stop_idx=-1):
         imp_map_list = []
         colored_imp_map_list = []
         for idx in np.arange( len(error_map_list) ):
@@ -239,7 +247,8 @@ class Visualizer:
             colored_imp_map_list.append(colored_imp_map)
         return imp_map_list, colored_imp_map_list
 
-    def get_movement_map(self, pr_list, stop_idx=-1):
+    @staticmethod
+    def get_movement_map(pr_list, stop_idx=-1):
         move_map_list = []
         colored_move_map_list = []
         for idx in range(0, len(pr_list)):
@@ -254,7 +263,8 @@ class Visualizer:
             colored_move_map_list.append(colored_move_map)
         return move_map_list, colored_move_map_list
 
-    def get_acceleration_map(self, move_map_list, stop_idx=-1):
+    @staticmethod
+    def get_acceleration_map(move_map_list, stop_idx=-1):
         # get the difference between movement vector
         colored_acc_map_list =[]
         for idx in range(0, len(move_map_list)):
@@ -268,7 +278,8 @@ class Visualizer:
             colored_acc_map_list.append(colored_acc_map)
         return colored_acc_map_list
 
-    def get_mask(self, mask_list, binary_thold, stop_idx=-1):
+    @staticmethod
+    def get_mask(mask_list, binary_thold, stop_idx=-1):
         colored_mask_list = []
         mask_binary_list = []
         for idx in range(0, len(mask_list)):
@@ -282,9 +293,9 @@ class Visualizer:
             mask_binary = mask_list[idx] < binary_thold
             mask_binary_list.append(mask_binary)
         
-        return colored_mask_list, mask_binary_list
+        return mask_binary_list, colored_mask_list
 
-    def analyze(self, dict_list, imageGT_file, in_one_fig=False, group=2):
+    def analyze(self, dict_list, imageGT_file, in_one_fig=False, group=2, return_fig=False):
         """
             dict_list:
                 [{"name": "disp",
@@ -313,6 +324,7 @@ class Visualizer:
         os.makedirs(sv_dir, exist_ok=True)
 
         fig_data_list = []
+        fig_vis_obj_list = []
         for vis_dict in dict_list :
             vis_name = vis_dict.get("name", None)
             assert vis_name is not None, "missing 'name' in vis_dict"
@@ -359,7 +371,7 @@ class Visualizer:
 
             # get the colorized mask and binary mask
             if mask_req :
-                colored_mask_list, mask_binary_list = self.get_mask(img_list, binary_thold, stop_idx)
+                mask_binary_list, colored_mask_list = self.get_mask(img_list, binary_thold, stop_idx)
 
             cnt = 0
             for idx in np.arange( len(img_list) ) :
@@ -428,17 +440,21 @@ class Visualizer:
                 H,W = img_list[0].shape
                 pre,lat = os.path.splitext(sv_path)
                 tmp_sv_path = pre + f"-sequence-{vis_name}" + lat
-                show_imgs(fig_data_list, 
-                        sv_img=True, save2where=tmp_sv_path, if_inter=False, 
-                        fontsize=20, szWidth=np.ceil(W/H)*5, szHeight=5, 
-                        group=tmp_group, dpi=300)
+                fig_vis_obj = show_imgs(fig_data_list, 
+                                    sv_img=True, save2where=tmp_sv_path, if_inter=False, 
+                                    fontsize=20, szWidth=np.ceil(W/H)*5, szHeight=5, 
+                                    group=tmp_group, dpi=300, return_fig=return_fig)
+                fig_vis_obj_list.append(fig_vis_obj)
                 fig_data_list = []
 
         if in_one_fig:
-            show_imgs(fig_data_list, 
-                    sv_img=True, save2where=sv_path, if_inter=False, 
-                    fontsize=20, szWidth=10, szHeight=5, group=group, dpi=300)
-        
+            fig_vis_obj = show_imgs(fig_data_list, 
+                            sv_img=True, save2where=sv_path, if_inter=False, 
+                            fontsize=20, szWidth=10, szHeight=5, group=group, dpi=300, return_fig=return_fig)
+            fig_vis_obj_list.append(fig_vis_obj)
+
+        if return_fig:
+            return fig_vis_obj_list
 
 def colorize_error_map(error_map, ver_hor="hor"):
     # Define a custom colormap for errors within 10 (shades of red)
