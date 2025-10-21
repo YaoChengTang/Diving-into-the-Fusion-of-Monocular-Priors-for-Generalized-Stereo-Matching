@@ -533,11 +533,28 @@ class LoggerTraining(LoggerCommon):
         else:
             if self.writer is None:
                 self.writer = SummaryWriter(log_dir=TB_ROOT)
+
+            imgs = []
+            for fig in fig_vis_obj_list:
+                # 将 matplotlib Figure 转为 numpy 图像
+                fig.canvas.draw()
+                img = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+                img = img.reshape(fig.canvas.get_width_height()[::-1] + (3,))  # HWC
                 
-            if isinstance(img, np.ndarray):
-                if img.ndim == 3 and img.shape[2] in [1, 3]:  # HWC -> CHW
-                    img = np.transpose(img, (2, 0, 1))
-            self.writer.add_image(vis_name, img, step)
+                # 转成 CHW
+                img = np.transpose(img, (2, 0, 1))
+                imgs.append(img)
+
+                plt.close(fig)  # 释放内存，防止过多figure积累
+
+            # 保证形状一致 (H, W)
+            min_h = min(im.shape[1] for im in imgs)
+            min_w = min(im.shape[2] for im in imgs)
+            imgs = [im[:, :min_h, :min_w] for im in imgs]  # 裁剪到相同大小
+
+            imgs = np.stack(imgs, axis=0)  # (N, C, H, W)
+
+            self.writer.add_images(vis_name, imgs, step)
 
 
     def close(self):
