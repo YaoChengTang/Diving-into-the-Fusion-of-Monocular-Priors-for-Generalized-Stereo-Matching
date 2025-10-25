@@ -50,8 +50,16 @@ def setup_distributed(args):
     args.rank = int(os.getenv("RANK"))
     args.local_rank = int(os.getenv("LOCAL_RANK"))
     args.world_size = int(os.getenv("WORLD_SIZE"))
-    # print("-"*10, "local_rank: {}, world_size:{}".format(args.local_rank, args.world_size),
-    #      " - {}, {}".format(dist.get_rank(), dist.get_world_size()))  # they result in the same value
+    master_ip = os.getenv("MASTER_ADDR", default=None)
+    master_port = os.getenv("MASTER_PORT", default=None)
+    print("-"*10, f"local_rank: {args.local_rank}, world_size:{args.world_size}",
+          f"rank: {args.rank}, master_ip: {master_ip}, master_port: {master_port}")  # they result in the same value
+    # if master_ip is not None and master_port is not None:
+    #     master_uri = "tcp://%s:%s" % (master_ip, master_port)
+    #     dist.init_process_group(backend='nccl', init_method=master_uri, 
+    #                             world_size=args.world_size, rank=args.rank)
+    # else:
+    #     dist.init_process_group(backend='nccl')
     dist.init_process_group(backend='nccl')
     torch.cuda.set_device(args.local_rank)
     torch.set_printoptions(precision=10)

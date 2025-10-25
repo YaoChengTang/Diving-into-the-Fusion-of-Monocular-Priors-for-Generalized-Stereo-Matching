@@ -155,6 +155,22 @@ export CUDA_LAUNCH_BLOCKING=1
 #     --train_datasets "FSD" --use_wandb \
 #     --exp_name "$EXP_NAME"
 
+# torchrun --nnodes 1 --nproc_per_node $nproc_per_node --master_port 27501 \
+#     train_stereo_raftstereo.py \
+#     --model_name "RAFTStereoDepthBetaRefine" \
+#     --train_iters 22 --valid_iters 32 --n_downsample 2 \
+#     --lbp_neighbor_offsets '(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)' \
+#     --modulation_ratio 1.0 --conf_from_fea \
+#     --depthany_model_dir "$PRETRAINED_ROOT" \
+#     --restore_ckpt "runs/ckpoint/FSD_RAFTStereoDepthBetaRefine_F_20251006_053806/FSD_RAFTStereoDepthBetaRefine_F.pth" \
+#     --spatial_scale -1 -0.5 --saturation_range 0 1.4 \
+#     --image_size 320 736 --noyjitter \
+#     --lr 0.0001 --batch_size 32 --num_steps 100000 --validation_frequency 5000\
+#     --fintune_info "tune_refine" --use_wandb \
+#     --train_datasets "FSD" \
+#     --exp_name "$EXP_NAME"
+
+
 torchrun --nnodes 1 --nproc_per_node $nproc_per_node --master_port 27501 \
     train_stereo_raftstereo.py \
     --model_name "RAFTStereoDepthBetaRefine" \
@@ -162,10 +178,11 @@ torchrun --nnodes 1 --nproc_per_node $nproc_per_node --master_port 27501 \
     --lbp_neighbor_offsets '(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)' \
     --modulation_ratio 1.0 --conf_from_fea \
     --depthany_model_dir "$PRETRAINED_ROOT" \
-    --restore_ckpt "runs/ckpoint/FSD_RAFTStereoDepthBetaRefine_F_20251006_053806/FSD_RAFTStereoDepthBetaRefine_F.pth" \
+    --restore_ckpt "runs/ckpoint/FSD_RAFTStereoDepthBetaRefine_F_tuneraft_scale05_20251017_065422/FSD_RAFTStereoDepthBetaRefine_F_tuneraft_scale05.pth" \
     --spatial_scale -1 -0.5 --saturation_range 0 1.4 \
     --image_size 320 736 --noyjitter \
-    --lr 0.0001 --batch_size 32 --num_steps 100000 --validation_frequency 5000\
-    --fintune_info "tune_refine" --use_wandb \
+    --lr 0.0001 --batch_size 64 --num_workers 16 \
+    --num_steps 100000 --validation_frequency 5000 \
+    --fintune_info "tune_refine" \
     --train_datasets "FSD" \
     --exp_name "$EXP_NAME"
