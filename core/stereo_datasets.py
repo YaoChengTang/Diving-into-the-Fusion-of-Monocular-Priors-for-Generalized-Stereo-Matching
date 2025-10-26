@@ -14,6 +14,7 @@ import random
 from pathlib import Path
 from glob import glob
 import os.path as osp
+from tqdm import tqdm
 
 import matplotlib.pyplot as plt
 import argparse
@@ -33,6 +34,7 @@ except:
 
 
 DATASET_ROOT = os.getenv('DATASET_ROOT')
+LOCAL_RANK   = os.getenv("LOCAL_RANK", default=0)
 
 
 
@@ -476,7 +478,161 @@ class FSDDataset(StereoDataset):
             logging.info(f"Eval FSD, only use 2000 samples for quick validation")
             self.image_list = self.image_list[:2000]
             self.disparity_list = self.disparity_list[:2000]
-    
+
+
+
+class InfStereoDataset(StereoDataset):
+    """Dataset class for InfinigenStereo (flying / indoor / nature)
+    Each scene has the following structure:
+        frames/
+            ├── Image/
+            │   ├── camera_0/Image_..._0.png  ← left view
+            │   └── camera_1/Image_..._1.png  ← right view
+            ├── disparity/
+            │   └── camera_0/Image_..._0.npy  ← disparity map
+            └── camview/
+                └── camera_0/camview_..._0.npz ← camera intrinsics & extrinsics
+    """
+
+    def __init__(self, aug_params=None, root='datasets/InfinigenStereo/release_full',
+                 image_set='training', args=None, eval=False, caching=True):
+        super(InfStereoDataset, self).__init__(
+            aug_params, sparse=False, reader=frame_utils.readDispInfStereo, args=args
+        )
+
+        self.root = root
+        self.eval = eval
+        self.caching = caching
+
+        assert os.path.exists(self.root), f"[InfStereoDataset] Root path not found: {self.root}"
+
+        cache_file = os.path.join(self.root, "InfStereo_cache.npz")
+
+        # Load cache if available
+        if self.caching and os.path.exists(cache_file):
+            logging.info(f"[InfStereoDataset] Loading cache from {cache_file}")
+            cache = np.load(cache_file, allow_pickle=True)
+            image1_list = list(cache["image1_list"])
+            image2_list = list(cache["image2_list"])
+            disp_list = list(cache["disp_list"])
+            cam_list = list(cache["cam_list"])
+        else:
+            logging.info(f"[InfStereoDataset] Scanning dataset under {self.root}")
+            image1_list, image2_list, disp_list, cam_list = self._scan_dataset()
+
+            if self.caching:
+                np.savez(cache_file,
+                         image1_list=image1_list,
+                         image2_list=image2_list,
+                         disp_list=disp_list,
+                         cam_list=cam_list)
+                logging.info(f"[InfStereoDataset] Cached {len(image1_list)} samples to {cache_file}")
+
+        # Register all samples
+        for img1, img2, disp, cam_param in zip(image1_list, image2_list, disp_list, cam_list):
+            self.image_list += [[img1, img2]]
+            self.disparity_list += [disp]
+            self.extra_info["cam"] += [cam_param["K"][0,0], cam_param["K"][1,1], 
+                                       cam_param["K"][0,2], cam_param["K"][1,2], ]
+
+        if eval:
+            logging.info("[InfStereoDataset] Eval mode: using only first 2000 samples")
+            self.image_list = self.image_list[:2000]
+            self.disparity_list = self.disparity_list[:2000]
+            self.extra_info["cam"] = self.extra_info["cam"][:2000]
+
+        logging.info(f"[InfStereoDataset] Loaded {len(self.image_list)} stereo pairs from {self.root}")
+
+
+    def _right_name_from_left(self, left_png_name: str) -> str:
+        """Convert left image filename to right image filename
+        Example: 'Image_0_0_0048_0.png' → 'Image_0_0_0048_1.png'
+        """
+        m = re.match(r"(.*)_(\d+)\.png$", left_png_name)
+        if not m:
+            return left_png_name  # fallback: unchanged
+        prefix, view_id = m.groups()
+        return f"{prefix}_1.png"
+
+    def _disp_name_from_left(self, left_png_name: str) -> str:
+        """Convert left image name to disparity file name
+        Example: 'Image_0_0_0048_0.png' → 'Image_0_0_0048_0.npy'
+        """
+        return left_png_name.replace(".png", ".npy")
+
+    def _cam_name_from_left(self, left_png_name: str) -> str:
+        """Convert left image name to camera parameter file name
+        Example: 'Image_0_0_0048_0.png' → 'camview_0_0_0048_0.npz'
+        """
+        stem = left_png_name[:-4]  # remove .png
+        if stem.startswith("Image"):
+            stem = "camview" + stem[len("Image"):]
+        return stem + ".npz"
+
+    def _read_cam_npz(self, path: str) -> dict:
+        """Read a camera parameter npz file and return {K, T, HW} dict"""
+        try:
+            data = np.load(path)
+            return dict(
+                K=data.get('K', None),
+                T=data.get('T', None),
+                HW=data.get('HW', None)
+            )
+        except Exception as e:
+            logging.warning(f"[InfStereoDataset] Failed to read {path}: {e}")
+            return dict(K=None, T=None, HW=None)
+
+    def _scan_dataset(self):
+        """Recursively scan all scenes and build stereo/disparity/camera lists"""
+        image1_list, image2_list, disp_list, cam_list = [], [], [], []
+        categories = ["flying", "indoor", "nature"]
+        show_progress = (LOCAL_RANK == 0)
+
+        for cat in categories:
+            cat_dir = os.path.join(self.root, cat)
+            if not os.path.isdir(cat_dir):
+                continue
+            
+            # Prepare list of scenes
+            scenes = os.listdir(cat_dir)
+            iterator = tqdm(scenes, desc=f"Scanning {cat}", ncols=100) if show_progress else scenes
+
+            for scene in iterator:
+                frames_dir = os.path.join(cat_dir, scene, "frames")
+                if not os.path.isdir(frames_dir):
+                    continue
+
+                left_dir  = os.path.join(frames_dir, "Image", "camera_0")
+                right_dir = os.path.join(frames_dir, "Image", "camera_1")
+                disp_dir  = os.path.join(frames_dir, "disparity", "camera_0")
+                cam_dir   = os.path.join(frames_dir, "camview", "camera_0")
+
+                if not (os.path.isdir(left_dir) and os.path.isdir(right_dir)
+                        and os.path.isdir(disp_dir) and os.path.isdir(cam_dir)):
+                    continue
+
+                for left_path in sorted(glob(os.path.join(left_dir, "*.png"))):
+                    left_name = os.path.basename(left_path)
+
+                    right_name = self._right_name_from_left(left_name)
+                    right_path = os.path.join(right_dir, right_name)
+
+                    disp_name = self._disp_name_from_left(left_name)
+                    disp_path = os.path.join(disp_dir, disp_name)
+
+                    cam_name = self._cam_name_from_left(left_name)
+                    cam_path = os.path.join(cam_dir, cam_name)
+
+                    if not (os.path.exists(right_path) and os.path.exists(disp_path) and os.path.exists(cam_path)):
+                        continue
+
+                    image1_list.append(left_path)
+                    image2_list.append(right_path)
+                    disp_list.append(disp_path)
+                    cam_list.append(self._read_cam_npz(cam_path))
+
+        return image1_list, image2_list, disp_list, cam_list
+
 
 
 class Trans(StereoDataset):
@@ -728,6 +884,9 @@ def fetch_dataloader(args):
         elif dataset_name.lower() == 'fsd':
             new_dataset = FSDDataset(aug_params, args=args, txt_root='./datasets/FSD/')
             logging.info(f"Adding {len(new_dataset)} samples from FSDDataset")
+        elif dataset_name.lower() == 'infstereo':
+            new_dataset = InfStereoDataset(aug_params, args=args, root='./datasets/InfinigenStereo/release_full', caching=True)
+            logging.info(f"Adding {len(new_dataset)} samples from InfStereoDataset")
         elif dataset_name.lower() == 'trans':
             new_dataset = Trans(aug_params, args=args)
             logging.info(f"Adding {len(new_dataset)} samples from Trans")
@@ -761,7 +920,7 @@ def _tensor_to_image(tensor: torch.Tensor) -> np.ndarray:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="FSDDataset sample visualizer")
+    parser = argparse.ArgumentParser(description="Dataset sample visualizer")
     parser.add_argument("--root", default="datasets/FSD", help="Dataset root directory")
     parser.add_argument("--txt-root", default='./datasets/FSD/', help="Optional cached file-list root")
     parser.add_argument("--index", type=int, default=0, help="Sample index to visualize")
@@ -792,9 +951,10 @@ def main():
     if hasattr(args, "do_flip") and args.do_flip is not None:
         aug_params["do_flip"] = args.do_flip
 
-    dataset = FSDDataset(aug_params=aug_params, root=args.root, txt_root=args.txt_root)
+    # dataset = FSDDataset(aug_params=aug_params, root=args.root, txt_root=args.txt_root)
+    dataset = InfStereoDataset(aug_params=aug_params)
     if len(dataset) == 0:
-        raise RuntimeError("FSDDataset contains no samples")
+        raise RuntimeError("Dataset contains no samples")
 
     idx = max(0, min(args.index, len(dataset) - 1))
     metadata, left, right, flow, valid, _ = dataset[idx]

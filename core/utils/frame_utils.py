@@ -247,6 +247,31 @@ def writeDispFSD(file_name, disp, scale=1000):
     img = np.stack([r, g, b], axis=-1)
     cv2.imwrite(file_name, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
 
+
+def readDispInfStereo(file_name):
+    disp = np.load(file_name)
+    valid = disp > 0.0
+
+    sky_mask_path = (
+        file_name
+        .replace("/disparity/", "/sky_mask/")
+        .replace("disparity_", "skymask_")
+        .replace(".npy", ".png")
+    )
+
+    if os.path.exists(sky_mask_path):
+        sky_mask = imageio.imread(sky_mask_path)
+        if sky_mask.ndim == 3:
+            # Convert RGB or RGBA to grayscale / single channel
+            sky_mask = sky_mask[..., 0]
+        valid = valid & (sky_mask == 0)
+
+    return disp, valid
+
+def writeDispInfStereo(file_name, disp):
+    writePFM(file_name, disp)
+
+
 def read_gen(file_name, pil=False):
     ext = splitext(file_name)[-1]
     if ext == '.png' or ext == '.jpeg' or ext == '.ppm' or ext == '.jpg':
