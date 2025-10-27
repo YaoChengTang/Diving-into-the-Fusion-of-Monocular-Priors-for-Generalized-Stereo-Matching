@@ -15,6 +15,7 @@ from pathlib import Path
 from glob import glob
 import os.path as osp
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor
 
 import matplotlib.pyplot as plt
 import argparse
@@ -529,6 +530,7 @@ class InfStereoDataset(StereoDataset):
                 logging.info(f"[InfStereoDataset] Cached {len(image1_list)} samples to {cache_file}")
 
         # Register all samples
+        self.extra_info["cam"] = []
         for img1, img2, disp, cam_param in zip(image1_list, image2_list, disp_list, cam_list):
             self.image_list += [[img1, img2]]
             self.disparity_list += [disp]
@@ -558,7 +560,7 @@ class InfStereoDataset(StereoDataset):
         """Convert left image name to disparity file name
         Example: 'Image_0_0_0048_0.png' → 'Image_0_0_0048_0.npy'
         """
-        return left_png_name.replace(".png", ".npy")
+        return left_png_name.replace("Image_", "disparity_").replace(".png", ".npy")
 
     def _cam_name_from_left(self, left_png_name: str) -> str:
         """Convert left image name to camera parameter file name
@@ -583,55 +585,63 @@ class InfStereoDataset(StereoDataset):
             return dict(K=None, T=None, HW=None)
 
     def _scan_dataset(self):
-        """Recursively scan all scenes and build stereo/disparity/camera lists"""
+        """Fast recursive scan with parallel I/O and scandir"""
         image1_list, image2_list, disp_list, cam_list = [], [], [], []
         categories = ["flying", "indoor", "nature"]
         show_progress = (LOCAL_RANK == 0)
 
+        def process_scene(cat_dir, scene):
+            frames_dir = cat_dir / scene / "frames"
+            if not frames_dir.is_dir():
+                return [], [], [], []
+
+            left_dir  = frames_dir / "Image" / "camera_0"
+            right_dir = frames_dir / "Image" / "camera_1"
+            disp_dir  = frames_dir / "disparity" / "camera_0"
+            cam_dir   = frames_dir / "camview" / "camera_0"
+
+            if not (left_dir.is_dir() and right_dir.is_dir() and disp_dir.is_dir() and cam_dir.is_dir()):
+                return [], [], [], []
+
+            img1, img2, disp, cam = [], [], [], []
+            for left_path in sorted(left_dir.glob("*.png")):
+                left_name = left_path.name
+                right_path = right_dir / self._right_name_from_left(left_name)
+                disp_path = disp_dir / self._disp_name_from_left(left_name)
+                cam_path = cam_dir / self._cam_name_from_left(left_name)
+                if not (right_path.exists() and disp_path.exists() and cam_path.exists()):
+                    missing = []
+                    if not right_path.exists():
+                        missing.append("right")
+                    if not disp_path.exists():
+                        missing.append("disp")
+                    if not cam_path.exists():
+                        missing.append("cam")
+                    tqdm.write(f"[WARN] Missing {', '.join(missing)} for {left_path}")
+                    continue
+                img1.append(str(left_path))
+                img2.append(str(right_path))
+                disp.append(str(disp_path))
+                cam.append(self._read_cam_npz(str(cam_path)))
+            return img1, img2, disp, cam
+
         for cat in categories:
-            cat_dir = os.path.join(self.root, cat)
-            if not os.path.isdir(cat_dir):
+            cat_dir = Path(self.root) / cat
+            if not cat_dir.is_dir():
                 continue
-            
-            # Prepare list of scenes
-            scenes = os.listdir(cat_dir)
+
+            scenes = [p.name for p in cat_dir.iterdir() if p.is_dir()]
             iterator = tqdm(scenes, desc=f"Scanning {cat}", ncols=100) if show_progress else scenes
 
-            for scene in iterator:
-                frames_dir = os.path.join(cat_dir, scene, "frames")
-                if not os.path.isdir(frames_dir):
-                    continue
-
-                left_dir  = os.path.join(frames_dir, "Image", "camera_0")
-                right_dir = os.path.join(frames_dir, "Image", "camera_1")
-                disp_dir  = os.path.join(frames_dir, "disparity", "camera_0")
-                cam_dir   = os.path.join(frames_dir, "camview", "camera_0")
-
-                if not (os.path.isdir(left_dir) and os.path.isdir(right_dir)
-                        and os.path.isdir(disp_dir) and os.path.isdir(cam_dir)):
-                    continue
-
-                for left_path in sorted(glob(os.path.join(left_dir, "*.png"))):
-                    left_name = os.path.basename(left_path)
-
-                    right_name = self._right_name_from_left(left_name)
-                    right_path = os.path.join(right_dir, right_name)
-
-                    disp_name = self._disp_name_from_left(left_name)
-                    disp_path = os.path.join(disp_dir, disp_name)
-
-                    cam_name = self._cam_name_from_left(left_name)
-                    cam_path = os.path.join(cam_dir, cam_name)
-
-                    if not (os.path.exists(right_path) and os.path.exists(disp_path) and os.path.exists(cam_path)):
-                        continue
-
-                    image1_list.append(left_path)
-                    image2_list.append(right_path)
-                    disp_list.append(disp_path)
-                    cam_list.append(self._read_cam_npz(cam_path))
+            with ThreadPoolExecutor(max_workers=8) as ex:
+                for img1, img2, disp, cam in ex.map(lambda s: process_scene(cat_dir, s), iterator):
+                    image1_list += img1
+                    image2_list += img2
+                    disp_list += disp
+                    cam_list += cam
 
         return image1_list, image2_list, disp_list, cam_list
+
 
 
 
