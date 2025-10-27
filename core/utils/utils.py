@@ -220,7 +220,7 @@ LOG_ROOT     = os.getenv('LOG_ROOT', default="logs")
 TB_ROOT      = os.getenv('TB_ROOT', default="runs")
 
 class LoggerCommon:
-    def __init__(self, name, log_root='', local_rank=0, node_rank=0):
+    def __init__(self, name, log_root='', local_rank=-1, node_rank=-1):
         """
         Initialize a logger.
         
@@ -232,8 +232,8 @@ class LoggerCommon:
         """
         self.name = name
         self.log_root = log_root if log_root else LOG_ROOT
-        self.local_rank = int(local_rank)
-        self.node_rank = int(node_rank)
+        self.local_rank = int(local_rank) if local_rank >=0 else int(LOCAL_RANK)
+        self.node_rank = int(node_rank) if node_rank >=0 else int(NODE_RANK)
         self.log_name = f"{self.name}-{datetime.now().strftime('%y%m%d_%H%M%S')}.log"
         self.log_path = os.path.join(self.log_root, self.log_name)
         self.logger = logging.getLogger(name)
