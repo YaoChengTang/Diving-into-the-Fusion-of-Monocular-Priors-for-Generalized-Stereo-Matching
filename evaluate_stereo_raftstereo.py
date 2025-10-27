@@ -40,6 +40,59 @@ logger = LoggerCommon("EVAL")
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
+
+@torch.no_grad()
+def validate_drivingstereo(model, iters=32, root="", mixed_prec=False, subset='weather'):
+    """ Peform validation using the drivingstereo dataset """
+    model.eval()
+    aug_params = {}
+    val_dataset = datasets.DrivingStereo(aug_params, root=root, image_set=subset)
+    torch.backends.cudnn.benchmark = True
+
+    out_list, epe_list, elapsed_list = [], [], []
+    for val_id in tqdm(range(len(val_dataset))):
+        _, image1, image2, flow_gt, valid_gt, _ = val_dataset[val_id]
+        image1 = image1[None].cuda()
+        image2 = image2[None].cuda()
+        padder = InputPadder(image1.shape, divis_by=32)
+        image1, image2 = padder.pad(image1, image2)
+
+        with autocast(enabled=mixed_prec):
+            start = time.time()
+            _, flow_pr = model(image1, image2, iters=iters, test_mode=True)
+            end = time.time()
+
+        if val_id > 50:
+            elapsed_list.append(end-start)
+        flow_pr = padder.unpad(flow_pr).cpu().squeeze(0)
+
+        assert flow_pr.shape == flow_gt.shape, (flow_pr.shape, flow_gt.shape)
+        epe = torch.sum((flow_pr - flow_gt)**2, dim=0).sqrt()
+
+        epe_flattened = epe.flatten()
+        val = valid_gt.flatten() >= 0.5
+
+        out = (epe_flattened > 3.0)
+        image_out = out[val].float().mean().item()
+        image_epe = epe_flattened[val].mean().item()
+        # if val_id < 9 or (val_id+1)%10 == 0:
+            # print(f"DrivingStereo Iter {val_id+1} out of {len(val_dataset)}. EPE {round(image_epe,4)} D1 {round(image_out,4)}. Runtime: {format(end-start, '.3f')}s ({format(1/(end-start), '.2f')}-FPS)")
+        epe_list.append(epe_flattened[val].mean().item())
+        out_list.append(out[val].cpu().numpy())
+
+    epe_list = np.array(epe_list)
+    out_list = np.concatenate(out_list)
+
+    epe = np.mean(epe_list)
+    d1 = 100 * np.mean(out_list)
+
+    avg_runtime = np.mean(elapsed_list)
+
+    print(f"Validation DrivingStereo/{subset}: EPE {round(epe,4)}, D1 {round(d1,4)}, FPS {format(1/avg_runtime, '.2f')}, Time ({format(avg_runtime, '.3f')}s)")
+    print("\r\n"*3)
+    return {'DrivingStereo-epe': round(epe,4), 'DrivingStereo-d1': round(d1,4)}
+
+
 import torch.nn.functional as F
 @torch.no_grad()
 def validate_booster(model, iters=32, root="", mixed_prec=False):
@@ -476,7 +529,7 @@ if __name__ == '__main__':
     parser.add_argument('--mast3r_model_path', default='MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth', help="pretrained model path for MaSt3R")
     parser.add_argument('--depthany_model_dir', default='/data5/yao/pretrained', help="directory of pretrained model path for DepthAnything")
     parser.add_argument('--restore_ckpt', help="restore checkpoint", default=None)
-    parser.add_argument('--dataset', help="dataset for evaluation", required=True, choices=["eth3d", "kitti", 'kitti2012', "things", "booster"] + [f"middlebury_{s}" for s in 'FHQ'])
+    parser.add_argument('--dataset', help="dataset for evaluation", required=True, choices=["eth3d", "kitti", 'kitti2012', "things", "booster","drivingstereo_weather"] + [f"middlebury_{s}" for s in 'FHQ'])
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--mixed_precision_dtype', default='float16', choices=['float16', 'bfloat16'], help='which dtype to use for mixed precision')
     parser.add_argument('--valid_iters', type=int, default=32, help='number of flow-field updates during forward pass')
@@ -599,7 +652,15 @@ if __name__ == '__main__':
             args.root = "./datasets/Booster"
         res = validate_booster(model, iters=args.valid_iters, root=args.root, 
                                mixed_prec=use_mixed_precision)
-    
+    elif 'drivingstereo' in args.dataset:
+        subset = args.dataset.split('_')[-1]
+        # if args.root is None:
+        if subset == 'weather':
+            for s in ['foggy', 'rainy', 'cloudy', 'sunny']:
+                print(f"######## Validating DrivingStereo {s} ########")
+                res = validate_drivingstereo(model, iters=args.valid_iters, root=args.root, 
+                                            mixed_prec=use_mixed_precision, subset=subset+'/'+s)
+                print(f"##############################################\n")
     
     # write results into excel
     res["Model"] = args.test_exp_name + " - " + os.path.basename(args.restore_ckpt)

@@ -624,7 +624,19 @@ class Fooling3DBatchSampler(data.Sampler):
             total_batches += len(frames_info) // self.batch_size + (1 if len(frames_info) % self.batch_size != 0 else 0)
         return total_batches
 
+class DrivingStereo(StereoDataset):
+    def __init__(self, aug_params=None, root='datasets/DrivingStereo', image_set='training', image_size='half'):
+        super(DrivingStereo, self).__init__(aug_params, sparse=True, reader=frame_utils.readDispDrivingStereoFull if image_size=='full' else frame_utils.readDispDrivingStereoHalf)
+        root = root if len(root)>0 else DATASET_ROOT
+        assert os.path.exists(root), "check the existence: {}".format(root)
 
+        image1_list = sorted(glob(os.path.join(root, image_set, f'left-image-{image_size}-size/*')))
+        image2_list = sorted(glob(os.path.join(root, image_set, f'right-image-{image_size}-size/*')))
+        disp_list = sorted(glob(os.path.join(root, image_set, f'disparity-map-{image_size}-size/*')))
+        print(f"image1_list: {len(image1_list)}")
+        for idx, (img1, img2, disp) in enumerate(zip(image1_list, image2_list, disp_list)):
+            self.image_list += [ [img1, img2] ]
+            self.disparity_list += [ disp ]
 
 class DistributedFooling3DBatchSampler(DistributedSampler):
     def __init__(self, dataset, batch_size, num_replicas=None, rank=None):

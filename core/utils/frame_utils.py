@@ -10,7 +10,15 @@ cv2.setNumThreads(0)
 cv2.ocl.setUseOpenCL(False)
 
 TAG_CHAR = np.array([202021.25], np.float32)
+def readDispDrivingStereoFull(filename):
+    disp = cv2.imread(filename, cv2.IMREAD_ANYDEPTH) / 128.0
+    valid = disp > 0.0
+    return disp, valid
 
+def readDispDrivingStereoHalf(filename):
+    disp = cv2.imread(filename, cv2.IMREAD_ANYDEPTH) / 256.0
+    valid = disp > 0.0
+    return disp, valid
 def readFlow(fn):
     """ Read .flo file in Middlebury format"""
     # Code adapted from:
