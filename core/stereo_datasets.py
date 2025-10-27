@@ -511,14 +511,16 @@ class InfStereoDataset(StereoDataset):
 
         # Load cache if available
         if self.caching and os.path.exists(cache_file):
-            logging.info(f"[InfStereoDataset] Loading cache from {cache_file}")
+            if LOCAL_RANK==0:
+                logging.info(f"[InfStereoDataset] Loading cache from {cache_file}")
             cache = np.load(cache_file, allow_pickle=True)
             image1_list = list(cache["image1_list"])
             image2_list = list(cache["image2_list"])
             disp_list = list(cache["disp_list"])
             cam_list = list(cache["cam_list"])
         else:
-            logging.info(f"[InfStereoDataset] Scanning dataset under {self.root}")
+            if LOCAL_RANK==0:
+                logging.info(f"[InfStereoDataset] Scanning dataset under {self.root}")
             image1_list, image2_list, disp_list, cam_list = self._scan_dataset()
 
             if self.caching:
@@ -527,7 +529,8 @@ class InfStereoDataset(StereoDataset):
                          image2_list=image2_list,
                          disp_list=disp_list,
                          cam_list=cam_list)
-                logging.info(f"[InfStereoDataset] Cached {len(image1_list)} samples to {cache_file}")
+                if LOCAL_RANK==0:
+                    logging.info(f"[InfStereoDataset] Cached {len(image1_list)} samples to {cache_file}")
 
         # Register all samples
         self.extra_info["cam"] = []
@@ -538,12 +541,14 @@ class InfStereoDataset(StereoDataset):
                                        cam_param["K"][0,2], cam_param["K"][1,2], ]
 
         if eval:
-            logging.info("[InfStereoDataset] Eval mode: using only first 2000 samples")
+            if LOCAL_RANK==0:
+                logging.info("[InfStereoDataset] Eval mode: using only first 2000 samples")
             self.image_list = self.image_list[:2000]
             self.disparity_list = self.disparity_list[:2000]
             self.extra_info["cam"] = self.extra_info["cam"][:2000]
 
-        logging.info(f"[InfStereoDataset] Loaded {len(self.image_list)} stereo pairs from {self.root}")
+        if LOCAL_RANK==0:
+            logging.info(f"[InfStereoDataset] Loaded {len(self.image_list)} stereo pairs from {self.root}")
 
 
     def _right_name_from_left(self, left_png_name: str) -> str:
