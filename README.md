@@ -24,6 +24,30 @@ conda env create -n MGStereo -f envs/environment_new.yaml
 conda activate MGStereo
 ```
 
+> 💡 **Note:**  
+> If you encounter issues installing PyTorch (e.g., missing CUDA support, MKL errors, or version conflicts),  
+> or if you want to use the latest PyTorch and related modules, you can manually update them as follows:
+
+```bash
+conda activate MGStereo
+
+# Check current Torch installation and CUDA availability
+python -c "import torch; print(torch.__version__); print('CUDA available:', torch.cuda.is_available())"
+
+# (Optional) Update to a newer PyTorch version (for CUDA 12.6)
+pip install torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu126
+
+# (Optional) Install or update additional dependencies
+# Make sure that the versions of PyTorch, TorchVision, and xFormers are consistent.
+pip install xformers==0.0.32.post2
+
+# (Optional) MKL error
+conda install -f mkl mkl-service intel-openmp
+
+# (Optional) missing openpyxl
+conda install openpyxl
+```
+
 ### 2. Prepare Paths
 Create symbolic links for the running data, pretrained models, and datasets:
 ```Shell
