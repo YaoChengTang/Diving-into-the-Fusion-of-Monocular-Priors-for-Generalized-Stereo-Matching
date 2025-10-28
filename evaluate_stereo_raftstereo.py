@@ -317,6 +317,8 @@ def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=
         val_dataset = datasets.SceneFlowDatasets(dstype='frames_finalpass', root=root, things_test=True, eval=True)
     elif dataset.lower() == "fsd":
         val_dataset = datasets.FSDDataset(root=root, args=args, txt_root='./datasets/FSD/', eval=True)
+    elif dataset.lower() == "infstereo":
+        val_dataset = datasets.InfStereoDataset(root=root, eval=True, caching=True)
     elif dataset.lower() == "trans":
         val_dataset = datasets.Trans(root=root, things_test=True)
     else:
