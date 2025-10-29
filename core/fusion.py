@@ -10,7 +10,7 @@ from torch.distributions import Beta
 
 from core.extractor import ResidualBlock
 from core.confidence import EfficientUNetSimple
-from core.utils.utils import sv_intermediate_results
+from core.utils.utils import sv_intermediate_results, tile_expand
 
 
 
@@ -163,6 +163,126 @@ class RefinementMonStereo(nn.Module):
 
         mono_params = self.mono_params_estimate( torch.cat([disp, depth], dim=1) )
         a, b = torch.split(mono_params, 1, dim=1)
+        depth_registered = depth * a + b
+        
+        disp = disp * conf_normed + (1-conf_normed) * depth_registered
+
+        up_mask= self.mask( torch.cat([hidden, disp], dim=1) )
+
+        if self.args is not None and hasattr(self.args, "vis_inter") and self.args.vis_inter:
+            sv_intermediate_results(disp, f"disp_refine", self.args.sv_root)
+            sv_intermediate_results(depth_registered, f"depth_registered", self.args.sv_root)
+            sv_intermediate_results(conf_normed, f"conf", self.args.sv_root)
+            sv_intermediate_results(a, f"a", self.args.sv_root)
+            sv_intermediate_results(b, f"b", self.args.sv_root)
+        
+        return disp, up_mask, depth_registered, conf
+
+
+
+class ShiftRefinement(nn.Module):
+    def __init__(self, args, norm_fn='batch', hidden_dim=32):
+        super(ShiftRefinement, self).__init__()
+        self.args = args
+
+        self.shift_global_up = nn.Conv2d(5, 64, kernel_size=1, padding=0, bias=True)
+        self.ctx_fea_down    = nn.Conv2d(hidden_dim, 64, kernel_size=3, padding=1, bias=True)
+        self.opt_estimate    = nn.Sequential(
+            nn.Conv2d(128, 64, 3, padding=1),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(64, 16, 3, padding=1),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(16, 2, 1, padding=0),
+        )
+        
+        factor = 2**self.args.n_downsample
+        self.mask = nn.Sequential(
+            nn.Conv2d(hidden_dim+1, 256, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, (factor**2)*9, 1, padding=0))
+        
+    def forward(self, shift, ctx_fea):
+        B, C, H, W = shift.shape
+
+        # ----- Multi-scale global average pooling -----
+        shift_global1  = F.adaptive_avg_pool2d(shift,  (1, 1))
+        shift_global2  = F.adaptive_avg_pool2d(shift,  (2, 2))
+        shift_global4  = F.adaptive_avg_pool2d(shift,  (4, 4))
+        shift_global8  = F.adaptive_avg_pool2d(shift,  (8, 8))
+        shift_global16 = F.adaptive_avg_pool2d(shift, (16,16))
+
+        # ----- Block replication to match full resolution -----
+        shift_global1  = tile_expand(shift_global1,  H // 1,  W // 1)
+        shift_global2  = tile_expand(shift_global2,  H // 2,  W // 2)
+        shift_global4  = tile_expand(shift_global4,  H // 4,  W // 4)
+        shift_global8  = tile_expand(shift_global8,  H // 8,  W // 8)
+        shift_global16 = tile_expand(shift_global16, H //16,  W //16)
+
+        # ----- Estimate refined shift and fusion weight -----
+        shift_global   = torch.cat([shift_global1, shift_global2, shift_global4, shift_global8, shift_global16], dim=1)
+        opt_paras      = self.opt_estimate(torch.cat([
+                            self.shift_global_up(shift_global), 
+                            self.ctx_fea_down(ctx_fea)], dim=1)
+                        )
+        shift_candidate, weight = torch.split(opt_paras, 1, dim=1)[0]
+        weight = torch.tanh(weight) * 0.5 + 0.5
+
+        # ----- Weighted fusion -----
+        shift_opt = shift * (1 - weight) + shift_candidate * weight
+        return shift_opt
+
+
+class RefinementMonStereoGlobal(nn.Module):
+    def __init__(self, args, norm_fn='batch', hidden_dim=32):
+        super(RefinementMonStereoGlobal, self).__init__()
+        self.args = args
+
+        corr_channel = self.args.corr_levels * (self.args.corr_radius*2 + 1)
+        if not args.conf_from_fea:
+            conf_in_dim = corr_channel
+        else:
+            conf_in_dim = corr_channel + hidden_dim + 2
+        self.conf_estimate = nn.Sequential(
+            nn.Conv2d(conf_in_dim, 128, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(128, 128, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(128, 1, 1, padding=0),)
+        self.norm_conf = nn.Sigmoid()
+        
+        if self.args.refine_unet:
+            self.mono_params_estimate = EfficientUNetSimple(num_classes=2)
+        else:
+            self.mono_params_estimate = nn.Sequential(
+                nn.Conv2d(2, 32, 3, padding=1),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(32, 32, 3, padding=1),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(32, 2, 1, padding=0))
+        if self.args.refine_pool:
+            self.mono_params_estimate.add_module("global_avg_pool", nn.AdaptiveAvgPool2d((1, 1)))
+
+        self.shift_refinement = ShiftRefinement(args, norm_fn=norm_fn, hidden_dim=hidden_dim)
+
+        factor = 2**self.args.n_downsample
+        self.mask = nn.Sequential(
+            nn.Conv2d(hidden_dim+1, 256, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, (factor**2)*9, 1, padding=0))
+        
+    def forward(self, disp, depth, hidden, cost_volume, Beta_distribution=None, ctx_fea=None):
+        if not self.args.conf_from_fea:
+            conf = self.conf_estimate(cost_volume)
+        else:
+            conf = self.conf_estimate( torch.cat([cost_volume,hidden,Beta_distribution.mean,Beta_distribution.variance], dim=1) )
+        conf_normed = self.norm_conf(conf)
+
+        mono_params = self.mono_params_estimate( torch.cat([disp, depth], dim=1) )
+        a, b = torch.split(mono_params, 1, dim=1)
+
+        # refine shift (b)
+        b = self.shift_refinement(b, ctx_fea)
+
         depth_registered = depth * a + b
         
         disp = disp * conf_normed + (1-conf_normed) * depth_registered

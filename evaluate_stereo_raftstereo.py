@@ -23,6 +23,7 @@ from core.raft_stereo_depthbeta import RAFTStereoDepthBeta
 from core.raft_stereo_depthbeta_nolbp import RAFTStereoDepthBetaNoLBP
 from core.raft_stereo_depthmatch import RAFTStereoDepthMatch
 from core.raft_stereo_depthbeta_refine import RAFTStereoDepthBetaRefine
+from core.raft_stereo_depthbeta_refine_global import RAFTStereoDepthBetaRefineGlobal
 from core.raft_stereo_depth_postfusion import RAFTStereoDepthPostFusion
 from core.raft_stereo_metric3d import RAFTStereoMetric3D
 
@@ -534,6 +535,8 @@ if __name__ == '__main__':
         model = RAFTStereoDepthMatch(args)
     elif args.model_name.lower() == "RAFTStereoDepthBetaRefine".lower():
         model = RAFTStereoDepthBetaRefine(args)
+    elif args.model_name.lower() == "RAFTStereoDepthBetaRefineGlobal".lower():
+        model = RAFTStereoDepthBetaRefineGlobal(args)
     elif args.model_name.lower() == "RAFTStereoDepthPostFusion".lower():
         model = RAFTStereoDepthPostFusion(args)
     elif args.model_name.lower() == "RAFTStereoMetric3D".lower():

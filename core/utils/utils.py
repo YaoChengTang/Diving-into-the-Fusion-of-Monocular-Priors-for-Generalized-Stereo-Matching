@@ -58,6 +58,26 @@ def resize_to_quarter(tensor, original_size, ratio):
     return resized_tensor
 
 
+def tile_expand(x, factor_h: int, factor_w: int):
+    """
+    Efficiently expands a low-resolution feature map to a higher resolution
+    by *replicating* (not interpolating) each cell value into a spatial block.
+
+    Args:
+        x: Tensor of shape [B, C, h, w]
+        factor_h: vertical upscaling factor
+        factor_w: horizontal upscaling factor
+
+    Returns:
+        Tensor of shape [B, C, h * factor_h, w * factor_w]
+    """
+    B, C, h, w = x.shape
+    # Insert singleton dimensions and replicate along height and width
+    x = x.unsqueeze(3).unsqueeze(5)                   # [B, C, h, 1, w, 1]
+    x = x.repeat(1, 1, 1, factor_h, 1, factor_w)      # broadcast each cell
+    return x.view(B, C, h * factor_h, w * factor_w)   # reshape to expanded map
+    
+
 class InputPadder:
     """ Pads images such that dimensions are divisible by 8 """
     def __init__(self, dims, mode='sintel', divis_by=8):

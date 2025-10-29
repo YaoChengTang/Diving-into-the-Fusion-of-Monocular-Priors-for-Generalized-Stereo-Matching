@@ -209,3 +209,76 @@ torchrun --nnodes 1 --nproc_per_node $nproc_per_node --master_port 27501 \
     --fintune_info "tune_raft" \
     --train_datasets "InfStereo" \
     --exp_name "$EXP_NAME"
+
+
+torchrun --nnodes 1 --nproc_per_node $nproc_per_node --master_port 27501 \
+    train_stereo_raftstereo.py \
+    --model_name "RAFTStereoDepthBetaRefineGlobal" \
+    --train_iters 22 --valid_iters 32 --n_downsample 2 \
+    --lbp_neighbor_offsets '(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)' \
+    --modulation_ratio 1.0 --conf_from_fea \
+    --depthany_model_dir "$PRETRAINED_ROOT" \
+    --restore_ckpt "runs/ckpoint/InfStereo_RAFTStereoDepthBetaRefine_tuneraft_20251028_040343/50000_InfStereo_RAFTStereoDepthBetaRefine_tuneraft.pth" \
+    --spatial_scale -1 -0.5 --saturation_range 0 1.4 \
+    --image_size 320 736 --noyjitter \
+    --lr 0.0001 --batch_size 16 --num_workers 16 \
+    --num_steps 100000 --validation_frequency 5000 \
+    --mixed_precision --mixed_precision_dtype "float16" \
+    --fintune_info "tune_refine" \
+    --train_datasets "InfStereo" \
+    --exp_name "$EXP_NAME"
+
+
+# --------- tuning register along with raft arch ---------
+torchrun --nnodes 1 --nproc_per_node $nproc_per_node --master_port 27501 \
+    train_stereo_raftstereo.py \
+    --model_name "RAFTStereoDepthBetaRefineGlobal" \
+    --train_iters 22 --valid_iters 32 --n_downsample 2 \
+    --lbp_neighbor_offsets '(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)' \
+    --modulation_ratio 1.0 --conf_from_fea \
+    --depthany_model_dir "$PRETRAINED_ROOT" \
+    --restore_ckpt "runs/ckpoint/InfStereo_RAFTStereoDepthBetaRefine_tuneraft_20251028_040343/50000_InfStereo_RAFTStereoDepthBetaRefine_tuneraft.pth" \
+    --spatial_scale -1 -0.5 --saturation_range 0 1.4 \
+    --image_size 320 736 --noyjitter \
+    --lr 0.0001 --batch_size 16 --num_workers 16 \
+    --num_steps 100000 --validation_frequency 5000 \
+    --mixed_precision --mixed_precision_dtype "float16" \
+    --train_refine_mono \
+    --train_datasets "InfStereo" \
+    --exp_name "$EXP_NAME"
+
+# --------- tuning register (same function with tune_refine + train_refine_mono) ---------
+torchrun --nnodes 1 --nproc_per_node $nproc_per_node --master_port 27501 \
+    train_stereo_raftstereo.py \
+    --model_name "RAFTStereoDepthBetaRefineGlobal" \
+    --train_iters 22 --valid_iters 32 --n_downsample 2 \
+    --lbp_neighbor_offsets '(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)' \
+    --modulation_ratio 1.0 --conf_from_fea \
+    --depthany_model_dir "$PRETRAINED_ROOT" \
+    --restore_ckpt "runs/ckpoint/InfStereo_RAFTStereoDepthBetaRefine_tuneraft_20251028_040343/50000_InfStereo_RAFTStereoDepthBetaRefine_tuneraft.pth" \
+    --spatial_scale -1 -0.5 --saturation_range 0 1.4 \
+    --image_size 320 736 --noyjitter \
+    --lr 0.0001 --batch_size 16 --num_workers 16 \
+    --num_steps 100000 --validation_frequency 5000 \
+    --mixed_precision --mixed_precision_dtype "float16" \
+    --fintune_info "tune_register" \
+    --train_datasets "InfStereo" \
+    --exp_name "$EXP_NAME"
+
+# --------- tuning shift refinement in register ---------
+torchrun --nnodes 1 --nproc_per_node $nproc_per_node --master_port 27501 \
+    train_stereo_raftstereo.py \
+    --model_name "RAFTStereoDepthBetaRefineGlobal" \
+    --train_iters 22 --valid_iters 32 --n_downsample 2 \
+    --lbp_neighbor_offsets '(-5,-5), (5,5), (5,-5), (-5,5), (-3,0), (3,0), (0,-3), (0,3)' \
+    --modulation_ratio 1.0 --conf_from_fea \
+    --depthany_model_dir "$PRETRAINED_ROOT" \
+    --restore_ckpt "runs/ckpoint/InfStereo_RAFTStereoDepthBetaRefine_tuneraft_20251028_040343/50000_InfStereo_RAFTStereoDepthBetaRefine_tuneraft.pth" \
+    --spatial_scale -1 -0.5 --saturation_range 0 1.4 \
+    --image_size 320 736 --noyjitter \
+    --lr 0.0001 --batch_size 16 --num_workers 16 \
+    --num_steps 100000 --validation_frequency 5000 \
+    --mixed_precision --mixed_precision_dtype "float16" \
+    --fintune_info "tune_register_shift_refine" \
+    --train_datasets "InfStereo" \
+    --exp_name "$EXP_NAME"
