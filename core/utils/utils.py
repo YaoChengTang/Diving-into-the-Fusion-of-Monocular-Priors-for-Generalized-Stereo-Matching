@@ -558,8 +558,13 @@ class LoggerTraining(LoggerCommon):
             for fig in fig_vis_obj_list:
                 # 将 matplotlib Figure 转为 numpy 图像
                 fig.canvas.draw()
-                img = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-                img = img.reshape(fig.canvas.get_width_height()[::-1] + (3,))  # HWC
+                try:
+                    # Matplotlib>3.8
+                    img = np.asarray(fig.canvas.buffer_rgba())[..., :3]
+                except AttributeError:
+                    # Matplotlib<3.8
+                    img = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+                    img = img.reshape(fig.canvas.get_width_height()[::-1] + (3,))
                 
                 # 转成 CHW
                 img = np.transpose(img, (2, 0, 1))
