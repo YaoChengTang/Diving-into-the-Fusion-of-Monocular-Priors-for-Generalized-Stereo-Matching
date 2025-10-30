@@ -396,17 +396,21 @@ class LoggerTraining(LoggerCommon):
 
         # Reset
         self.running_loss = {}
+        return metrics_data
 
     def push(self, metrics):
         self.total_steps += 1
 
+        metrics_data = None
         for key in metrics:
             if key not in self.running_loss:
                 self.running_loss[key] = 0.0
             self.running_loss[key] += metrics[key]
 
         if self.total_steps % LoggerTraining.SUM_FREQ == LoggerTraining.SUM_FREQ - 1:
-            self._print_training_status()
+            metrics_data = self._print_training_status()
+
+        return metrics_data
     
     def add_scalar(self, key, value, step=None):
         if self.use_wandb:

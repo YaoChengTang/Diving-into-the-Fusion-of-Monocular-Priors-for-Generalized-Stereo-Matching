@@ -212,9 +212,11 @@ def train(args, logger):
             if args.local_rank==0 and int(NODE_RANK)==0:
                 metrics['loss'] = loss.item()
                 metrics['lr'] = optimizer.param_groups[0]['lr']
-                logger.push(metrics)
-                # logger.add_scalar("live_loss", loss.item(), global_batch_num)
-                # logger.add_scalar(f'learning_rate', optimizer.param_groups[0]['lr'], global_batch_num)
+                metrics_data = logger.push(metrics)
+                
+                if total_steps>10000 and metrics_data is not None:
+                    if metrics_data["epe"] > 0.1:
+                        logger.info(f"Large EPE with paths: {paths[0]}")
             
             if args.local_rank==0 and int(NODE_RANK)==0 and (global_batch_num % 100 == 0):
                 viz = {
