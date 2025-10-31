@@ -219,7 +219,9 @@ class RAFTStereoDepthBetaRefine(nn.Module):
                 sv_intermediate_results(disp_up, f"disp_up-itr{itr+1}", self.args.sv_root)
 
         conf, depth_registered_up, depth_registered = None, None, None
-        if not hasattr(self.args, "fintune_info") or "tune_refine" in self.args.fintune_info.lower().split(" ") :
+        if not hasattr(self.args, "fintune_info") or \
+           "tune_refine" in self.args.fintune_info.lower().split(" ") or \
+           (hasattr(self.args, 'train_refine_mono') and self.args.train_refine_mono):
             # refinement
             corr = corr_fn(hor_coords1)
             disp = -hor_coords1 + hor_coords0
@@ -230,6 +232,8 @@ class RAFTStereoDepthBetaRefine(nn.Module):
             disp_predictions.append(depth_registered_up)
             if not hasattr(self.args, 'train_refine_mono') or not self.args.train_refine_mono:
                 disp_predictions.append(disp_up)
+            if hasattr(self.args, 'train_refine_mono') and self.args.train_refine_mono:
+                disp_up = depth_registered_up
 
             if hasattr(self.args, "vis_inter") and self.args.vis_inter:
                 sv_intermediate_results(disp_up, f"disp_refine_up", self.args.sv_root)

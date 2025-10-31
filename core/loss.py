@@ -40,7 +40,9 @@ def sequence_loss(flow_preds, flow_gt, valid, loss_gamma=0.9, max_flow=700, args
     assert not torch.isinf(flow_gt[valid.bool()]).any()
 
     for i in range(n_predictions):
-        if args is not None and "tune_refine" in args.fintune_info.lower().split(" ") and i<n_predictions-1:
+        if args is not None and hasattr(args, "fintune_info") and  \
+           "tune_refine" in args.fintune_info.lower().split(" ") and \
+           i < n_predictions - 1:
             continue
 
         if not torch.isnan(flow_preds[i]).any() and not torch.isinf(flow_preds[i]).any():
