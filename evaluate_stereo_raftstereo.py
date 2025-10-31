@@ -310,7 +310,7 @@ def validate_kitti2012(model, iters=32, root="", mixed_prec=False):
     return {'kitti-epe': round(epe,4), 'kitti-d1': round(d1,4)}
 
 @torch.no_grad()
-def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=False, dataset="sceneflow", info="", txt_root=""):
+def validate_things(model, iters=32, root='', mixed_prec=False, args=None, eval=False, dataset="sceneflow", info="eval", txt_root=""):
     """ Peform validation using the FlyingThings3D (TEST) split """
     eval = args.eval if args is not None else eval
     model.eval()

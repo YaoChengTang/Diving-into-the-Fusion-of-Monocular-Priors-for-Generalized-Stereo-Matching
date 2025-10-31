@@ -254,7 +254,9 @@ def train(args, logger):
                     torch.save(model.state_dict(), save_path)
 
                 # results = validate_things(model.module, iters=args.valid_iters, root="./datasets/sceneflow")
-                results = validate_things(model.module, iters=args.valid_iters, root=DATASET_ROOT, dataset=args.train_datasets[0])
+                results = validate_things(model.module, iters=args.valid_iters, \
+                                          root=DATASET_ROOT, dataset=args.train_datasets[0], \
+                                          info=f"{args.train_datasets[0]}-eval")
                 if args.local_rank==0 and int(NODE_RANK)==0:
                     logger.write_dict(results)
 
